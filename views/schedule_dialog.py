@@ -1307,8 +1307,20 @@ class ScheduleCreateDialog(QDialog):
             return "custom_real"
         elif self.test_method_custom_accel.isChecked():
             return "custom_acceleration"
-        return ""    
-    
+        return ""
+
+    def get_storage_condition(self):
+        """현재 선택된 보관 조건 반환"""
+        if self.storage_room_temp.isChecked():
+            return "room_temp"
+        elif self.storage_warm.isChecked():
+            return "warm"
+        elif self.storage_cool.isChecked():
+            return "cool"
+        elif self.storage_freeze.isChecked():
+            return "freeze"
+        return ""
+
     def clear_custom_temp_inputs(self):
         """모든 온도 입력 필드를 제거합니다."""
         try:
