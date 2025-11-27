@@ -123,7 +123,14 @@ class FeeTab(QWidget):
                 price_item = QTableWidgetItem(f"{int(fee['price']):,}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.fee_table.setItem(row, 3, price_item)
-                self.fee_table.setItem(row, 4, QTableWidgetItem(fee['description'] or ""))
+                # 검체 수량 표시
+                try:
+                    sample_qty = fee['sample_quantity'] or 0
+                except (KeyError, IndexError):
+                    sample_qty = 0
+                sample_qty_item = QTableWidgetItem(str(sample_qty))
+                sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.fee_table.setItem(row, 4, sample_qty_item)
                 
                 # 정렬순서 설정 - 기존 데이터에 없을 경우 기본값 사용
                 # sqlite3.Row 객체는 get() 메서드가 없으므로 다른 방식으로 접근

@@ -473,6 +473,10 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(2)
 
+        # 열 균등 배분
+        for col in range(6):
+            grid.setColumnStretch(col, 1)
+
         label_style = "font-weight: bold; background-color: #ecf0f1; padding: 4px; border: 1px solid #bdc3c7; font-size: 13px;"
         value_style = "background-color: white; padding: 4px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 13px;"
 
@@ -680,8 +684,9 @@ class ScheduleManagementTab(QWidget):
 
         layout.addLayout(btn_layout)
 
-        # 추가된 항목 저장용 리스트
+        # 추가/삭제된 항목 저장용 리스트
         self.additional_test_items = []
+        self.removed_base_items = []
 
         # 비용 요약
         self.create_cost_summary(layout)
@@ -759,8 +764,9 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
-            # 추가 항목 초기화
+            # 추가/삭제 항목 초기화
             self.additional_test_items = []
+            self.removed_base_items = []
             client_name = schedule.get('client_name', '-') or '-'
             product_name = schedule.get('product_name', '-') or '-'
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
@@ -884,21 +890,29 @@ class ScheduleManagementTab(QWidget):
 
         food_type_id = schedule.get('food_type_id')
         if not food_type_id:
-            return default_items
+            base_items = default_items
+        else:
+            try:
+                food_type = ProductType.get_by_id(food_type_id)
+                if food_type:
+                    test_items_str = food_type.get('test_items', '') or ''
+                    if test_items_str:
+                        # 쉼표로 구분된 문자열을 리스트로 변환
+                        items = [item.strip() for item in test_items_str.split(',') if item.strip()]
+                        if items:
+                            base_items = items
+                        else:
+                            base_items = default_items
+                    else:
+                        base_items = default_items
+                else:
+                    base_items = default_items
+            except Exception as e:
+                print(f"식품유형에서 검사항목 로드 오류: {e}")
+                base_items = default_items
 
-        try:
-            food_type = ProductType.get_by_id(food_type_id)
-            if food_type:
-                test_items_str = food_type.get('test_items', '') or ''
-                if test_items_str:
-                    # 쉼표로 구분된 문자열을 리스트로 변환
-                    items = [item.strip() for item in test_items_str.split(',') if item.strip()]
-                    if items:
-                        return items
-        except Exception as e:
-            print(f"식품유형에서 검사항목 로드 오류: {e}")
-
-        return default_items
+        # 삭제된 기본 항목 제외
+        return [item for item in base_items if item not in self.removed_base_items]
 
     def update_temperature_panel(self, schedule):
         """온도 구간 패널 업데이트"""
@@ -1313,19 +1327,28 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.warning(self, "삭제 실패", "먼저 스케줄을 선택하세요.")
             return
 
-        if not self.additional_test_items:
-            QMessageBox.warning(self, "삭제 실패", "추가로 삭제할 수 있는 항목이 없습니다.\n(기본 항목은 삭제할 수 없습니다)")
+        # 현재 표시된 모든 항목 수집 (기본 + 추가)
+        base_items = self.get_test_items_from_food_type(self.current_schedule)
+        all_current_items = base_items + self.additional_test_items
+
+        if not all_current_items:
+            QMessageBox.warning(self, "삭제 실패", "삭제할 항목이 없습니다.")
             return
 
-        # 추가된 항목 중에서 선택하여 삭제
+        # 모든 항목 중에서 선택하여 삭제
         from PyQt5.QtWidgets import QInputDialog
         item, ok = QInputDialog.getItem(
             self, "항목 삭제", "삭제할 항목을 선택하세요:",
-            self.additional_test_items, 0, False
+            all_current_items, 0, False
         )
 
         if ok and item:
-            self.additional_test_items.remove(item)
+            if item in self.additional_test_items:
+                # 추가된 항목 삭제
+                self.additional_test_items.remove(item)
+            else:
+                # 기본 항목 삭제 (removed_base_items에 추가)
+                self.removed_base_items.append(item)
 
             # 테이블 새로고침
             self.update_experiment_schedule(self.current_schedule)
