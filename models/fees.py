@@ -1,5 +1,6 @@
 # models/fees.py
 from database import get_connection
+import os
 
 class Fee:
     @staticmethod
@@ -128,22 +129,103 @@ class Fee:
         """검사 항목 목록의 총 수수료 계산"""
         if not test_items:
             return 0
-            
+
         # 쉼표로 구분된 문자열을 목록으로 변환
         if isinstance(test_items, str):
             items_list = [item.strip() for item in test_items.split(',')]
         else:
             items_list = test_items
-            
+
         conn = get_connection()
         cursor = conn.cursor()
-        
+
         total_price = 0
         for item in items_list:
             cursor.execute("SELECT price FROM fees WHERE test_item = ?", (item,))
             fee = cursor.fetchone()
             if fee:
                 total_price += fee['price']
-        
+
         conn.close()
         return total_price
+
+    @staticmethod
+    def import_from_excel(file_path):
+        """Excel 파일에서 수수료 데이터 가져오기 (기존 데이터 삭제 후)"""
+        try:
+            import openpyxl
+
+            if not os.path.exists(file_path):
+                return False, f"파일이 존재하지 않습니다: {file_path}"
+
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb.active
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 기존 데이터 삭제
+            cursor.execute("DELETE FROM fees")
+
+            # display_order 열 확인 및 추가
+            cursor.execute("PRAGMA table_info(fees)")
+            columns = [column[1] for column in cursor.fetchall()]
+
+            if "display_order" not in columns:
+                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+            if "sample_quantity" not in columns:
+                cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+
+            # Excel 데이터 삽입 (첫 번째 행은 헤더이므로 2번째 행부터)
+            # 열: 정렬순서, 식품 카테고리, 검사항목, 가격, 검체 수량(g)
+            inserted_count = 0
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                display_order, food_category, test_item, price, sample_qty = row
+
+                # 빈 행 스킵
+                if not test_item:
+                    continue
+
+                # None 값 처리
+                display_order = display_order if display_order is not None else 100
+                food_category = food_category if food_category else ""
+                price = price if price is not None else 0
+
+                # sample_quantity 처리 (숫자가 아닌 경우 0으로 설정)
+                if sample_qty is None:
+                    sample_qty = 0
+                elif isinstance(sample_qty, str):
+                    # 숫자만 추출 시도
+                    try:
+                        sample_qty = int(''.join(filter(str.isdigit, sample_qty.split('\n')[0][:10])))
+                    except:
+                        sample_qty = 0
+                else:
+                    try:
+                        sample_qty = int(sample_qty)
+                    except:
+                        sample_qty = 0
+
+                cursor.execute("""
+                    INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (test_item, food_category, price, "", display_order, sample_qty))
+                inserted_count += 1
+
+            conn.commit()
+            conn.close()
+
+            return True, f"{inserted_count}개의 수수료 데이터가 성공적으로 가져와졌습니다."
+        except Exception as e:
+            return False, f"가져오기 오류: {str(e)}"
+
+    @staticmethod
+    def delete_all():
+        """모든 수수료 데이터 삭제"""
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM fees")
+        conn.commit()
+        deleted_count = cursor.rowcount
+        conn.close()
+        return deleted_count

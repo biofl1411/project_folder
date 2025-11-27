@@ -19,6 +19,7 @@ from datetime import datetime
 
 from models.schedules import Schedule
 from models.fees import Fee
+from models.product_types import ProductType
 
 
 class DisplaySettingsDialog(QDialog):
@@ -174,6 +175,105 @@ class DisplaySettingsDialog(QDialog):
     def get_visible_fields(self):
         """현재 체크된 필드 목록 반환"""
         return [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+
+
+class TestItemSelectDialog(QDialog):
+    """검사항목 선택 다이얼로그"""
+
+    def __init__(self, parent=None, exclude_items=None):
+        super().__init__(parent)
+        self.selected_item = None
+        self.exclude_items = exclude_items or []
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("검사항목 선택")
+        self.setMinimumSize(500, 400)
+
+        layout = QVBoxLayout(self)
+
+        # 검색
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("검색:"))
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("검사항목 검색...")
+        self.search_input.textChanged.connect(self.filter_items)
+        search_layout.addWidget(self.search_input)
+        layout.addLayout(search_layout)
+
+        # 검사항목 목록 테이블
+        self.item_table = QTableWidget()
+        self.item_table.setColumnCount(4)
+        self.item_table.setHorizontalHeaderLabels(["검사항목", "카테고리", "가격", "검체량(g)"])
+
+        header = self.item_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+
+        self.item_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.item_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.item_table.doubleClicked.connect(self.accept)
+        layout.addWidget(self.item_table)
+
+        # 버튼
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+        self.load_items()
+
+    def load_items(self):
+        """수수료 목록에서 검사항목 로드"""
+        try:
+            all_fees = Fee.get_all()
+            self.all_items = []
+
+            for fee in all_fees:
+                test_item = fee['test_item']
+                # 이미 추가된 항목은 제외
+                if test_item not in self.exclude_items:
+                    self.all_items.append({
+                        'test_item': test_item,
+                        'food_category': fee['food_category'] or '',
+                        'price': fee['price'] or 0,
+                        'sample_quantity': fee['sample_quantity'] or 0
+                    })
+
+            self.display_items(self.all_items)
+        except Exception as e:
+            print(f"검사항목 로드 오류: {e}")
+
+    def display_items(self, items):
+        """테이블에 항목 표시"""
+        self.item_table.setRowCount(0)
+        for row, item in enumerate(items):
+            self.item_table.insertRow(row)
+            self.item_table.setItem(row, 0, QTableWidgetItem(item['test_item']))
+            self.item_table.setItem(row, 1, QTableWidgetItem(item['food_category']))
+            price_item = QTableWidgetItem(f"{int(item['price']):,}원")
+            price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.item_table.setItem(row, 2, price_item)
+            qty_item = QTableWidgetItem(f"{item['sample_quantity']}g")
+            qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.item_table.setItem(row, 3, qty_item)
+
+    def filter_items(self, text):
+        """검색 필터"""
+        if not text:
+            self.display_items(self.all_items)
+        else:
+            filtered = [item for item in self.all_items if text.lower() in item['test_item'].lower()]
+            self.display_items(filtered)
+
+    def accept(self):
+        selected = self.item_table.selectedIndexes()
+        if selected:
+            row = selected[0].row()
+            self.selected_item = self.item_table.item(row, 0).text()
+        super().accept()
 
 
 class ScheduleSelectDialog(QDialog):
@@ -457,8 +557,14 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.packaging_value, 5, 3)
         self.required_sample_label = self._create_label("필요검체량", label_style)
         grid.addWidget(self.required_sample_label, 5, 4)
-        self.required_sample_value = self._create_value_label("-", value_style)
+        # 필요 검체량 - 수정 가능한 입력 필드
+        self.required_sample_value = QLineEdit("-")
+        self.required_sample_value.setStyleSheet(value_style + " color: #e67e22; font-weight: bold;")
+        self.required_sample_value.setAlignment(Qt.AlignCenter)
+        self.required_sample_value.setMinimumWidth(60)
+        self.required_sample_value.setPlaceholderText("개수 입력")
         grid.addWidget(self.required_sample_value, 5, 5)
+        self.current_required_sample = 0  # 계산된 필요 검체량 저장
 
         parent_layout.addWidget(group)
 
@@ -558,6 +664,25 @@ class ScheduleManagementTab(QWidget):
         self.experiment_table.cellClicked.connect(self.on_experiment_cell_clicked)
         layout.addWidget(self.experiment_table)
 
+        # 항목 추가/삭제 버튼
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        self.add_item_btn = QPushButton("+ 항목 추가")
+        self.add_item_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 5px 15px; font-weight: bold;")
+        self.add_item_btn.clicked.connect(self.add_test_item)
+        btn_layout.addWidget(self.add_item_btn)
+
+        self.remove_item_btn = QPushButton("- 항목 삭제")
+        self.remove_item_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px 15px; font-weight: bold;")
+        self.remove_item_btn.clicked.connect(self.remove_test_item)
+        btn_layout.addWidget(self.remove_item_btn)
+
+        layout.addLayout(btn_layout)
+
+        # 추가된 항목 저장용 리스트
+        self.additional_test_items = []
+
         # 비용 요약
         self.create_cost_summary(layout)
 
@@ -634,6 +759,8 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
+            # 추가 항목 초기화
+            self.additional_test_items = []
             client_name = schedule.get('client_name', '-') or '-'
             product_name = schedule.get('product_name', '-') or '-'
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
@@ -696,7 +823,16 @@ class ScheduleManagementTab(QWidget):
         self.extension_value.setText("진행" if schedule.get('extension_test') else "미진행")
 
         sampling_count = schedule.get('sampling_count', 6) or 6
-        self.sampling_count_value.setText(f"{sampling_count}회")
+
+        # 온도 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 샘플링 횟수 × 온도 구간 수
+        total_sampling = sampling_count * zone_count
+        self.sampling_count_value.setText(f"{total_sampling}회 ({sampling_count}×{zone_count}구간)")
 
         if experiment_days > 0 and sampling_count > 0:
             interval = experiment_days // sampling_count
@@ -742,6 +878,28 @@ class ScheduleManagementTab(QWidget):
 
         self.update_temperature_panel(schedule)
 
+    def get_test_items_from_food_type(self, schedule):
+        """식품유형에서 검사항목 가져오기"""
+        default_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        food_type_id = schedule.get('food_type_id')
+        if not food_type_id:
+            return default_items
+
+        try:
+            food_type = ProductType.get_by_id(food_type_id)
+            if food_type:
+                test_items_str = food_type.get('test_items', '') or ''
+                if test_items_str:
+                    # 쉼표로 구분된 문자열을 리스트로 변환
+                    items = [item.strip() for item in test_items_str.split(',') if item.strip()]
+                    if items:
+                        return items
+        except Exception as e:
+            print(f"식품유형에서 검사항목 로드 오류: {e}")
+
+        return default_items
+
     def update_temperature_panel(self, schedule):
         """온도 구간 패널 업데이트"""
         test_method = schedule.get('test_method', '') or ''
@@ -775,21 +933,33 @@ class ScheduleManagementTab(QWidget):
                 self.temp_zone2_value.setText(temps[1])
                 self.temp_zone3_value.setText(temps[2])
 
-    def update_sample_info(self, schedule, sampling_count):
+    def update_sample_info(self, schedule, sampling_count, zone_count=None):
         """검체량 정보 업데이트"""
         try:
-            test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+            import math
 
-            # 수수료 정보에서 sample_quantity 가져오기
+            # 식품유형에서 검사항목 가져오기 + 추가된 항목
+            base_items = self.get_test_items_from_food_type(schedule)
+            test_items = base_items + self.additional_test_items
+
+            # 온도 구간 수 결정
+            if zone_count is None:
+                test_method = schedule.get('test_method', '') or ''
+                if test_method in ['real', 'custom_real']:
+                    zone_count = 1
+                else:
+                    zone_count = 3
+
+            # 수수료 정보에서 sample_quantity 가져오기 (식품유형의 검사항목 기반)
             sample_per_test = 0
             try:
                 all_fees = Fee.get_all()
                 for fee in all_fees:
                     if fee['test_item'] in test_items:
-                        sample_qty = fee.get('sample_quantity', 0) or 0
+                        sample_qty = fee['sample_quantity'] or 0
                         sample_per_test += sample_qty
-            except:
-                pass
+            except Exception as e:
+                print(f"수수료 정보 로드 오류: {e}")
 
             # 1회 실험 검체량 표시
             self.sample_per_test_value.setText(f"{sample_per_test}g")
@@ -804,33 +974,34 @@ class ScheduleManagementTab(QWidget):
             # 포장단위 표시
             self.packaging_value.setText(f"{packaging_weight}{packaging_unit}")
 
-            # 필요 검체량 계산
-            # 1회 실험 검체량 <= 포장단위: 샘플링횟수 × 포장단위
-            # 1회 실험 검체량 > 포장단위: 초과분 계산
-            if packaging_weight_g > 0:
-                if sample_per_test <= packaging_weight_g:
-                    # 1회 검체량이 포장단위 이하인 경우
-                    required_sample = sampling_count * packaging_weight_g
-                else:
-                    # 1회 검체량이 포장단위 초과하는 경우
-                    # 1회당 필요한 포장 수 = ceil(1회검체량 / 포장단위)
-                    import math
-                    packages_per_test = math.ceil(sample_per_test / packaging_weight_g)
-                    required_sample = sampling_count * packages_per_test * packaging_weight_g
+            # 총 샘플링 횟수 (샘플링횟수 × 온도구간수)
+            total_sampling = sampling_count * zone_count
 
-                # 단위 변환 (1000g 이상이면 kg으로 표시)
-                if required_sample >= 1000:
-                    self.required_sample_value.setText(f"{required_sample / 1000:.1f}kg")
+            # 필요 검체량 계산 (개수로 표현)
+            if packaging_weight_g > 0:
+                if sample_per_test > packaging_weight_g:
+                    # 1회 검체량이 포장단위보다 큰 경우
+                    # 1회당 필요한 포장 수 = ceil(1회검체량 / 포장단위)
+                    packages_per_test = math.ceil(sample_per_test / packaging_weight_g)
+                    required_packages = total_sampling * packages_per_test
                 else:
-                    self.required_sample_value.setText(f"{required_sample}g")
+                    # 1회 검체량이 포장단위 이하인 경우
+                    # 1회당 1개 필요
+                    required_packages = total_sampling
+
+                # 개수로 표시
+                self.required_sample_value.setText(f"{required_packages}개")
+                self.current_required_sample = required_packages
             else:
                 self.required_sample_value.setText("-")
+                self.current_required_sample = 0
 
         except Exception as e:
             print(f"검체량 정보 업데이트 오류: {e}")
             self.sample_per_test_value.setText("-")
             self.packaging_value.setText("-")
             self.required_sample_value.setText("-")
+            self.current_required_sample = 0
 
     def load_memo_history(self):
         """메모 이력 로드"""
@@ -922,13 +1093,17 @@ class ScheduleManagementTab(QWidget):
             except:
                 pass
 
-        test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+        # 식품유형에서 검사항목 가져오기 + 추가된 항목
+        base_items = self.get_test_items_from_food_type(schedule)
+        test_items = base_items + self.additional_test_items
 
         fees = {}
+        sample_quantities = {}
         try:
             all_fees = Fee.get_all()
             for fee in all_fees:
                 fees[fee['test_item']] = fee['price']
+                sample_quantities[fee['test_item']] = fee['sample_quantity'] or 0
         except:
             pass
 
@@ -1108,6 +1283,59 @@ class ScheduleManagementTab(QWidget):
             label_widget.setVisible(is_visible)
             value_widget.setVisible(is_visible)
 
+    def add_test_item(self):
+        """검사항목 추가"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "추가 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        # 현재 테이블에 있는 항목들 수집
+        current_items = self.get_test_items_from_food_type(self.current_schedule) + self.additional_test_items
+
+        # 항목 선택 다이얼로그
+        dialog = TestItemSelectDialog(self, exclude_items=current_items)
+        if dialog.exec_() and dialog.selected_item:
+            # 추가된 항목 저장
+            self.additional_test_items.append(dialog.selected_item)
+
+            # 테이블 새로고침
+            self.update_experiment_schedule(self.current_schedule)
+
+            # 검체량 정보 업데이트
+            sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+            self.update_sample_info(self.current_schedule, sampling_count)
+
+            QMessageBox.information(self, "추가 완료", f"'{dialog.selected_item}' 항목이 추가되었습니다.")
+
+    def remove_test_item(self):
+        """검사항목 삭제"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "삭제 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        if not self.additional_test_items:
+            QMessageBox.warning(self, "삭제 실패", "추가로 삭제할 수 있는 항목이 없습니다.\n(기본 항목은 삭제할 수 없습니다)")
+            return
+
+        # 추가된 항목 중에서 선택하여 삭제
+        from PyQt5.QtWidgets import QInputDialog
+        item, ok = QInputDialog.getItem(
+            self, "항목 삭제", "삭제할 항목을 선택하세요:",
+            self.additional_test_items, 0, False
+        )
+
+        if ok and item:
+            self.additional_test_items.remove(item)
+
+            # 테이블 새로고침
+            self.update_experiment_schedule(self.current_schedule)
+
+            # 검체량 정보 업데이트
+            sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+            self.update_sample_info(self.current_schedule, sampling_count)
+
+            QMessageBox.information(self, "삭제 완료", f"'{item}' 항목이 삭제되었습니다.")
+
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글"""
         if not self.current_schedule:
@@ -1164,7 +1392,9 @@ class ScheduleManagementTab(QWidget):
         except:
             pass
 
-        test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+        # 식품유형에서 검사항목 가져오기 + 추가된 항목
+        base_items = self.get_test_items_from_food_type(self.current_schedule)
+        test_items = base_items + self.additional_test_items
 
         # 검사항목 행 시작 (행 2부터)
         test_item_start_row = 2
