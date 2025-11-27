@@ -554,6 +554,7 @@ class ScheduleCreateDialog(QDialog):
         # 식품 유형 관련
         self.food_type_combo.currentIndexChanged.connect(self.update_food_type_info)
         self.food_type_select_btn.clicked.connect(self.select_food_type)
+        self.food_type_combo.lineEdit().returnPressed.connect(self.select_food_type)
         
         # 소비기한 관련
         self.days_spin.valueChanged.connect(lambda value: self.period_value_changed(value, "days"))
