@@ -484,6 +484,7 @@ class ScheduleManagementTab(QWidget):
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #9b59b6; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #9b59b6; }
         """)
+        group.setMaximumHeight(120)  # 메모 영역 전체 높이 제한
 
         layout = QHBoxLayout(group)
 
@@ -494,7 +495,7 @@ class ScheduleManagementTab(QWidget):
 
         self.memo_edit = QTextEdit()
         self.memo_edit.setPlaceholderText("새 메모를 입력하세요...")
-        self.memo_edit.setMinimumHeight(60)
+        self.memo_edit.setMaximumHeight(50)
         left_layout.addWidget(self.memo_edit)
 
         save_btn = QPushButton("메모 저장")
@@ -508,7 +509,7 @@ class ScheduleManagementTab(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         self.memo_history_list = QListWidget()
-        self.memo_history_list.setMinimumHeight(100)
+        self.memo_history_list.setMaximumHeight(50)
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
@@ -536,7 +537,7 @@ class ScheduleManagementTab(QWidget):
         # 단일 테이블
         self.experiment_table = QTableWidget()
         self.experiment_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.experiment_table.setMinimumHeight(180)
+        self.experiment_table.setMinimumHeight(250)
         layout.addWidget(self.experiment_table)
 
         # 비용 요약
