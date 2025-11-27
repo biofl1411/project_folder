@@ -635,7 +635,6 @@ class ScheduleManagementTab(QWidget):
 
         # 시작일과 마지막실험일 사이의 간격을 샘플링 횟수로 나눔
         interval_days = experiment_days // sampling_count if sampling_count > 0 else 0
-        interval_hours = interval_days * 24  # 일수를 시간으로 변환
 
         # 시작일 파싱
         start_date_str = schedule.get('start_date', '')
@@ -696,14 +695,14 @@ class ScheduleManagementTab(QWidget):
                 table.setItem(0, i + 1, date_item)
             table.setItem(0, col_count - 1, QTableWidgetItem(""))
 
-            # 행 1: 제조후 시간
-            time_item = QTableWidgetItem("제조후 시간")
+            # 행 1: 제조후 일수
+            time_item = QTableWidgetItem("제조후 일수")
             time_item.setBackground(QColor('#90EE90'))
             table.setItem(1, 0, time_item)
 
             for i in range(sampling_count):
-                hours = i * interval_hours
-                time_value = f"{hours}h"  # 짧은 형식
+                days_elapsed = i * interval_days
+                time_value = f"{days_elapsed}일"
                 item = QTableWidgetItem(time_value)
                 item.setTextAlignment(Qt.AlignCenter)
                 table.setItem(1, i + 1, item)
