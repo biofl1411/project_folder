@@ -122,10 +122,12 @@ class TestDatabase:
         result = cursor.fetchone()
         assert result['count'] >= 2, "샘플 업체 데이터가 삽입되지 않았습니다"
 
-        # 샘플 수수료 데이터 확인
-        cursor.execute("SELECT COUNT(*) as count FROM fees")
+        # 샘플 식품 유형 데이터 확인
+        cursor.execute("SELECT COUNT(*) as count FROM food_types")
         result = cursor.fetchone()
-        assert result['count'] >= 1, "샘플 수수료 데이터가 삽입되지 않았습니다"
+        assert result['count'] >= 1, "샘플 식품 유형 데이터가 삽입되지 않았습니다"
+
+        # 참고: 수수료 데이터는 cash_db.xlsx에서 가져오므로 여기서 검증하지 않음
 
         conn.close()
 

@@ -27,27 +27,42 @@ def build_executable():
         "--name=FoodLabManager",
         "--windowed",  # GUI 애플리케이션
         "--onedir",    # 폴더로 빌드 (--onefile 옵션을 사용하면 단일 파일로 빌드)
-        "--icon=config/icon.ico",  # 아이콘 파일 (나중에 추가해야 함)
         "--add-data=config;config",  # 추가 데이터 파일 (Windows 형식)
-        "--add-data=templates;templates",
         "main.py"
     ]
-    
+
+    # 아이콘 파일이 있으면 추가
+    if os.path.exists("config/icon.ico"):
+        pyinstaller_cmd.insert(5, "--icon=config/icon.ico")
+
     # 운영체제에 따라 경로 구분자 조정
     if sys.platform != "win32":
-        pyinstaller_cmd[5] = "--add-data=config:config"  # Unix 형식
-        pyinstaller_cmd[6] = "--add-data=templates:templates"
+        # Windows가 아닌 경우 경로 구분자를 콜론으로 변경
+        for i, cmd in enumerate(pyinstaller_cmd):
+            if cmd.startswith("--add-data=") and ";" in cmd:
+                pyinstaller_cmd[i] = cmd.replace(";", ":")
     
     print("실행 파일 빌드 중...")
     subprocess.call(pyinstaller_cmd)
     
     print("추가 리소스 복사 중...")
-    # 빈 폴더 생성 (실행 시 필요한 폴더들)
+    # 필요한 폴더 생성
     os.makedirs("dist/FoodLabManager/data", exist_ok=True)
     os.makedirs("dist/FoodLabManager/output", exist_ok=True)
-    
-    print("빌드 완료!")
+
+    # 데이터베이스 파일 복사 (있는 경우)
+    if os.path.exists("data/app.db"):
+        shutil.copy("data/app.db", "dist/FoodLabManager/data/app.db")
+        print("  - 데이터베이스 복사 완료")
+
+    # Excel 파일 복사 (있는 경우)
+    if os.path.exists("cash_db.xlsx"):
+        shutil.copy("cash_db.xlsx", "dist/FoodLabManager/cash_db.xlsx")
+        print("  - cash_db.xlsx 복사 완료")
+
+    print("\n빌드 완료!")
     print(f"생성된 실행 파일: {os.path.abspath('dist/FoodLabManager')}")
+    print("\n실행 방법: dist/FoodLabManager/FoodLabManager.exe 실행")
 
 if __name__ == "__main__":
     # PyInstaller 설치 확인
