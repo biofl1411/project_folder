@@ -302,15 +302,14 @@ class ScheduleManagementTab(QWidget):
 
         layout = QHBoxLayout(group)
 
-        # 왼쪽: 메모 입력 (1/3)
+        # 왼쪽: 메모 입력 (1/2)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        left_layout.addWidget(QLabel("메모 입력"))
         self.memo_edit = QTextEdit()
         self.memo_edit.setPlaceholderText("새 메모를 입력하세요...")
-        self.memo_edit.setMaximumHeight(60)
+        self.memo_edit.setMinimumHeight(80)
         left_layout.addWidget(self.memo_edit)
 
         save_btn = QPushButton("메모 저장")
@@ -318,20 +317,19 @@ class ScheduleManagementTab(QWidget):
         save_btn.clicked.connect(self.save_memo)
         left_layout.addWidget(save_btn)
 
-        # 오른쪽: 메모 이력 (2/3)
+        # 오른쪽: 메모 이력 (1/2)
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        right_layout.addWidget(QLabel("메모 이력"))
         self.memo_history_list = QListWidget()
-        self.memo_history_list.setMaximumHeight(60)
+        self.memo_history_list.setMinimumHeight(80)
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
-        # 비율 설정 (1:2)
+        # 비율 설정 (1:1 동일 크기)
         layout.addWidget(left_widget, 1)
-        layout.addWidget(right_widget, 2)
+        layout.addWidget(right_widget, 1)
 
         parent_layout.addWidget(group)
 
@@ -636,7 +634,19 @@ class ScheduleManagementTab(QWidget):
         else:
             experiment_days = total_days // 2 if total_days > 0 else 0
 
-        interval = experiment_days // sampling_count if sampling_count > 0 else 0
+        # 시작일과 마지막실험일 사이의 간격을 샘플링 횟수로 나눔
+        interval_days = experiment_days // sampling_count if sampling_count > 0 else 0
+        interval_hours = interval_days * 24  # 일수를 시간으로 변환
+
+        # 시작일 파싱
+        start_date_str = schedule.get('start_date', '')
+        start_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            except:
+                pass
+
         test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
 
         fees = {}
@@ -662,36 +672,60 @@ class ScheduleManagementTab(QWidget):
             headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
             table.setHorizontalHeaderLabels(headers)
 
-            row_count = 1 + len(test_items) + 1
+            # 행 수: 날짜 + 제조후시간 + 검사항목들 + 1회기준
+            row_count = 2 + len(test_items) + 1
             table.setRowCount(row_count)
 
-            time_item = QTableWidgetItem("제조후 시간")
-            time_item.setBackground(QColor('#90EE90'))
-            table.setItem(0, 0, time_item)
+            # 행 0: 날짜
+            date_label = QTableWidgetItem("날짜")
+            date_label.setBackground(QColor('#ADD8E6'))
+            table.setItem(0, 0, date_label)
 
             for i in range(sampling_count):
-                time_value = f"{i * interval}시간" if interval > 0 else "-"
+                if start_date and interval_days > 0:
+                    from datetime import timedelta
+                    sample_date = start_date + timedelta(days=i * interval_days)
+                    date_value = sample_date.strftime('%Y-%m-%d')
+                else:
+                    date_value = "-"
+                date_item = QTableWidgetItem(date_value)
+                date_item.setTextAlignment(Qt.AlignCenter)
+                date_item.setBackground(QColor('#E6F3FF'))
+                table.setItem(0, i + 1, date_item)
+            table.setItem(0, col_count - 1, QTableWidgetItem(""))
+
+            # 행 1: 제조후 시간
+            time_item = QTableWidgetItem("제조후 시간")
+            time_item.setBackground(QColor('#90EE90'))
+            table.setItem(1, 0, time_item)
+
+            for i in range(sampling_count):
+                hours = i * interval_hours
+                if hours >= 24:
+                    time_value = f"{hours}시간"
+                else:
+                    time_value = f"{hours}시간"
                 item = QTableWidgetItem(time_value)
                 item.setTextAlignment(Qt.AlignCenter)
-                table.setItem(0, i + 1, item)
-            table.setItem(0, col_count - 1, QTableWidgetItem(""))
+                table.setItem(1, i + 1, item)
+            table.setItem(1, col_count - 1, QTableWidgetItem(""))
 
             total_price_per_test = 0
             for row_idx, test_item in enumerate(test_items):
                 item_label = QTableWidgetItem(test_item)
                 item_label.setBackground(QColor('#90EE90'))
-                table.setItem(row_idx + 1, 0, item_label)
+                table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
 
                 for i in range(sampling_count):
                     check_item = QTableWidgetItem("O")
                     check_item.setTextAlignment(Qt.AlignCenter)
-                    table.setItem(row_idx + 1, i + 1, check_item)
+                    table.setItem(row_idx + 2, i + 1, check_item)
 
                 price = int(fees.get(test_item, 0))
                 total_price_per_test += price
                 price_item = QTableWidgetItem(f"{price:,}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                table.setItem(row_idx + 1, col_count - 1, price_item)
+                table.setItem(row_idx + 2, col_count - 1, price_item)
 
             basis_item = QTableWidgetItem("(1회 기준)")
             basis_item.setBackground(QColor('#FFFF99'))
