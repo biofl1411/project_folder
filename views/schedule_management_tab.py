@@ -924,12 +924,18 @@ class ScheduleManagementTab(QWidget):
         """비용 요약 업데이트"""
         test_method = schedule.get('test_method', '') or ''
 
+        # 실험 방법에 따른 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
         # 1회 기준 비용 (소수점 제거)
         cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수)
-        test_method_cost = int(cost_per_test * sampling_count)
+        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수 × 구간 수)
+        test_method_cost = int(cost_per_test * sampling_count * zone_count)
         self.test_method_cost.setText(f"{test_method_cost:,}원")
 
         # 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
