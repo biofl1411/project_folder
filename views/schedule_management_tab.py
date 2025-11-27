@@ -457,8 +457,14 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.packaging_value, 5, 3)
         self.required_sample_label = self._create_label("필요검체량", label_style)
         grid.addWidget(self.required_sample_label, 5, 4)
-        self.required_sample_value = self._create_value_label("-", value_style)
+        # 필요 검체량 - 수정 가능한 입력 필드
+        self.required_sample_value = QLineEdit("-")
+        self.required_sample_value.setStyleSheet(value_style + " color: #e67e22; font-weight: bold;")
+        self.required_sample_value.setAlignment(Qt.AlignCenter)
+        self.required_sample_value.setMinimumWidth(60)
+        self.required_sample_value.setPlaceholderText("개수 입력")
         grid.addWidget(self.required_sample_value, 5, 5)
+        self.current_required_sample = 0  # 계산된 필요 검체량 저장
 
         parent_layout.addWidget(group)
 
@@ -696,7 +702,16 @@ class ScheduleManagementTab(QWidget):
         self.extension_value.setText("진행" if schedule.get('extension_test') else "미진행")
 
         sampling_count = schedule.get('sampling_count', 6) or 6
-        self.sampling_count_value.setText(f"{sampling_count}회")
+
+        # 온도 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 샘플링 횟수 × 온도 구간 수
+        total_sampling = sampling_count * zone_count
+        self.sampling_count_value.setText(f"{total_sampling}회 ({sampling_count}×{zone_count}구간)")
 
         if experiment_days > 0 and sampling_count > 0:
             interval = experiment_days // sampling_count
@@ -775,21 +790,32 @@ class ScheduleManagementTab(QWidget):
                 self.temp_zone2_value.setText(temps[1])
                 self.temp_zone3_value.setText(temps[2])
 
-    def update_sample_info(self, schedule, sampling_count):
+    def update_sample_info(self, schedule, sampling_count, zone_count=None):
         """검체량 정보 업데이트"""
         try:
+            import math
+
+            # 실험 테이블에 표시된 항목들
             test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
 
-            # 수수료 정보에서 sample_quantity 가져오기
+            # 온도 구간 수 결정
+            if zone_count is None:
+                test_method = schedule.get('test_method', '') or ''
+                if test_method in ['real', 'custom_real']:
+                    zone_count = 1
+                else:
+                    zone_count = 3
+
+            # 수수료 정보에서 sample_quantity 가져오기 (실험 테이블 항목 기반)
             sample_per_test = 0
             try:
                 all_fees = Fee.get_all()
                 for fee in all_fees:
                     if fee['test_item'] in test_items:
-                        sample_qty = fee.get('sample_quantity', 0) or 0
+                        sample_qty = fee['sample_quantity'] or 0
                         sample_per_test += sample_qty
-            except:
-                pass
+            except Exception as e:
+                print(f"수수료 정보 로드 오류: {e}")
 
             # 1회 실험 검체량 표시
             self.sample_per_test_value.setText(f"{sample_per_test}g")
@@ -804,33 +830,34 @@ class ScheduleManagementTab(QWidget):
             # 포장단위 표시
             self.packaging_value.setText(f"{packaging_weight}{packaging_unit}")
 
-            # 필요 검체량 계산
-            # 1회 실험 검체량 <= 포장단위: 샘플링횟수 × 포장단위
-            # 1회 실험 검체량 > 포장단위: 초과분 계산
-            if packaging_weight_g > 0:
-                if sample_per_test <= packaging_weight_g:
-                    # 1회 검체량이 포장단위 이하인 경우
-                    required_sample = sampling_count * packaging_weight_g
-                else:
-                    # 1회 검체량이 포장단위 초과하는 경우
-                    # 1회당 필요한 포장 수 = ceil(1회검체량 / 포장단위)
-                    import math
-                    packages_per_test = math.ceil(sample_per_test / packaging_weight_g)
-                    required_sample = sampling_count * packages_per_test * packaging_weight_g
+            # 총 샘플링 횟수 (샘플링횟수 × 온도구간수)
+            total_sampling = sampling_count * zone_count
 
-                # 단위 변환 (1000g 이상이면 kg으로 표시)
-                if required_sample >= 1000:
-                    self.required_sample_value.setText(f"{required_sample / 1000:.1f}kg")
+            # 필요 검체량 계산 (개수로 표현)
+            if packaging_weight_g > 0:
+                if sample_per_test > packaging_weight_g:
+                    # 1회 검체량이 포장단위보다 큰 경우
+                    # 1회당 필요한 포장 수 = ceil(1회검체량 / 포장단위)
+                    packages_per_test = math.ceil(sample_per_test / packaging_weight_g)
+                    required_packages = total_sampling * packages_per_test
                 else:
-                    self.required_sample_value.setText(f"{required_sample}g")
+                    # 1회 검체량이 포장단위 이하인 경우
+                    # 1회당 1개 필요
+                    required_packages = total_sampling
+
+                # 개수로 표시
+                self.required_sample_value.setText(f"{required_packages}개")
+                self.current_required_sample = required_packages
             else:
                 self.required_sample_value.setText("-")
+                self.current_required_sample = 0
 
         except Exception as e:
             print(f"검체량 정보 업데이트 오류: {e}")
             self.sample_per_test_value.setText("-")
             self.packaging_value.setText("-")
             self.required_sample_value.setText("-")
+            self.current_required_sample = 0
 
     def load_memo_history(self):
         """메모 이력 로드"""
