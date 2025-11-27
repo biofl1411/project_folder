@@ -243,8 +243,16 @@ class MainWindow(QMainWindow):
     
     def show_settings(self):
         """설정 창 표시"""
-        # 여기에 설정 창 표시 코드 구현
-        QMessageBox.information(self, "설정", "설정 기능은 아직 구현되지 않았습니다.\n여기에 실험 항목과 수수료 관리 기능이 포함될 예정입니다.")
+        try:
+            from .settings_dialog import SettingsDialog
+
+            dialog = SettingsDialog(self)
+            dialog.exec_()
+        except Exception as e:
+            import traceback
+            print(f"설정 창 표시 중 오류: {str(e)}")
+            traceback.print_exc()
+            QMessageBox.critical(self, "오류", f"설정 창을 열 수 없습니다: {str(e)}")
     
     def logout(self):
         """로그아웃 처리"""

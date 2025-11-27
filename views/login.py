@@ -97,21 +97,23 @@ class LoginWindow(QWidget):
         """로그인 시도"""
         username = self.username_input.text()
         password = self.password_input.text()
-        
+
         if not username or not password:
             QMessageBox.warning(self, "입력 오류", "사용자명과 비밀번호를 모두 입력하세요.")
             return
-        
-        # 임시 인증 로직 (나중에 User 모델로 대체)
-        if username == "admin" and password == "admin123":
-            # 로그인 성공
-            user_data = {
-                "id": 1,
-                "username": "admin",
-                "name": "관리자",
-                "role": "admin"
-            }
-            self.login_successful.emit(user_data)
-            self.close()
-        else:
-            QMessageBox.warning(self, "로그인 실패", "사용자명 또는 비밀번호가 올바르지 않습니다.")
+
+        # 데이터베이스에서 사용자 인증
+        try:
+            from models.users import User
+
+            user_data = User.authenticate(username, password)
+
+            if user_data:
+                # 로그인 성공
+                self.login_successful.emit(user_data)
+                self.close()
+            else:
+                QMessageBox.warning(self, "로그인 실패", "사용자명 또는 비밀번호가 올바르지 않습니다.")
+        except Exception as e:
+            print(f"로그인 중 오류: {str(e)}")
+            QMessageBox.critical(self, "오류", f"로그인 처리 중 오류가 발생했습니다: {str(e)}")

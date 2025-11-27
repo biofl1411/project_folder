@@ -62,9 +62,10 @@ class ProductType:
             (type_name, category, sterilization, pasteurization, appearance, test_items, type_id)
         )
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
-        
+        return rowcount > 0
+
     @staticmethod
     def delete(type_id):
         """식품 유형 삭제"""
@@ -72,8 +73,9 @@ class ProductType:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM food_types WHERE id = ?", (type_id,))
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
+        return rowcount > 0
     
     @staticmethod
     def delete_all():

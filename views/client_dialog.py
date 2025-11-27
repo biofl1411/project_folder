@@ -27,9 +27,11 @@ class ClientSearchDialog(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("업체명, CEO, 또는 담당자명으로 검색...")
         search_btn = QPushButton("검색")
+        search_btn.setAutoDefault(False)
+        search_btn.setDefault(False)
         search_btn.clicked.connect(self.searchClients)
         self.search_input.returnPressed.connect(self.searchClients)
-        
+
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(search_btn)
         layout.addLayout(search_layout)
@@ -55,10 +57,14 @@ class ClientSearchDialog(QDialog):
         # 버튼 영역
         btn_layout = QHBoxLayout()
         select_btn = QPushButton("선택")
+        select_btn.setAutoDefault(False)
+        select_btn.setDefault(False)
         select_btn.clicked.connect(self.selectClient)
         cancel_btn = QPushButton("취소")
+        cancel_btn.setAutoDefault(False)
+        cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
-        
+
         btn_layout.addStretch()
         btn_layout.addWidget(select_btn)
         btn_layout.addWidget(cancel_btn)
@@ -195,15 +201,19 @@ class ClientDialog(QDialog):
         # 버튼 영역
         btn_layout = QHBoxLayout()
         save_btn = QPushButton("저장")
+        save_btn.setAutoDefault(False)
+        save_btn.setDefault(False)
         save_btn.clicked.connect(self.saveClient)
         cancel_btn = QPushButton("취소")
+        cancel_btn.setAutoDefault(False)
+        cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
-        
+
         btn_layout.addStretch()
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
-        
+
         # 기존 데이터 채우기
         if self.client_data:
             self.name_input.setText(self.client_data.get('name', ''))
