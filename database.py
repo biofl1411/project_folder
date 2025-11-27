@@ -254,24 +254,7 @@ def init_database():
             VALUES (?, ?, ?, ?, ?, ?)
             ''', (type_name, category, sterilization, pasteurization, appearance, test_items))
     
-    # 샘플 수수료 데이터 (테이블이 비어있을 때만 삽입)
-    cursor.execute("SELECT COUNT(*) FROM fees")
-    if cursor.fetchone()[0] == 0:
-        sample_fees = [
-            ('일반세균', '일반', 20000, '일반세균 검사'),
-            ('대장균군', '일반', 25000, '대장균군 검사'),
-            ('세균수', '일반', 22000, '세균수 검사'),
-            ('pH', '일반', 15000, 'pH 검사'),
-            ('수분', '일반', 18000, '수분 함량 검사'),
-            ('발효도수', '일반', 30000, '발효도수 검사'),
-            ('총아플라톡신', '일반', 50000, '총아플라톡신 검사')
-        ]
-
-        for test_item, food_category, price, description in sample_fees:
-            cursor.execute('''
-            INSERT OR IGNORE INTO fees (test_item, food_category, price, description)
-            VALUES (?, ?, ?, ?)
-            ''', (test_item, food_category, price, description))
+    # 샘플 수수료 데이터 삽입 제거됨 - cash_db.xlsx에서 가져옴
     
     conn.commit()
     conn.close()
