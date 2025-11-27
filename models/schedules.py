@@ -148,6 +148,25 @@ class Schedule:
             return []
 
     @staticmethod
+    def update_memo(schedule_id, memo):
+        """스케줄 메모 업데이트"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules
+                SET memo = ?
+                WHERE id = ?
+            """, (memo, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"스케줄 메모 업데이트 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def get_filtered(keyword=None, status=None, date_from=None, date_to=None):
         """필터링된 스케줄 조회"""
         try:
