@@ -43,24 +43,31 @@ class Fee:
         return fee
     
     @staticmethod
-    def create(test_item, food_category="", price=0, description="", display_order=100):
+    def create(test_item, food_category="", price=0, description="", display_order=100, sample_quantity=0):
         """새 수수료 생성"""
         conn = get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO fees (test_item, food_category, price, description, display_order) VALUES (?, ?, ?, ?, ?)",
-                (test_item, food_category, price, description, display_order)
+                "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                (test_item, food_category, price, description, display_order, sample_quantity)
             )
         except Exception as e:
-            # display_order 열이 없는 경우를 처리
-            if "no such column: display_order" in str(e):
+            # display_order 또는 sample_quantity 열이 없는 경우를 처리
+            if "no such column" in str(e):
                 # 열 추가 시도
-                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                try:
+                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                except:
+                    pass
+                try:
+                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+                except:
+                    pass
                 # 다시 삽입 시도
                 cursor.execute(
-                    "INSERT INTO fees (test_item, food_category, price, description, display_order) VALUES (?, ?, ?, ?, ?)",
-                    (test_item, food_category, price, description, display_order)
+                    "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                    (test_item, food_category, price, description, display_order, sample_quantity)
                 )
             else:
                 # 다른 예외는 다시 발생시킴
@@ -71,30 +78,31 @@ class Fee:
         return fee_id
     
     @staticmethod
-    def update(fee_id, test_item, food_category="", price=0, description="", display_order=None):
+    def update(fee_id, test_item, food_category="", price=0, description="", display_order=None, sample_quantity=None):
         """수수료 정보 수정"""
         conn = get_connection()
         cursor = conn.cursor()
         try:
-            if display_order is not None:
-                cursor.execute(
-                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ? WHERE id = ?",
-                    (test_item, food_category, price, description, display_order, fee_id)
-                )
-            else:
-                cursor.execute(
-                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ? WHERE id = ?",
-                    (test_item, food_category, price, description, fee_id)
-                )
+            cursor.execute(
+                "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
+            )
         except Exception as e:
-            # display_order 열이 없는 경우를 처리
-            if "no such column: display_order" in str(e) and display_order is not None:
+            # 열이 없는 경우를 처리
+            if "no such column" in str(e):
                 # 열 추가 시도
-                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                try:
+                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                except:
+                    pass
+                try:
+                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+                except:
+                    pass
                 # 다시 업데이트 시도
                 cursor.execute(
-                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ? WHERE id = ?",
-                    (test_item, food_category, price, description, display_order, fee_id)
+                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                    (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
                 )
             else:
                 # 다른 예외는 다시 발생시킴
