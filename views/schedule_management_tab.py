@@ -308,14 +308,14 @@ class ScheduleManagementTab(QWidget):
 
         layout = QHBoxLayout(group)
 
-        # 왼쪽: 메모 입력 (1/2)
+        # 왼쪽: 메모 입력 (1/3)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         self.memo_edit = QTextEdit()
         self.memo_edit.setPlaceholderText("새 메모를 입력하세요...")
-        self.memo_edit.setMinimumHeight(80)
+        self.memo_edit.setMinimumHeight(60)
         left_layout.addWidget(self.memo_edit)
 
         save_btn = QPushButton("메모 저장")
@@ -323,13 +323,13 @@ class ScheduleManagementTab(QWidget):
         save_btn.clicked.connect(self.save_memo)
         left_layout.addWidget(save_btn)
 
-        # 오른쪽: 메모 이력 (1/2)
+        # 오른쪽: 메모 이력 (2/3)
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         self.memo_history_list = QListWidget()
-        self.memo_history_list.setMinimumHeight(80)
+        self.memo_history_list.setMinimumHeight(100)
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
@@ -338,9 +338,9 @@ class ScheduleManagementTab(QWidget):
         edit_memo_btn.clicked.connect(self.edit_selected_memo)
         right_layout.addWidget(edit_memo_btn)
 
-        # 비율 설정 (1:1 동일 크기)
+        # 비율 설정 (1:2 - 메모 입력 1/3, 메모 이력 2/3)
         layout.addWidget(left_widget, 1)
-        layout.addWidget(right_widget, 1)
+        layout.addWidget(right_widget, 2)
 
         parent_layout.addWidget(group)
 
