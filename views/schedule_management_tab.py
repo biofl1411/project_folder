@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QDialog, QFormLayout, QTextEdit, QCheckBox, QGroupBox,
                              QFileDialog, QGridLayout, QSpinBox, QSplitter,
                              QScrollArea, QTabWidget, QListWidget, QListWidgetItem,
-                             QDialogButtonBox)
+                             QDialogButtonBox, QCalendarWidget)
 from PyQt5.QtCore import Qt, QDate, QDateTime
 from PyQt5.QtGui import QColor, QFont, QBrush
 import pandas as pd
@@ -273,6 +273,60 @@ class TestItemSelectDialog(QDialog):
         if selected:
             row = selected[0].row()
             self.selected_item = self.item_table.item(row, 0).text()
+        super().accept()
+
+
+class DateSelectDialog(QDialog):
+    """날짜 선택 다이얼로그 (달력 표시)"""
+
+    def __init__(self, parent=None, current_date=None, title="날짜 선택"):
+        super().__init__(parent)
+        self.selected_date = None
+        self.current_date = current_date
+        self.setWindowTitle(title)
+        self.initUI()
+
+    def initUI(self):
+        self.setMinimumSize(350, 300)
+        layout = QVBoxLayout(self)
+
+        # 안내 라벨
+        info_label = QLabel("실험 날짜를 선택하세요:")
+        info_label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 5px;")
+        layout.addWidget(info_label)
+
+        # 달력 위젯
+        self.calendar = QCalendarWidget()
+        self.calendar.setGridVisible(True)
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+
+        # 현재 날짜가 있으면 설정
+        if self.current_date:
+            try:
+                if isinstance(self.current_date, str):
+                    # MM-DD 또는 YYYY-MM-DD 형식 파싱
+                    if len(self.current_date) == 5:  # MM-DD
+                        year = datetime.now().year
+                        date_obj = datetime.strptime(f"{year}-{self.current_date}", '%Y-%m-%d')
+                    else:
+                        date_obj = datetime.strptime(self.current_date, '%Y-%m-%d')
+                    self.calendar.setSelectedDate(QDate(date_obj.year, date_obj.month, date_obj.day))
+                elif isinstance(self.current_date, datetime):
+                    self.calendar.setSelectedDate(QDate(self.current_date.year, self.current_date.month, self.current_date.day))
+            except:
+                pass
+
+        layout.addWidget(self.calendar)
+
+        # 버튼
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def accept(self):
+        q_date = self.calendar.selectedDate()
+        self.selected_date = datetime(q_date.year(), q_date.month(), q_date.day())
         super().accept()
 
 
@@ -688,6 +742,9 @@ class ScheduleManagementTab(QWidget):
         self.additional_test_items = []
         self.removed_base_items = []
 
+        # 사용자 정의 날짜 저장용 딕셔너리 {column_index: datetime}
+        self.custom_dates = {}
+
         # 비용 요약
         self.create_cost_summary(layout)
 
@@ -767,6 +824,8 @@ class ScheduleManagementTab(QWidget):
             # 추가/삭제 항목 초기화
             self.additional_test_items = []
             self.removed_base_items = []
+            # 사용자 정의 날짜 초기화
+            self.custom_dates = {}
             client_name = schedule.get('client_name', '-') or '-'
             product_name = schedule.get('product_name', '-') or '-'
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
@@ -1137,17 +1196,35 @@ class ScheduleManagementTab(QWidget):
         date_label.setBackground(QColor('#ADD8E6'))
         table.setItem(0, 0, date_label)
 
+        # 각 회차별 날짜 저장 (제조후 일수 계산용)
+        sample_dates = {}
+
         for i in range(sampling_count):
-            if start_date and interval_days > 0:
+            col_idx = i + 1
+
+            # 사용자 정의 날짜가 있으면 우선 사용
+            if col_idx in self.custom_dates:
+                sample_date = self.custom_dates[col_idx]
+                date_value = sample_date.strftime('%m-%d')
+                sample_dates[col_idx] = sample_date
+                date_item = QTableWidgetItem(date_value)
+                date_item.setTextAlignment(Qt.AlignCenter)
+                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+            elif start_date and interval_days > 0:
                 from datetime import timedelta
                 sample_date = start_date + timedelta(days=i * interval_days)
                 date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
+                sample_dates[col_idx] = sample_date
+                date_item = QTableWidgetItem(date_value)
+                date_item.setTextAlignment(Qt.AlignCenter)
+                date_item.setBackground(QColor('#E6F3FF'))
             else:
                 date_value = "-"
-            date_item = QTableWidgetItem(date_value)
-            date_item.setTextAlignment(Qt.AlignCenter)
-            date_item.setBackground(QColor('#E6F3FF'))
-            table.setItem(0, i + 1, date_item)
+                date_item = QTableWidgetItem(date_value)
+                date_item.setTextAlignment(Qt.AlignCenter)
+                date_item.setBackground(QColor('#E6F3FF'))
+
+            table.setItem(0, col_idx, date_item)
         table.setItem(0, col_count - 1, QTableWidgetItem(""))
 
         # 행 1: 제조후 일수
@@ -1156,11 +1233,23 @@ class ScheduleManagementTab(QWidget):
         table.setItem(1, 0, time_item)
 
         for i in range(sampling_count):
-            days_elapsed = int(round(i * interval_days))
+            col_idx = i + 1
+
+            # sample_dates에 날짜가 있으면 시작일로부터 일수 계산
+            if col_idx in sample_dates and start_date:
+                days_elapsed = (sample_dates[col_idx] - start_date).days
+                # 사용자 정의 날짜인 경우 강조 표시
+                is_custom = col_idx in self.custom_dates
+            else:
+                days_elapsed = int(round(i * interval_days))
+                is_custom = False
+
             time_value = f"{days_elapsed}일"
             item = QTableWidgetItem(time_value)
             item.setTextAlignment(Qt.AlignCenter)
-            table.setItem(1, i + 1, item)
+            if is_custom:
+                item.setBackground(QColor('#FFE4B5'))  # 수정된 값 강조
+            table.setItem(1, col_idx, item)
         table.setItem(1, col_count - 1, QTableWidgetItem(""))
 
         total_price_per_test = 0
@@ -1360,12 +1449,17 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.information(self, "삭제 완료", f"'{item}' 항목이 삭제되었습니다.")
 
     def on_experiment_cell_clicked(self, row, col):
-        """실험 테이블 셀 클릭 시 O/X 토글"""
+        """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
         if not self.current_schedule:
             return
 
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # 행 0: 날짜 클릭 시 달력으로 날짜 수정
+        if row == 0 and col >= 1 and col <= sampling_count:
+            self.edit_date_with_calendar(col)
+            return
 
         # 검사항목 행 범위 확인 (행 2부터 마지막 행-1까지가 검사항목)
         # 행 0: 날짜, 행 1: 제조후 일수, 행 2~n-1: 검사항목, 행 n: 1회 기준
@@ -1396,6 +1490,56 @@ class ScheduleManagementTab(QWidget):
 
         # 비용 재계산
         self.recalculate_costs()
+
+    def edit_date_with_calendar(self, col):
+        """달력을 통해 날짜 수정"""
+        table = self.experiment_table
+        current_date_text = table.item(0, col).text() if table.item(0, col) else "-"
+
+        # 시작일 가져오기
+        start_date_str = self.current_schedule.get('start_date', '')
+        start_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            except:
+                pass
+
+        # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
+        current_date = None
+        if current_date_text != "-":
+            try:
+                # MM-DD 형식이면 현재 연도 추가
+                if len(current_date_text) == 5:
+                    year = datetime.now().year
+                    # 시작일이 있으면 그 연도 사용
+                    if start_date:
+                        year = start_date.year
+                    current_date = datetime.strptime(f"{year}-{current_date_text}", '%Y-%m-%d')
+                else:
+                    current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
+            except:
+                current_date = start_date
+
+        # 날짜 선택 다이얼로그 표시
+        dialog = DateSelectDialog(self, current_date=current_date, title=f"{col}회차 날짜 선택")
+        if dialog.exec_() and dialog.selected_date:
+            # 선택된 날짜 저장
+            self.custom_dates[col] = dialog.selected_date
+
+            # 테이블 날짜 업데이트
+            date_item = table.item(0, col)
+            if date_item:
+                date_item.setText(dialog.selected_date.strftime('%m-%d'))
+                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+
+            # 제조후 일수 업데이트
+            if start_date:
+                days_elapsed = (dialog.selected_date - start_date).days
+                time_item = table.item(1, col)
+                if time_item:
+                    time_item.setText(f"{days_elapsed}일")
+                    time_item.setBackground(QColor('#FFE4B5'))  # 수정된 값 강조
 
     def recalculate_costs(self):
         """셀 변경 시 비용 재계산"""
