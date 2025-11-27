@@ -28,9 +28,10 @@ jobs:
 
     - name: 필요한 폴더 생성
       run: |
-        mkdir -p templates
-        mkdir -p data
-        mkdir -p output
+        if (!(Test-Path "templates")) { New-Item -ItemType Directory -Path "templates" }
+        if (!(Test-Path "data")) { New-Item -ItemType Directory -Path "data" }
+        if (!(Test-Path "output")) { New-Item -ItemType Directory -Path "output" }
+      shell: pwsh
 
     - name: exe 파일 빌드
       run: |
@@ -38,8 +39,9 @@ jobs:
 
     - name: 실행에 필요한 폴더 추가
       run: |
-        mkdir -p dist/FoodLabManager/data
-        mkdir -p dist/FoodLabManager/output
+        New-Item -ItemType Directory -Force -Path "dist/FoodLabManager/data"
+        New-Item -ItemType Directory -Force -Path "dist/FoodLabManager/output"
+      shell: pwsh
 
     - name: 빌드 결과물 업로드
       uses: actions/upload-artifact@v4
