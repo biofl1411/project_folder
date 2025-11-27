@@ -1163,77 +1163,73 @@ class ScheduleCreateDialog(QDialog):
         """다이얼로그 수락 (저장 버튼 클릭)"""
         try:
             print("스케줄 저장 시작")  # 로그 기록
-            
-            # 기본 정보 수집
-            schedule_data = {
-                'client_id': self.selected_client_id,
-                'food_type_id': self.selected_food_type_id,
-                'sample_name': self.sample_name_input.text() if hasattr(self, 'sample_name_input') else "",
-                'product_name': self.product_name_input.text(),
-                'test_method': self.get_test_method(),
-                'storage_condition': self.get_storage_condition(),
-                'test_period_days': self.days_spin.value(),
-                'test_period_months': self.months_spin.value(), 
-                'test_period_years': self.years_spin.value(),
-                'sampling_count': 6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
-                'test_start_date': self.test_start_date.date().toString('yyyy-MM-dd'),
-                # 보고서 종류 추가
-                'report_interim': self.report_type_interim.isChecked(),
-                'report_korean': self.report_type_korean.isChecked(),
-                'report_english': self.report_type_english.isChecked(),
-                'sampling_count': 6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
-                'test_start_date': self.test_start_date.date().toString('yyyy-MM-dd'),
-                # 보고서 종류
-                'report_interim': self.report_type_interim.isChecked(),
-                'report_korean': self.report_type_korean.isChecked(),
-                'report_english': self.report_type_english.isChecked(),
-                # 연장실험 상태 추가
-                'extension_test': self.extension_check.isChecked()
-            }
-           
-            # 설정 기간 메시지 구성
-            period_msg = ""
-            if schedule_data['test_period_days'] > 0:
-                period_msg += f"{schedule_data['test_period_days']}일 "
-            if schedule_data['test_period_months'] > 0:
-                period_msg += f"{schedule_data['test_period_months']}개월 "
-            if schedule_data['test_period_years'] > 0:
-                period_msg += f"{schedule_data['test_period_years']}년"
-                
-            if period_msg:
-                period_msg = f"설정 기간: {period_msg.strip()}"
-            else:
-                period_msg = "설정 기간이 입력되지 않았습니다."
-            
+
+            # 필수 입력 확인
+            if not self.selected_client_id:
+                QMessageBox.warning(self, "입력 오류", "업체를 선택해주세요.")
+                return
+
+            if not self.product_name_input.text().strip():
+                QMessageBox.warning(self, "입력 오류", "제품명을 입력해주세요.")
+                return
+
             # 의뢰자 요청 온도인 경우 온도 값 수집
-            temp_msg = ""
+            custom_temperatures = None
             if (self.test_method_custom_real.isChecked() or self.test_method_custom_accel.isChecked()) and hasattr(self, 'temp_inputs'):
                 temperatures = []
-                for i, temp_input in enumerate(self.temp_inputs):
+                for temp_input in self.temp_inputs:
                     temp_value = temp_input.text().strip()
                     if temp_value:
                         temperatures.append(temp_value)
-                        temp_msg += f"온도 {i+1}: {temp_value}℃\n"
-                
-                # 온도 값을 쉼표로 구분하여 저장
-                schedule_data['custom_temperatures'] = ','.join(temperatures)
-                print(f"수집된 온도 값: {schedule_data['custom_temperatures']}")
-            
-            # 완성된 메시지
-            save_msg = f"스케줄이 저장되었습니다.\n\n{period_msg}"
-            if temp_msg:
-                save_msg += f"\n\n의뢰자 요청 온도:\n{temp_msg}"
-            
-            # 로그에 저장할 데이터 기록
-            print(f"스케줄 데이터: {schedule_data}")
-            
-            # TODO: 데이터베이스에 저장하는 코드 추가
-            # DB에 저장하는 코드가 없으므로 성공 메시지만 표시
-            QMessageBox.information(self, "저장 완료", save_msg)
-            print("스케줄 저장 완료")
-            
-            # 다이얼로그 닫기
-            super().accept()
+                custom_temperatures = ','.join(temperatures) if temperatures else None
+
+            # 데이터베이스에 저장
+            from models.schedules import Schedule
+
+            schedule_id = Schedule.create(
+                client_id=self.selected_client_id,
+                product_name=self.product_name_input.text().strip(),
+                food_type_id=self.selected_food_type_id,
+                test_method=self.get_test_method(),
+                storage_condition=self.get_storage_condition(),
+                test_start_date=self.test_start_date.date().toString('yyyy-MM-dd'),
+                test_period_days=self.days_spin.value(),
+                test_period_months=self.months_spin.value(),
+                test_period_years=self.years_spin.value(),
+                sampling_count=6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
+                report_interim=self.report_type_interim.isChecked(),
+                report_korean=self.report_type_korean.isChecked(),
+                report_english=self.report_type_english.isChecked(),
+                extension_test=self.extension_check.isChecked(),
+                custom_temperatures=custom_temperatures
+            )
+
+            if schedule_id:
+                # 설정 기간 메시지 구성
+                period_msg = ""
+                days = self.days_spin.value()
+                months = self.months_spin.value()
+                years = self.years_spin.value()
+
+                if days > 0:
+                    period_msg += f"{days}일 "
+                if months > 0:
+                    period_msg += f"{months}개월 "
+                if years > 0:
+                    period_msg += f"{years}년"
+
+                if period_msg:
+                    period_msg = f"소비기한: {period_msg.strip()}"
+
+                save_msg = f"스케줄이 저장되었습니다.\n\n{period_msg}"
+                QMessageBox.information(self, "저장 완료", save_msg)
+                print(f"스케줄 저장 완료: ID {schedule_id}")
+
+                # 다이얼로그 닫기
+                super().accept()
+            else:
+                QMessageBox.critical(self, "저장 실패", "스케줄을 저장하지 못했습니다.")
+
         except Exception as e:
             import traceback
             error_msg = f"스케줄 저장 중 오류 발생: {str(e)}"

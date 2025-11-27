@@ -52,8 +52,55 @@ class ScheduleTab(QWidget):
     
     def load_schedules(self):
         """스케줄 목록 로드"""
-        # 여기에 데이터베이스에서 스케줄 로드 코드 구현
-        pass
+        try:
+            from models.schedules import Schedule
+
+            schedules = Schedule.get_all()
+            self.schedule_table.setRowCount(0)
+
+            for row, schedule in enumerate(schedules):
+                self.schedule_table.insertRow(row)
+
+                # 업체명
+                client_name = schedule.get('client_name', '') or ''
+                self.schedule_table.setItem(row, 0, QTableWidgetItem(client_name))
+
+                # 제품명/샘플명
+                product_name = schedule.get('product_name', '') or schedule.get('title', '') or ''
+                self.schedule_table.setItem(row, 1, QTableWidgetItem(product_name))
+
+                # 시작일
+                start_date = schedule.get('start_date', '') or ''
+                self.schedule_table.setItem(row, 2, QTableWidgetItem(start_date))
+
+                # 종료일
+                end_date = schedule.get('end_date', '') or ''
+                self.schedule_table.setItem(row, 3, QTableWidgetItem(end_date))
+
+                # 상태
+                status = schedule.get('status', 'pending') or 'pending'
+                status_text = {
+                    'pending': '대기중',
+                    'in_progress': '진행중',
+                    'completed': '완료',
+                    'cancelled': '취소'
+                }.get(status, status)
+
+                status_item = QTableWidgetItem(status_text)
+                if status == 'in_progress':
+                    status_item.setBackground(Qt.yellow)
+                elif status == 'completed':
+                    status_item.setBackground(Qt.green)
+                elif status == 'cancelled':
+                    status_item.setBackground(Qt.red)
+
+                self.schedule_table.setItem(row, 4, status_item)
+
+            print(f"스케줄 {len(schedules)}개 로드 완료")
+        except Exception as e:
+            import traceback
+            print(f"스케줄 로드 중 오류: {str(e)}")
+            traceback.print_exc()
     
     def create_new_schedule(self):
         """새 스케줄 작성 다이얼로그 표시"""
