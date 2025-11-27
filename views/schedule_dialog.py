@@ -507,6 +507,18 @@ class ScheduleCreateDialog(QDialog):
         self.product_name_input = QLineEdit()
         product_layout.addRow("제품명:", self.product_name_input)
 
+        # 포장단위 (0~3000, g 또는 kg)
+        packaging_layout = QHBoxLayout()
+        self.packaging_weight_spin = QSpinBox()
+        self.packaging_weight_spin.setRange(0, 3000)
+        self.packaging_weight_spin.setValue(0)
+        self.packaging_unit_combo = QComboBox()
+        self.packaging_unit_combo.addItems(["g", "kg"])
+        packaging_layout.addWidget(self.packaging_weight_spin)
+        packaging_layout.addWidget(self.packaging_unit_combo)
+        packaging_layout.addStretch()
+        product_layout.addRow("포장단위:", packaging_layout)
+
         # 식품 유형 콤보박스와 선택 버튼
         food_type_layout = QHBoxLayout()
         self.food_type_combo = QComboBox()
@@ -1213,7 +1225,9 @@ class ScheduleCreateDialog(QDialog):
                 'report_korean': 1 if self.report_type_korean.isChecked() else 0,
                 'report_english': 1 if self.report_type_english.isChecked() else 0,
                 'extension_test': 1 if self.extension_check.isChecked() else 0,
-                'custom_temperatures': custom_temperatures
+                'custom_temperatures': custom_temperatures,
+                'packaging_weight': self.packaging_weight_spin.value(),
+                'packaging_unit': self.packaging_unit_combo.currentText()
             }
 
             if self.is_edit_mode:
@@ -1242,7 +1256,9 @@ class ScheduleCreateDialog(QDialog):
                     report_korean=self.report_type_korean.isChecked(),
                     report_english=self.report_type_english.isChecked(),
                     extension_test=self.extension_check.isChecked(),
-                    custom_temperatures=custom_temperatures
+                    custom_temperatures=custom_temperatures,
+                    packaging_weight=self.packaging_weight_spin.value(),
+                    packaging_unit=self.packaging_unit_combo.currentText()
                 )
 
                 if schedule_id:
@@ -1516,6 +1532,14 @@ class ScheduleCreateDialog(QDialog):
 
             # 제품명
             self.product_name_input.setText(schedule.get('product_name', '') or '')
+
+            # 포장단위 로드
+            packaging_weight = schedule.get('packaging_weight', 0) or 0
+            self.packaging_weight_spin.setValue(packaging_weight)
+            packaging_unit = schedule.get('packaging_unit', 'g') or 'g'
+            unit_index = self.packaging_unit_combo.findText(packaging_unit)
+            if unit_index >= 0:
+                self.packaging_unit_combo.setCurrentIndex(unit_index)
 
             # 식품유형 로드
             food_type_id = schedule.get('food_type_id')

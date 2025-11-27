@@ -8,7 +8,8 @@ class Schedule:
                storage_condition=None, test_start_date=None, test_period_days=0,
                test_period_months=0, test_period_years=0, sampling_count=6,
                report_interim=False, report_korean=True, report_english=False,
-               extension_test=False, custom_temperatures=None, status='pending'):
+               extension_test=False, custom_temperatures=None, status='pending',
+               packaging_weight=0, packaging_unit='g'):
         """새 스케줄 생성"""
         try:
             conn = get_connection()
@@ -29,15 +30,15 @@ class Schedule:
                     product_name, food_type_id, test_method, storage_condition,
                     test_period_days, test_period_months, test_period_years,
                     sampling_count, report_interim, report_korean, report_english,
-                    extension_test, custom_temperatures
+                    extension_test, custom_temperatures, packaging_weight, packaging_unit
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 client_id, product_name, test_start_date, end_date, status,
                 product_name, food_type_id, test_method, storage_condition,
                 test_period_days, test_period_months, test_period_years,
                 sampling_count, report_interim, report_korean, report_english,
-                extension_test, custom_temperatures
+                extension_test, custom_temperatures, packaging_weight, packaging_unit
             ))
 
             schedule_id = cursor.lastrowid
@@ -202,7 +203,9 @@ class Schedule:
                     report_korean = ?,
                     report_english = ?,
                     extension_test = ?,
-                    custom_temperatures = ?
+                    custom_temperatures = ?,
+                    packaging_weight = ?,
+                    packaging_unit = ?
                 WHERE id = ?
             """, (
                 data.get('client_id'),
@@ -222,6 +225,8 @@ class Schedule:
                 data.get('report_english', 0),
                 data.get('extension_test', 0),
                 data.get('custom_temperatures'),
+                data.get('packaging_weight', 0),
+                data.get('packaging_unit', 'g'),
                 schedule_id
             ))
 
