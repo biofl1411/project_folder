@@ -533,15 +533,11 @@ class ScheduleManagementTab(QWidget):
 
         layout = QVBoxLayout(group)
 
-        # 단일 테이블 (탭 없이)
-        self.zone_tables = []
-        for i in range(3):
-            table = QTableWidget()
-            table.setEditTriggers(QTableWidget.NoEditTriggers)
-            table.setMinimumHeight(180)
-            table.setVisible(False)  # 초기에는 숨김
-            self.zone_tables.append(table)
-            layout.addWidget(table)
+        # 단일 테이블
+        self.experiment_table = QTableWidget()
+        self.experiment_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.experiment_table.setMinimumHeight(180)
+        layout.addWidget(self.experiment_table)
 
         # 비용 요약
         self.create_cost_summary(layout)
@@ -843,98 +839,87 @@ class ScheduleManagementTab(QWidget):
         except:
             pass
 
-        zone_count = 1 if test_method in ['real', 'custom_real'] else 3
+        # 단일 테이블 업데이트
+        table = self.experiment_table
+        col_count = sampling_count + 2
+        table.setColumnCount(col_count)
+        headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
+        table.setHorizontalHeaderLabels(headers)
 
-        for zone_idx in range(3):
-            table = self.zone_tables[zone_idx]
+        # 행 수: 날짜 + 제조후시간 + 검사항목들 + 1회기준
+        row_count = 2 + len(test_items) + 1
+        table.setRowCount(row_count)
 
-            # 필요한 구간만 표시
-            if zone_idx >= zone_count:
-                table.setVisible(False)
-                table.setRowCount(0)
-                table.setColumnCount(0)
-                continue
+        # 행 0: 날짜
+        date_label = QTableWidgetItem("날짜")
+        date_label.setBackground(QColor('#ADD8E6'))
+        table.setItem(0, 0, date_label)
 
-            table.setVisible(True)
-            col_count = sampling_count + 2
-            table.setColumnCount(col_count)
-            headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
-            table.setHorizontalHeaderLabels(headers)
+        for i in range(sampling_count):
+            if start_date and interval_days > 0:
+                from datetime import timedelta
+                sample_date = start_date + timedelta(days=i * interval_days)
+                date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
+            else:
+                date_value = "-"
+            date_item = QTableWidgetItem(date_value)
+            date_item.setTextAlignment(Qt.AlignCenter)
+            date_item.setBackground(QColor('#E6F3FF'))
+            table.setItem(0, i + 1, date_item)
+        table.setItem(0, col_count - 1, QTableWidgetItem(""))
 
-            # 행 수: 날짜 + 제조후시간 + 검사항목들 + 1회기준
-            row_count = 2 + len(test_items) + 1
-            table.setRowCount(row_count)
+        # 행 1: 제조후 일수
+        time_item = QTableWidgetItem("제조후 일수")
+        time_item.setBackground(QColor('#90EE90'))
+        table.setItem(1, 0, time_item)
 
-            # 행 0: 날짜
-            date_label = QTableWidgetItem("날짜")
-            date_label.setBackground(QColor('#ADD8E6'))
-            table.setItem(0, 0, date_label)
+        for i in range(sampling_count):
+            days_elapsed = int(round(i * interval_days))
+            time_value = f"{days_elapsed}일"
+            item = QTableWidgetItem(time_value)
+            item.setTextAlignment(Qt.AlignCenter)
+            table.setItem(1, i + 1, item)
+        table.setItem(1, col_count - 1, QTableWidgetItem(""))
 
-            for i in range(sampling_count):
-                if start_date and interval_days > 0:
-                    from datetime import timedelta
-                    sample_date = start_date + timedelta(days=i * interval_days)
-                    date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
-                else:
-                    date_value = "-"
-                date_item = QTableWidgetItem(date_value)
-                date_item.setTextAlignment(Qt.AlignCenter)
-                date_item.setBackground(QColor('#E6F3FF'))
-                table.setItem(0, i + 1, date_item)
-            table.setItem(0, col_count - 1, QTableWidgetItem(""))
-
-            # 행 1: 제조후 일수
-            time_item = QTableWidgetItem("제조후 일수")
-            time_item.setBackground(QColor('#90EE90'))
-            table.setItem(1, 0, time_item)
-
-            for i in range(sampling_count):
-                days_elapsed = int(round(i * interval_days))
-                time_value = f"{days_elapsed}일"
-                item = QTableWidgetItem(time_value)
-                item.setTextAlignment(Qt.AlignCenter)
-                table.setItem(1, i + 1, item)
-            table.setItem(1, col_count - 1, QTableWidgetItem(""))
-
-            total_price_per_test = 0
-            for row_idx, test_item in enumerate(test_items):
-                item_label = QTableWidgetItem(test_item)
-                item_label.setBackground(QColor('#90EE90'))
-                table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
-
-                for i in range(sampling_count):
-                    check_item = QTableWidgetItem("O")
-                    check_item.setTextAlignment(Qt.AlignCenter)
-                    table.setItem(row_idx + 2, i + 1, check_item)
-
-                price = int(fees.get(test_item, 0))
-                total_price_per_test += price
-                price_item = QTableWidgetItem(f"{price:,}")
-                price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                table.setItem(row_idx + 2, col_count - 1, price_item)
-
-            basis_item = QTableWidgetItem("(1회 기준)")
-            basis_item.setBackground(QColor('#FFFF99'))
-            table.setItem(row_count - 1, 0, basis_item)
+        total_price_per_test = 0
+        for row_idx, test_item in enumerate(test_items):
+            item_label = QTableWidgetItem(test_item)
+            item_label.setBackground(QColor('#90EE90'))
+            table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
 
             for i in range(sampling_count):
-                cost_item = QTableWidgetItem(f"{total_price_per_test:,}")
-                cost_item.setTextAlignment(Qt.AlignCenter)
-                cost_item.setBackground(QColor('#FFFF99'))
-                table.setItem(row_count - 1, i + 1, cost_item)
+                check_item = QTableWidgetItem("O")
+                check_item.setTextAlignment(Qt.AlignCenter)
+                table.setItem(row_idx + 2, i + 1, check_item)
 
-            total_item = QTableWidgetItem(f"{total_price_per_test:,}")
-            total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            total_item.setBackground(QColor('#FFFF99'))
-            table.setItem(row_count - 1, col_count - 1, total_item)
+            price = int(fees.get(test_item, 0))
+            total_price_per_test += price
+            price_item = QTableWidgetItem(f"{price:,}")
+            price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            table.setItem(row_idx + 2, col_count - 1, price_item)
 
-            # 모든 열 균등 배분
-            header = table.horizontalHeader()
-            header.setSectionResizeMode(QHeaderView.Stretch)
+        basis_item = QTableWidgetItem("(1회 기준)")
+        basis_item.setBackground(QColor('#FFFF99'))
+        table.setItem(row_count - 1, 0, basis_item)
 
-        self.update_cost_summary(schedule, test_items, fees, sampling_count, zone_count)
+        for i in range(sampling_count):
+            cost_item = QTableWidgetItem(f"{total_price_per_test:,}")
+            cost_item.setTextAlignment(Qt.AlignCenter)
+            cost_item.setBackground(QColor('#FFFF99'))
+            table.setItem(row_count - 1, i + 1, cost_item)
 
-    def update_cost_summary(self, schedule, test_items, fees, sampling_count, zone_count):
+        total_item = QTableWidgetItem(f"{total_price_per_test:,}")
+        total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        total_item.setBackground(QColor('#FFFF99'))
+        table.setItem(row_count - 1, col_count - 1, total_item)
+
+        # 모든 열 균등 배분
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+
+        self.update_cost_summary(schedule, test_items, fees, sampling_count)
+
+    def update_cost_summary(self, schedule, test_items, fees, sampling_count):
         """비용 요약 업데이트"""
         test_method = schedule.get('test_method', '') or ''
 
@@ -942,8 +927,8 @@ class ScheduleManagementTab(QWidget):
         cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수 × 구간 수)
-        test_method_cost = int(cost_per_test * sampling_count * zone_count)
+        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수)
+        test_method_cost = int(cost_per_test * sampling_count)
         self.test_method_cost.setText(f"{test_method_cost:,}원")
 
         # 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
