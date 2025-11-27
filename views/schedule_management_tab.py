@@ -19,6 +19,7 @@ from datetime import datetime
 
 from models.schedules import Schedule
 from models.fees import Fee
+from models.product_types import ProductType
 
 
 class DisplaySettingsDialog(QDialog):
@@ -757,6 +758,28 @@ class ScheduleManagementTab(QWidget):
 
         self.update_temperature_panel(schedule)
 
+    def get_test_items_from_food_type(self, schedule):
+        """식품유형에서 검사항목 가져오기"""
+        default_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        food_type_id = schedule.get('food_type_id')
+        if not food_type_id:
+            return default_items
+
+        try:
+            food_type = ProductType.get_by_id(food_type_id)
+            if food_type:
+                test_items_str = food_type.get('test_items', '') or ''
+                if test_items_str:
+                    # 쉼표로 구분된 문자열을 리스트로 변환
+                    items = [item.strip() for item in test_items_str.split(',') if item.strip()]
+                    if items:
+                        return items
+        except Exception as e:
+            print(f"식품유형에서 검사항목 로드 오류: {e}")
+
+        return default_items
+
     def update_temperature_panel(self, schedule):
         """온도 구간 패널 업데이트"""
         test_method = schedule.get('test_method', '') or ''
@@ -795,8 +818,8 @@ class ScheduleManagementTab(QWidget):
         try:
             import math
 
-            # 실험 테이블에 표시된 항목들
-            test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+            # 식품유형에서 검사항목 가져오기
+            test_items = self.get_test_items_from_food_type(schedule)
 
             # 온도 구간 수 결정
             if zone_count is None:
@@ -806,7 +829,7 @@ class ScheduleManagementTab(QWidget):
                 else:
                     zone_count = 3
 
-            # 수수료 정보에서 sample_quantity 가져오기 (실험 테이블 항목 기반)
+            # 수수료 정보에서 sample_quantity 가져오기 (식품유형의 검사항목 기반)
             sample_per_test = 0
             try:
                 all_fees = Fee.get_all()
@@ -949,7 +972,8 @@ class ScheduleManagementTab(QWidget):
             except:
                 pass
 
-        test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+        # 식품유형에서 검사항목 가져오기
+        test_items = self.get_test_items_from_food_type(schedule)
 
         fees = {}
         try:
@@ -1191,7 +1215,8 @@ class ScheduleManagementTab(QWidget):
         except:
             pass
 
-        test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+        # 식품유형에서 검사항목 가져오기
+        test_items = self.get_test_items_from_food_type(self.current_schedule)
 
         # 검사항목 행 시작 (행 2부터)
         test_item_start_row = 2
