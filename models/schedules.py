@@ -146,3 +146,67 @@ class Schedule:
         except Exception as e:
             print(f"스케줄 검색 중 오류: {str(e)}")
             return []
+
+    @staticmethod
+    def update_memo(schedule_id, memo):
+        """스케줄 메모 업데이트"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules
+                SET memo = ?
+                WHERE id = ?
+            """, (memo, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"스케줄 메모 업데이트 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_filtered(keyword=None, status=None, date_from=None, date_to=None):
+        """필터링된 스케줄 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                SELECT s.*, c.name as client_name
+                FROM schedules s
+                LEFT JOIN clients c ON s.client_id = c.id
+                WHERE 1=1
+            """
+            params = []
+
+            # 키워드 검색
+            if keyword:
+                query += " AND (s.title LIKE ? OR c.name LIKE ? OR s.product_name LIKE ?)"
+                params.extend([f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"])
+
+            # 상태 필터
+            if status:
+                query += " AND s.status = ?"
+                params.append(status)
+
+            # 기간 필터
+            if date_from:
+                query += " AND s.start_date >= ?"
+                params.append(date_from)
+
+            if date_to:
+                query += " AND (s.end_date <= ? OR s.start_date <= ?)"
+                params.extend([date_to, date_to])
+
+            query += " ORDER BY s.created_at DESC"
+
+            cursor.execute(query, params)
+            schedules = cursor.fetchall()
+            conn.close()
+
+            return [dict(s) for s in schedules]
+        except Exception as e:
+            print(f"스케줄 필터 조회 중 오류: {str(e)}")
+            return []

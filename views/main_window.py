@@ -116,8 +116,9 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(estimates_tab, "견적서 관리")
         
         # 스케줄 관리 탭
-        schedule_tab = QWidget()
-        self.tab_widget.addTab(schedule_tab, "스케줄 관리")
+        from .schedule_management_tab import ScheduleManagementTab
+        schedule_management_tab = ScheduleManagementTab()
+        self.tab_widget.addTab(schedule_management_tab, "스케줄 관리")
         
         # 사용자 관리 탭 (관리자만 접근 가능)
         users_tab = QWidget()

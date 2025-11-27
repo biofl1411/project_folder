@@ -98,10 +98,17 @@ def init_database():
         report_english INTEGER DEFAULT 0,
         extension_test INTEGER DEFAULT 0,
         custom_temperatures TEXT,
+        memo TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (client_id) REFERENCES clients (id)
     )
     ''')
+
+    # 기존 테이블에 memo 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN memo TEXT")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
     
     # 스케줄 항목 테이블
     cursor.execute('''
