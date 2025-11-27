@@ -254,11 +254,57 @@ def init_database():
             VALUES (?, ?, ?, ?, ?, ?)
             ''', (type_name, category, sterilization, pasteurization, appearance, test_items))
     
-    # 샘플 수수료 데이터 삽입 제거됨 - cash_db.xlsx에서 가져옴
-    
+    # 수수료 데이터가 비어있으면 cash_db.xlsx에서 자동 가져오기
+    cursor.execute("SELECT COUNT(*) FROM fees")
+    if cursor.fetchone()[0] == 0:
+        # cash_db.xlsx 파일 찾기
+        excel_paths = ['cash_db.xlsx', '../cash_db.xlsx', 'data/cash_db.xlsx']
+        excel_file = None
+        for path in excel_paths:
+            if os.path.exists(path):
+                excel_file = path
+                break
+
+        if excel_file:
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(excel_file)
+                ws = wb.active
+
+                # display_order 컬럼 추가 (없는 경우)
+                try:
+                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                except sqlite3.OperationalError:
+                    pass
+
+                # Excel 데이터 삽입 (첫 번째 행은 헤더)
+                inserted_count = 0
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    display_order, food_category, test_item, price, sample_qty = row
+
+                    if not test_item:
+                        continue
+
+                    display_order = display_order if display_order is not None else 100
+                    food_category = food_category if food_category else ""
+                    price = price if price is not None else 0
+                    sample_qty = int(sample_qty) if sample_qty is not None else 0
+
+                    cursor.execute('''
+                        INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (test_item, food_category, price, "", display_order, sample_qty))
+                    inserted_count += 1
+
+                print(f"cash_db.xlsx에서 {inserted_count}개 수수료 데이터 자동 로드 완료!")
+            except ImportError:
+                print("openpyxl 모듈이 없어 Excel 파일을 로드할 수 없습니다.")
+            except Exception as e:
+                print(f"Excel 파일 로드 중 오류: {e}")
+
     conn.commit()
     conn.close()
-    
+
     print("데이터베이스 초기화 완료!")
         
 
