@@ -4,15 +4,18 @@
 '''
 스케줄 작성 탭
 '''
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTableWidget, QTableWidgetItem, QHeaderView,
                            QFrame, QMessageBox)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
 
 class ScheduleTab(QWidget):
+    # 더블클릭 시 스케줄 ID를 전달하는 시그널
+    schedule_double_clicked = pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
@@ -39,12 +42,16 @@ class ScheduleTab(QWidget):
         
         # 스케줄 목록 테이블
         self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(5)
-        self.schedule_table.setHorizontalHeaderLabels(["업체명", "샘플명", "시작일", "종료일", "상태"])
+        self.schedule_table.setColumnCount(6)
+        self.schedule_table.setHorizontalHeaderLabels(["ID", "업체명", "샘플명", "시작일", "종료일", "상태"])
+        self.schedule_table.setColumnHidden(0, True)  # ID 열 숨김
         self.schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        
+
+        # 더블클릭 이벤트 연결
+        self.schedule_table.doubleClicked.connect(self.on_double_click)
+
         layout.addWidget(self.schedule_table)
         
         # 초기 데이터 로드
@@ -61,21 +68,25 @@ class ScheduleTab(QWidget):
             for row, schedule in enumerate(schedules):
                 self.schedule_table.insertRow(row)
 
+                # ID (숨김 열)
+                schedule_id = schedule.get('id', '')
+                self.schedule_table.setItem(row, 0, QTableWidgetItem(str(schedule_id)))
+
                 # 업체명
                 client_name = schedule.get('client_name', '') or ''
-                self.schedule_table.setItem(row, 0, QTableWidgetItem(client_name))
+                self.schedule_table.setItem(row, 1, QTableWidgetItem(client_name))
 
                 # 제품명/샘플명
                 product_name = schedule.get('product_name', '') or schedule.get('title', '') or ''
-                self.schedule_table.setItem(row, 1, QTableWidgetItem(product_name))
+                self.schedule_table.setItem(row, 2, QTableWidgetItem(product_name))
 
                 # 시작일
                 start_date = schedule.get('start_date', '') or ''
-                self.schedule_table.setItem(row, 2, QTableWidgetItem(start_date))
+                self.schedule_table.setItem(row, 3, QTableWidgetItem(start_date))
 
                 # 종료일
                 end_date = schedule.get('end_date', '') or ''
-                self.schedule_table.setItem(row, 3, QTableWidgetItem(end_date))
+                self.schedule_table.setItem(row, 4, QTableWidgetItem(end_date))
 
                 # 상태
                 status = schedule.get('status', 'pending') or 'pending'
@@ -94,13 +105,21 @@ class ScheduleTab(QWidget):
                 elif status == 'cancelled':
                     status_item.setBackground(Qt.red)
 
-                self.schedule_table.setItem(row, 4, status_item)
+                self.schedule_table.setItem(row, 5, status_item)
 
             print(f"스케줄 {len(schedules)}개 로드 완료")
         except Exception as e:
             import traceback
             print(f"스케줄 로드 중 오류: {str(e)}")
             traceback.print_exc()
+
+    def on_double_click(self, index):
+        """더블클릭 시 스케줄 관리 탭으로 이동"""
+        row = index.row()
+        schedule_id_item = self.schedule_table.item(row, 0)
+        if schedule_id_item:
+            schedule_id = int(schedule_id_item.text())
+            self.schedule_double_clicked.emit(schedule_id)
     
     def create_new_schedule(self):
         """새 스케줄 작성 다이얼로그 표시"""
