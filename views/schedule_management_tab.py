@@ -21,6 +21,158 @@ from models.schedules import Schedule
 from models.fees import Fee
 
 
+class DisplaySettingsDialog(QDialog):
+    """표시 항목 설정 다이얼로그"""
+
+    # 설정 가능한 필드 목록
+    FIELD_OPTIONS = [
+        ('company', '회사명', True),
+        ('test_method', '실험방법', True),
+        ('product', '제품명', True),
+        ('expiry', '소비기한', True),
+        ('storage', '보관조건', True),
+        ('food_type', '식품유형', True),
+        ('period', '실험기간', True),
+        ('interim_report', '중간보고서', True),
+        ('extension', '연장실험', True),
+        ('sampling_count', '샘플링횟수', True),
+        ('sampling_interval', '샘플링간격', True),
+        ('start_date', '시작일', True),
+        ('interim_date', '중간보고일', True),
+        ('last_test_date', '마지막실험일', True),
+        ('status', '상태', True),
+        ('temp_zone1', '온도 1구간', True),
+        ('temp_zone2', '온도 2구간', True),
+        ('temp_zone3', '온도 3구간', True),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("표시 항목 설정")
+        self.setMinimumSize(400, 500)
+        self.checkboxes = {}
+        self.initUI()
+        self.load_settings()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        # 설명 라벨
+        info_label = QLabel("스케줄 관리 화면에서 표시할 항목을 선택하세요:")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # 스크롤 영역
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        # 실험 계획 정보 그룹
+        info_group = QGroupBox("실험 계획 정보")
+        info_layout = QVBoxLayout(info_group)
+
+        for field_key, field_name, default_visible in self.FIELD_OPTIONS[:15]:
+            checkbox = QCheckBox(field_name)
+            checkbox.setChecked(default_visible)
+            self.checkboxes[field_key] = checkbox
+            info_layout.addWidget(checkbox)
+
+        scroll_layout.addWidget(info_group)
+
+        # 온도 구간 그룹
+        temp_group = QGroupBox("온도 구간")
+        temp_layout = QVBoxLayout(temp_group)
+
+        for field_key, field_name, default_visible in self.FIELD_OPTIONS[15:]:
+            checkbox = QCheckBox(field_name)
+            checkbox.setChecked(default_visible)
+            self.checkboxes[field_key] = checkbox
+            temp_layout.addWidget(checkbox)
+
+        scroll_layout.addWidget(temp_group)
+        scroll_layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        # 전체 선택/해제 버튼
+        btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(self.select_all)
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(self.deselect_all)
+        btn_layout.addWidget(select_all_btn)
+        btn_layout.addWidget(deselect_all_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        # 저장/취소 버튼
+        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.save_settings)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def select_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(True)
+
+    def deselect_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(False)
+
+    def load_settings(self):
+        """데이터베이스에서 설정 로드"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_display_fields'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                visible_fields = result['value'].split(',')
+                for field_key, checkbox in self.checkboxes.items():
+                    checkbox.setChecked(field_key in visible_fields)
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
+    def save_settings(self):
+        """설정 저장"""
+        try:
+            from database import get_connection
+
+            visible_fields = [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+            value = ','.join(visible_fields)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE key = 'schedule_display_fields'
+            """, (value,))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (key, value, description)
+                    VALUES ('schedule_display_fields', ?, '스케줄 관리 표시 필드')
+                """, (value,))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "표시 항목 설정이 저장되었습니다.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
+
+    def get_visible_fields(self):
+        """현재 체크된 필드 목록 반환"""
+        return [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+
+
 class ScheduleSelectDialog(QDialog):
     """스케줄 선택 팝업 다이얼로그"""
 
@@ -177,6 +329,9 @@ class ScheduleManagementTab(QWidget):
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.addWidget(scroll)
 
+        # 초기 표시 설정 적용
+        self.apply_display_settings()
+
     def create_schedule_selector_button(self, parent_layout):
         """스케줄 선택 버튼 영역"""
         frame = QFrame()
@@ -189,6 +344,12 @@ class ScheduleManagementTab(QWidget):
         layout.addWidget(self.selected_schedule_label)
 
         layout.addStretch()
+
+        # 표시 설정 버튼
+        settings_btn = QPushButton("표시 설정")
+        settings_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 15px; font-weight: bold;")
+        settings_btn.clicked.connect(self.open_display_settings)
+        layout.addWidget(settings_btn)
 
         # 스케줄 선택 버튼
         select_btn = QPushButton("스케줄 선택")
@@ -213,57 +374,72 @@ class ScheduleManagementTab(QWidget):
         value_style = "background-color: white; padding: 4px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 13px;"
 
         # 행 1
-        grid.addWidget(self._create_label("회사명", label_style), 0, 0)
+        self.company_label = self._create_label("회사명", label_style)
+        grid.addWidget(self.company_label, 0, 0)
         self.company_value = self._create_value_label("-", value_style)
         grid.addWidget(self.company_value, 0, 1)
-        grid.addWidget(self._create_label("실험방법", label_style), 0, 2)
+        self.test_method_label = self._create_label("실험방법", label_style)
+        grid.addWidget(self.test_method_label, 0, 2)
         self.test_method_value = self._create_value_label("-", value_style)
         grid.addWidget(self.test_method_value, 0, 3)
-        grid.addWidget(self._create_label("제품명", label_style), 0, 4)
+        self.product_label = self._create_label("제품명", label_style)
+        grid.addWidget(self.product_label, 0, 4)
         self.product_value = self._create_value_label("-", value_style)
         grid.addWidget(self.product_value, 0, 5)
 
         # 행 2
-        grid.addWidget(self._create_label("소비기한", label_style), 1, 0)
+        self.expiry_label = self._create_label("소비기한", label_style)
+        grid.addWidget(self.expiry_label, 1, 0)
         self.expiry_value = self._create_value_label("-", value_style)
         grid.addWidget(self.expiry_value, 1, 1)
-        grid.addWidget(self._create_label("보관조건", label_style), 1, 2)
+        self.storage_label = self._create_label("보관조건", label_style)
+        grid.addWidget(self.storage_label, 1, 2)
         self.storage_value = self._create_value_label("-", value_style)
         grid.addWidget(self.storage_value, 1, 3)
-        grid.addWidget(self._create_label("식품유형", label_style), 1, 4)
+        self.food_type_label = self._create_label("식품유형", label_style)
+        grid.addWidget(self.food_type_label, 1, 4)
         self.food_type_value = self._create_value_label("-", value_style)
         grid.addWidget(self.food_type_value, 1, 5)
 
         # 행 3
-        grid.addWidget(self._create_label("실험기간", label_style), 2, 0)
+        self.period_label = self._create_label("실험기간", label_style)
+        grid.addWidget(self.period_label, 2, 0)
         self.period_value = self._create_value_label("-", value_style)
         grid.addWidget(self.period_value, 2, 1)
-        grid.addWidget(self._create_label("중간보고서", label_style), 2, 2)
+        self.interim_report_label = self._create_label("중간보고서", label_style)
+        grid.addWidget(self.interim_report_label, 2, 2)
         self.interim_report_value = self._create_value_label("-", value_style)
         grid.addWidget(self.interim_report_value, 2, 3)
-        grid.addWidget(self._create_label("연장실험", label_style), 2, 4)
+        self.extension_label = self._create_label("연장실험", label_style)
+        grid.addWidget(self.extension_label, 2, 4)
         self.extension_value = self._create_value_label("-", value_style)
         grid.addWidget(self.extension_value, 2, 5)
 
         # 행 4
-        grid.addWidget(self._create_label("샘플링횟수", label_style), 3, 0)
+        self.sampling_count_label = self._create_label("샘플링횟수", label_style)
+        grid.addWidget(self.sampling_count_label, 3, 0)
         self.sampling_count_value = self._create_value_label("-", value_style)
         grid.addWidget(self.sampling_count_value, 3, 1)
-        grid.addWidget(self._create_label("샘플링간격", label_style), 3, 2)
+        self.sampling_interval_label = self._create_label("샘플링간격", label_style)
+        grid.addWidget(self.sampling_interval_label, 3, 2)
         self.sampling_interval_value = self._create_value_label("-", value_style)
         grid.addWidget(self.sampling_interval_value, 3, 3)
-        grid.addWidget(self._create_label("시작일", label_style), 3, 4)
+        self.start_date_label = self._create_label("시작일", label_style)
+        grid.addWidget(self.start_date_label, 3, 4)
         self.start_date_value = self._create_value_label("-", value_style)
         grid.addWidget(self.start_date_value, 3, 5)
 
         # 행 5
-        grid.addWidget(self._create_label("중간보고일", label_style), 4, 0)
+        self.interim_date_label = self._create_label("중간보고일", label_style)
+        grid.addWidget(self.interim_date_label, 4, 0)
         self.interim_date_value = self._create_value_label("-", value_style)
         grid.addWidget(self.interim_date_value, 4, 1)
-        grid.addWidget(self._create_label("마지막실험일", label_style), 4, 2)
+        self.last_test_date_label = self._create_label("마지막실험일", label_style)
+        grid.addWidget(self.last_test_date_label, 4, 2)
         self.last_test_date_value = self._create_value_label("-", value_style)
         grid.addWidget(self.last_test_date_value, 4, 3)
-        grid.addWidget(self._create_label("상태", label_style), 4, 4)
+        self.status_label = self._create_label("상태", label_style)
+        grid.addWidget(self.status_label, 4, 4)
         self.status_value = self._create_value_label("-", value_style)
         grid.addWidget(self.status_value, 4, 5)
 
@@ -284,9 +460,12 @@ class ScheduleManagementTab(QWidget):
         value_style = "background-color: white; padding: 4px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 13px;"
 
         grid.addWidget(self._create_label("구분", label_style), 0, 0)
-        grid.addWidget(self._create_label("1구간", label_style), 0, 1)
-        grid.addWidget(self._create_label("2구간", label_style), 0, 2)
-        grid.addWidget(self._create_label("3구간", label_style), 0, 3)
+        self.temp_zone1_label = self._create_label("1구간", label_style)
+        grid.addWidget(self.temp_zone1_label, 0, 1)
+        self.temp_zone2_label = self._create_label("2구간", label_style)
+        grid.addWidget(self.temp_zone2_label, 0, 2)
+        self.temp_zone3_label = self._create_label("3구간", label_style)
+        grid.addWidget(self.temp_zone3_label, 0, 3)
 
         grid.addWidget(self._create_label("온도", label_style), 1, 0)
         self.temp_zone1_value = self._create_value_label("-", value_style)
@@ -778,3 +957,60 @@ class ScheduleManagementTab(QWidget):
 
         final_cost = test_method_cost + report_cost
         self.final_cost.setText(f"{final_cost:,}원")
+
+    def open_display_settings(self):
+        """표시 설정 다이얼로그 열기"""
+        dialog = DisplaySettingsDialog(self)
+        if dialog.exec_():
+            # 설정이 저장되면 화면 새로고침
+            self.apply_display_settings()
+
+    def get_display_settings(self):
+        """데이터베이스에서 표시 설정 로드"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_display_fields'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return result['value'].split(',')
+            else:
+                # 기본값: 모든 필드 표시
+                return [opt[0] for opt in DisplaySettingsDialog.FIELD_OPTIONS]
+        except Exception as e:
+            print(f"표시 설정 로드 오류: {e}")
+            return [opt[0] for opt in DisplaySettingsDialog.FIELD_OPTIONS]
+
+    def apply_display_settings(self):
+        """표시 설정을 UI에 적용"""
+        visible_fields = self.get_display_settings()
+
+        # 필드 키와 해당 위젯 매핑
+        field_widgets = {
+            'company': (self.company_label, self.company_value),
+            'test_method': (self.test_method_label, self.test_method_value),
+            'product': (self.product_label, self.product_value),
+            'expiry': (self.expiry_label, self.expiry_value),
+            'storage': (self.storage_label, self.storage_value),
+            'food_type': (self.food_type_label, self.food_type_value),
+            'period': (self.period_label, self.period_value),
+            'interim_report': (self.interim_report_label, self.interim_report_value),
+            'extension': (self.extension_label, self.extension_value),
+            'sampling_count': (self.sampling_count_label, self.sampling_count_value),
+            'sampling_interval': (self.sampling_interval_label, self.sampling_interval_value),
+            'start_date': (self.start_date_label, self.start_date_value),
+            'interim_date': (self.interim_date_label, self.interim_date_value),
+            'last_test_date': (self.last_test_date_label, self.last_test_date_value),
+            'status': (self.status_label, self.status_value),
+            'temp_zone1': (self.temp_zone1_label, self.temp_zone1_value),
+            'temp_zone2': (self.temp_zone2_label, self.temp_zone2_value),
+            'temp_zone3': (self.temp_zone3_label, self.temp_zone3_value),
+        }
+
+        for field_key, (label_widget, value_widget) in field_widgets.items():
+            is_visible = field_key in visible_fields
+            label_widget.setVisible(is_visible)
+            value_widget.setVisible(is_visible)
