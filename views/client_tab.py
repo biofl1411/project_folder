@@ -376,17 +376,21 @@ class ClientDialog(QDialog):
         
         # 버튼 영역
         button_layout = QHBoxLayout()
-        
+
         save_btn = QPushButton("저장")
+        save_btn.setAutoDefault(False)
+        save_btn.setDefault(False)
         save_btn.clicked.connect(self.save_client)
-        
+
         cancel_btn = QPushButton("취소")
+        cancel_btn.setAutoDefault(False)
+        cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
-        
+
         button_layout.addStretch()
         button_layout.addWidget(save_btn)
         button_layout.addWidget(cancel_btn)
-        
+
         layout.addLayout(button_layout)
     
     def save_client(self):

@@ -100,8 +100,9 @@ class Fee:
                 # 다른 예외는 다시 발생시킴
                 raise
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
+        return rowcount > 0
     
     @staticmethod
     def delete(fee_id):
@@ -110,8 +111,9 @@ class Fee:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM fees WHERE id = ?", (fee_id,))
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
+        return rowcount > 0
     
     @staticmethod
     def calculate_total_fee(test_items):
