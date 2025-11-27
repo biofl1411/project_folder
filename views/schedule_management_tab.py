@@ -538,6 +538,7 @@ class ScheduleManagementTab(QWidget):
         self.experiment_table = QTableWidget()
         self.experiment_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.experiment_table.setMinimumHeight(250)
+        self.experiment_table.cellClicked.connect(self.on_experiment_cell_clicked)
         layout.addWidget(self.experiment_table)
 
         # 비용 요약
@@ -924,12 +925,18 @@ class ScheduleManagementTab(QWidget):
         """비용 요약 업데이트"""
         test_method = schedule.get('test_method', '') or ''
 
+        # 실험 방법에 따른 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
         # 1회 기준 비용 (소수점 제거)
         cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수)
-        test_method_cost = int(cost_per_test * sampling_count)
+        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수 × 구간 수)
+        test_method_cost = int(cost_per_test * sampling_count * zone_count)
         self.test_method_cost.setText(f"{test_method_cost:,}원")
 
         # 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
@@ -1000,3 +1007,115 @@ class ScheduleManagementTab(QWidget):
             is_visible = field_key in visible_fields
             label_widget.setVisible(is_visible)
             value_widget.setVisible(is_visible)
+
+    def on_experiment_cell_clicked(self, row, col):
+        """실험 테이블 셀 클릭 시 O/X/- 토글"""
+        if not self.current_schedule:
+            return
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # 검사항목 행 범위 확인 (행 2부터 마지막 행-1까지가 검사항목)
+        # 행 0: 날짜, 행 1: 제조후 일수, 행 2~n-1: 검사항목, 행 n: 1회 기준
+        test_item_start_row = 2
+        test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
+
+        # 검사항목 셀만 토글 가능 (열 1~sampling_count)
+        if row < test_item_start_row or row > test_item_end_row:
+            return
+        if col < 1 or col > sampling_count:
+            return
+
+        item = table.item(row, col)
+        if item is None:
+            return
+
+        current_value = item.text()
+
+        # O → X → - → O 순환
+        if current_value == 'O':
+            new_value = 'X'
+            item.setForeground(QBrush(QColor('#e74c3c')))  # 빨간색
+        elif current_value == 'X':
+            new_value = '-'
+            item.setForeground(QBrush(QColor('#95a5a6')))  # 회색
+        else:
+            new_value = 'O'
+            item.setForeground(QBrush(QColor('#000000')))  # 검정색
+
+        item.setText(new_value)
+
+        # 비용 재계산
+        self.recalculate_costs()
+
+    def recalculate_costs(self):
+        """셀 변경 시 비용 재계산"""
+        if not self.current_schedule:
+            return
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        test_method = self.current_schedule.get('test_method', '') or ''
+
+        # 수수료 정보 로드
+        fees = {}
+        try:
+            all_fees = Fee.get_all()
+            for fee in all_fees:
+                fees[fee['test_item']] = fee['price']
+        except:
+            pass
+
+        test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        # 검사항목 행 시작 (행 2부터)
+        test_item_start_row = 2
+        col_count = table.columnCount()
+
+        # 각 회차별 활성 항목 비용 합계 계산
+        column_costs = []  # 각 회차별 비용
+        for col_idx in range(1, sampling_count + 1):
+            col_cost = 0
+            for row_idx, test_item in enumerate(test_items):
+                item = table.item(test_item_start_row + row_idx, col_idx)
+                if item and item.text() == 'O':
+                    col_cost += int(fees.get(test_item, 0))
+            column_costs.append(col_cost)
+
+        # (1회 기준) 행 업데이트
+        basis_row = table.rowCount() - 1
+        for i, col_cost in enumerate(column_costs):
+            cost_item = table.item(basis_row, i + 1)
+            if cost_item:
+                cost_item.setText(f"{col_cost:,}")
+
+        # 전체 합계 계산
+        total_active_cost = sum(column_costs)
+
+        # 실험 방법에 따른 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 1회 기준 비용 (첫 번째 회차 기준으로 표시)
+        first_col_cost = column_costs[0] if column_costs else 0
+        self.cost_per_test.setText(f"{first_col_cost:,}원")
+
+        # 실험 방법 가격 (모든 회차 비용 합계 × 구간 수)
+        test_method_cost = int(total_active_cost * zone_count)
+        self.test_method_cost.setText(f"{test_method_cost:,}원")
+
+        # 보고서 비용
+        if test_method in ['real', 'custom_real']:
+            report_cost = 200000
+        elif test_method in ['acceleration', 'custom_acceleration']:
+            report_cost = 300000
+        else:
+            report_cost = 200000
+        self.report_cost.setText(f"{report_cost:,}원")
+
+        # 최종 비용
+        final_cost = test_method_cost + report_cost
+        self.final_cost.setText(f"{final_cost:,}원")
