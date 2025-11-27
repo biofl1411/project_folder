@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QLineEdit, QPushButton, QTextEdit, QDateEdit,
     QComboBox, QLabel, QMessageBox, QWidget, QRadioButton,
     QTableWidget, QTableWidgetItem, QSpinBox, QButtonGroup,
-    QFrame, QApplication, QCheckBox
+    QFrame, QApplication, QCheckBox, QHeaderView
 )
 from PyQt5.QtCore import QDate, Qt, QTranslator, QEvent
 
