@@ -256,65 +256,7 @@ class ScheduleCreateDialog(QDialog):
         self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
         self.is_edit_mode = schedule_id is not None
         self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
-        self.resize(750, 850)
-        self.setMinimumSize(700, 800)
-
-        # 전체 스타일 설정
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-            }
-            QGroupBox {
-                font-size: 14px;
-                font-weight: bold;
-                border: 2px solid #3498db;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 10px;
-                background-color: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 8px;
-                color: #2c3e50;
-            }
-            QLabel {
-                font-size: 13px;
-                color: #2c3e50;
-                padding: 2px;
-            }
-            QLineEdit, QComboBox, QSpinBox, QDateEdit {
-                font-size: 13px;
-                padding: 6px 10px;
-                border: 1px solid #bdc3c7;
-                border-radius: 4px;
-                background-color: white;
-                min-height: 28px;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateEdit:focus {
-                border: 2px solid #3498db;
-            }
-            QPushButton {
-                font-size: 13px;
-                padding: 8px 16px;
-                border-radius: 4px;
-                background-color: #3498db;
-                color: white;
-                border: none;
-                min-height: 32px;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-            QPushButton:pressed {
-                background-color: #1c6ea4;
-            }
-            QRadioButton, QCheckBox {
-                font-size: 13px;
-                spacing: 8px;
-            }
-        """)
+        self.resize(700, 850)
         
         # 온도 상수 정의 - 인스턴스 변수로 추가
         # 실측실험 온도
@@ -338,16 +280,14 @@ class ScheduleCreateDialog(QDialog):
         
         # 레이아웃 설정
         self.main_layout = QVBoxLayout()
-        self.main_layout.setSpacing(15)
-        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout.setSpacing(10)
+        self.main_layout.setContentsMargins(15, 15, 15, 15)
         self.setLayout(self.main_layout)
 
-        # 업체 정보 영역 수정
+        # 업체 정보 영역
         client_group = QGroupBox("업체 정보")
         client_layout = QFormLayout()
-        client_layout.setSpacing(12)
-        client_layout.setContentsMargins(15, 20, 15, 15)
-        client_layout.setLabelAlignment(Qt.AlignRight)
+        client_layout.setSpacing(8)
         client_group.setLayout(client_layout)
 
         # 업체명 입력 및 검색
@@ -387,9 +327,7 @@ class ScheduleCreateDialog(QDialog):
         # 실험 정보 영역
         test_group = QGroupBox("실험 정보")
         test_layout = QFormLayout()
-        test_layout.setSpacing(12)
-        test_layout.setContentsMargins(15, 20, 15, 15)
-        test_layout.setLabelAlignment(Qt.AlignRight)
+        test_layout.setSpacing(8)
         test_group.setLayout(test_layout)
         
         # 실험 방법 라디오 버튼 - 4가지 옵션으로 확장
@@ -564,12 +502,10 @@ class ScheduleCreateDialog(QDialog):
         # 실험 정보 영역 추가
         self.main_layout.addWidget(test_group)
         
-        # 제품 정보 영역 수정
+        # 제품 정보 영역
         product_group = QGroupBox("제품 정보")
         product_layout = QFormLayout()
-        product_layout.setSpacing(12)
-        product_layout.setContentsMargins(15, 20, 15, 15)
-        product_layout.setLabelAlignment(Qt.AlignRight)
+        product_layout.setSpacing(8)
         product_group.setLayout(product_layout)
 
         # 제품명
