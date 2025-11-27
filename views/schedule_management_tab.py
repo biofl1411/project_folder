@@ -553,29 +553,43 @@ class ScheduleManagementTab(QWidget):
         cost_layout = QGridLayout(cost_frame)
         cost_layout.setSpacing(5)
 
-        cost_layout.addWidget(QLabel("(1회 기준)"), 0, 0)
+        # 1. 1회 기준 (합계)
+        cost_layout.addWidget(QLabel("1. 1회 기준 (합계)"), 0, 0)
         self.cost_per_test = QLabel("-")
         self.cost_per_test.setAlignment(Qt.AlignRight)
         cost_layout.addWidget(self.cost_per_test, 0, 1)
 
-        cost_layout.addWidget(QLabel("실험 방법 가격"), 0, 2)
-        self.test_method_cost = QLabel("-")
-        self.test_method_cost.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.test_method_cost, 0, 3)
+        # 2. 회차별 총계 (합계)
+        cost_layout.addWidget(QLabel("2. 회차별 총계 (합계)"), 0, 2)
+        self.total_rounds_cost = QLabel("-")
+        self.total_rounds_cost.setAlignment(Qt.AlignRight)
+        cost_layout.addWidget(self.total_rounds_cost, 0, 3)
 
-        cost_layout.addWidget(QLabel("보고서 비용"), 1, 0)
+        # 3. 보고서 비용
+        cost_layout.addWidget(QLabel("3. 보고서 비용"), 1, 0)
         self.report_cost = QLabel("-")
         self.report_cost.setAlignment(Qt.AlignRight)
         cost_layout.addWidget(self.report_cost, 1, 1)
 
-        final_label = QLabel("최종비용")
-        final_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #e67e22;")
+        # 4. 최종비용 (부가세별도) - 계산식 포함
+        final_label = QLabel("4. 최종비용 (부가세별도)")
+        final_label.setStyleSheet("font-weight: bold; color: #e67e22;")
         cost_layout.addWidget(final_label, 1, 2)
 
-        self.final_cost = QLabel("-")
-        self.final_cost.setStyleSheet("font-weight: bold; font-size: 13px; color: white; background-color: #e67e22; padding: 5px; border-radius: 3px;")
-        self.final_cost.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.final_cost, 1, 3)
+        self.final_cost_formula = QLabel("-")
+        self.final_cost_formula.setStyleSheet("font-weight: bold; color: #e67e22;")
+        self.final_cost_formula.setAlignment(Qt.AlignRight)
+        cost_layout.addWidget(self.final_cost_formula, 1, 3)
+
+        # 5. 최종비용 (부가세 포함)
+        final_vat_label = QLabel("5. 최종비용 (부가세 포함)")
+        final_vat_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #c0392b;")
+        cost_layout.addWidget(final_vat_label, 2, 2)
+
+        self.final_cost_with_vat = QLabel("-")
+        self.final_cost_with_vat.setStyleSheet("font-weight: bold; font-size: 13px; color: white; background-color: #e67e22; padding: 5px; border-radius: 3px;")
+        self.final_cost_with_vat.setAlignment(Qt.AlignRight)
+        cost_layout.addWidget(self.final_cost_with_vat, 2, 3)
 
         parent_layout.addWidget(cost_frame)
 
@@ -931,15 +945,15 @@ class ScheduleManagementTab(QWidget):
         else:
             zone_count = 3
 
-        # 1회 기준 비용 (소수점 제거)
+        # 1. 1회 기준 (합계) - 모든 검사항목 합계
         cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수 × 구간 수)
-        test_method_cost = int(cost_per_test * sampling_count * zone_count)
-        self.test_method_cost.setText(f"{test_method_cost:,}원")
+        # 2. 회차별 총계 (합계) - 초기 로드 시 모든 O가 체크되어 있으므로 1회기준 × 샘플링횟수
+        total_rounds_cost = int(cost_per_test * sampling_count)
+        self.total_rounds_cost.setText(f"{total_rounds_cost:,}원")
 
-        # 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
+        # 3. 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
         if test_method in ['real', 'custom_real']:
             report_cost = 200000
         elif test_method in ['acceleration', 'custom_acceleration']:
@@ -948,8 +962,14 @@ class ScheduleManagementTab(QWidget):
             report_cost = 200000  # 기본값
         self.report_cost.setText(f"{report_cost:,}원")
 
-        final_cost = test_method_cost + report_cost
-        self.final_cost.setText(f"{final_cost:,}원")
+        # 4. 최종비용 (부가세별도) - 계산식 표시
+        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost)
+        formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
+        self.final_cost_formula.setText(formula_text)
+
+        # 5. 최종비용 (부가세 포함) - 10% 부가세
+        final_cost_with_vat = int(final_cost_no_vat * 1.1)
+        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
 
     def open_display_settings(self):
         """표시 설정 다이얼로그 열기"""
@@ -1009,7 +1029,7 @@ class ScheduleManagementTab(QWidget):
             value_widget.setVisible(is_visible)
 
     def on_experiment_cell_clicked(self, row, col):
-        """실험 테이블 셀 클릭 시 O/X/- 토글"""
+        """실험 테이블 셀 클릭 시 O/X 토글"""
         if not self.current_schedule:
             return
 
@@ -1033,13 +1053,10 @@ class ScheduleManagementTab(QWidget):
 
         current_value = item.text()
 
-        # O → X → - → O 순환
+        # O → X → O 순환
         if current_value == 'O':
             new_value = 'X'
             item.setForeground(QBrush(QColor('#e74c3c')))  # 빨간색
-        elif current_value == 'X':
-            new_value = '-'
-            item.setForeground(QBrush(QColor('#95a5a6')))  # 회색
         else:
             new_value = 'O'
             item.setForeground(QBrush(QColor('#000000')))  # 검정색
@@ -1071,7 +1088,6 @@ class ScheduleManagementTab(QWidget):
 
         # 검사항목 행 시작 (행 2부터)
         test_item_start_row = 2
-        col_count = table.columnCount()
 
         # 각 회차별 활성 항목 비용 합계 계산
         column_costs = []  # 각 회차별 비용
@@ -1090,24 +1106,21 @@ class ScheduleManagementTab(QWidget):
             if cost_item:
                 cost_item.setText(f"{col_cost:,}")
 
-        # 전체 합계 계산
-        total_active_cost = sum(column_costs)
-
         # 실험 방법에 따른 구간 수 결정 (실측=1구간, 가속=3구간)
         if test_method in ['real', 'custom_real']:
             zone_count = 1
         else:
             zone_count = 3
 
-        # 1회 기준 비용 (첫 번째 회차 기준으로 표시)
-        first_col_cost = column_costs[0] if column_costs else 0
-        self.cost_per_test.setText(f"{first_col_cost:,}원")
+        # 1. 1회 기준 (합계) - 모든 검사항목 합계
+        cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
+        self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (모든 회차 비용 합계 × 구간 수)
-        test_method_cost = int(total_active_cost * zone_count)
-        self.test_method_cost.setText(f"{test_method_cost:,}원")
+        # 2. 회차별 총계 (합계) - 모든 활성 항목의 합계
+        total_rounds_cost = sum(column_costs)
+        self.total_rounds_cost.setText(f"{total_rounds_cost:,}원")
 
-        # 보고서 비용
+        # 3. 보고서 비용
         if test_method in ['real', 'custom_real']:
             report_cost = 200000
         elif test_method in ['acceleration', 'custom_acceleration']:
@@ -1116,6 +1129,13 @@ class ScheduleManagementTab(QWidget):
             report_cost = 200000
         self.report_cost.setText(f"{report_cost:,}원")
 
-        # 최종 비용
-        final_cost = test_method_cost + report_cost
-        self.final_cost.setText(f"{final_cost:,}원")
+        # 4. 최종비용 (부가세별도) - 계산식 표시
+        # 실측: 회차별총계 × 1 + 보고서비용
+        # 가속: 회차별총계 × 3 + 보고서비용
+        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost)
+        formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
+        self.final_cost_formula.setText(formula_text)
+
+        # 5. 최종비용 (부가세 포함) - 10% 부가세
+        final_cost_with_vat = int(final_cost_no_vat * 1.1)
+        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
