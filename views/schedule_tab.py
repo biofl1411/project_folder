@@ -6,7 +6,8 @@
 '''
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTableWidget, QTableWidgetItem, QHeaderView,
-                           QFrame, QMessageBox)
+                           QFrame, QMessageBox, QComboBox, QCheckBox, QLabel,
+                           QApplication)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
@@ -48,15 +49,33 @@ class ScheduleTab(QWidget):
         button_layout.addWidget(new_schedule_btn)
         button_layout.addWidget(edit_schedule_btn)
         button_layout.addWidget(delete_schedule_btn)
+
+        # 구분선
+        button_layout.addSpacing(20)
+
+        # 상태 변경 영역
+        button_layout.addWidget(QLabel("상태 변경:"))
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["대기", "입고예정", "입고", "종료"])
+        self.status_combo.setMinimumWidth(100)
+        button_layout.addWidget(self.status_combo)
+
+        change_status_btn = QPushButton("일괄 변경")
+        change_status_btn.setStyleSheet("background-color: #27ae60; color: white;")
+        change_status_btn.clicked.connect(self.change_selected_status)
+        button_layout.addWidget(change_status_btn)
+
         button_layout.addStretch()
-        
+
         layout.addWidget(button_frame)
         
         # 스케줄 목록 테이블
         self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(6)
-        self.schedule_table.setHorizontalHeaderLabels(["ID", "업체명", "샘플명", "시작일", "종료일", "상태"])
-        self.schedule_table.setColumnHidden(0, True)  # ID 열 숨김
+        self.schedule_table.setColumnCount(7)
+        self.schedule_table.setHorizontalHeaderLabels(["선택", "ID", "업체명", "샘플명", "시작일", "종료일", "상태"])
+        self.schedule_table.setColumnHidden(1, True)  # ID 열 숨김
+        self.schedule_table.setColumnWidth(0, 50)  # 선택 열 너비 고정
         self.schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -80,44 +99,56 @@ class ScheduleTab(QWidget):
             for row, schedule in enumerate(schedules):
                 self.schedule_table.insertRow(row)
 
+                # 체크박스 (선택 열)
+                checkbox = QCheckBox()
+                checkbox_widget = QWidget()
+                checkbox_layout = QHBoxLayout(checkbox_widget)
+                checkbox_layout.addWidget(checkbox)
+                checkbox_layout.setAlignment(Qt.AlignCenter)
+                checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                self.schedule_table.setCellWidget(row, 0, checkbox_widget)
+
                 # ID (숨김 열)
                 schedule_id = schedule.get('id', '')
-                self.schedule_table.setItem(row, 0, QTableWidgetItem(str(schedule_id)))
+                self.schedule_table.setItem(row, 1, QTableWidgetItem(str(schedule_id)))
 
                 # 업체명
                 client_name = schedule.get('client_name', '') or ''
-                self.schedule_table.setItem(row, 1, QTableWidgetItem(client_name))
+                self.schedule_table.setItem(row, 2, QTableWidgetItem(client_name))
 
                 # 제품명/샘플명
                 product_name = schedule.get('product_name', '') or schedule.get('title', '') or ''
-                self.schedule_table.setItem(row, 2, QTableWidgetItem(product_name))
+                self.schedule_table.setItem(row, 3, QTableWidgetItem(product_name))
 
                 # 시작일
                 start_date = schedule.get('start_date', '') or ''
-                self.schedule_table.setItem(row, 3, QTableWidgetItem(start_date))
+                self.schedule_table.setItem(row, 4, QTableWidgetItem(start_date))
 
                 # 종료일
                 end_date = schedule.get('end_date', '') or ''
-                self.schedule_table.setItem(row, 4, QTableWidgetItem(end_date))
+                self.schedule_table.setItem(row, 5, QTableWidgetItem(end_date))
 
-                # 상태
+                # 상태 (새로운 상태값 매핑)
                 status = schedule.get('status', 'pending') or 'pending'
                 status_text = {
-                    'pending': '대기중',
-                    'in_progress': '진행중',
-                    'completed': '완료',
-                    'cancelled': '취소'
+                    'pending': '대기',
+                    'scheduled': '입고예정',
+                    'received': '입고',
+                    'completed': '종료',
+                    # 기존 상태 호환
+                    'in_progress': '입고',
+                    'cancelled': '종료'
                 }.get(status, status)
 
                 status_item = QTableWidgetItem(status_text)
-                if status == 'in_progress':
+                if status in ['scheduled']:
+                    status_item.setBackground(Qt.cyan)
+                elif status in ['received', 'in_progress']:
                     status_item.setBackground(Qt.yellow)
-                elif status == 'completed':
+                elif status in ['completed', 'cancelled']:
                     status_item.setBackground(Qt.green)
-                elif status == 'cancelled':
-                    status_item.setBackground(Qt.red)
 
-                self.schedule_table.setItem(row, 5, status_item)
+                self.schedule_table.setItem(row, 6, status_item)
 
             print(f"스케줄 {len(schedules)}개 로드 완료")
         except Exception as e:
@@ -128,7 +159,7 @@ class ScheduleTab(QWidget):
     def on_double_click(self, index):
         """더블클릭 시 스케줄 관리 탭으로 이동"""
         row = index.row()
-        schedule_id_item = self.schedule_table.item(row, 0)
+        schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if schedule_id_item:
             schedule_id = int(schedule_id_item.text())
             self.schedule_double_clicked.emit(schedule_id)
@@ -141,13 +172,13 @@ class ScheduleTab(QWidget):
             return
 
         row = selected_rows[0].row()
-        schedule_id_item = self.schedule_table.item(row, 0)
+        schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if not schedule_id_item:
             return
 
         schedule_id = int(schedule_id_item.text())
-        client_name = self.schedule_table.item(row, 1).text()
-        product_name = self.schedule_table.item(row, 2).text()
+        client_name = self.schedule_table.item(row, 2).text()  # 업체명은 2번 열
+        product_name = self.schedule_table.item(row, 3).text()  # 제품명은 3번 열
 
         reply = QMessageBox.question(
             self, '삭제 확인',
@@ -193,7 +224,7 @@ class ScheduleTab(QWidget):
             return
 
         row = selected_rows[0].row()
-        schedule_id_item = self.schedule_table.item(row, 0)
+        schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if not schedule_id_item:
             return
 
@@ -211,7 +242,64 @@ class ScheduleTab(QWidget):
             error_msg = f"스케줄 수정 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
             print(error_msg)
             QMessageBox.critical(self, "오류", error_msg)
-    
+
+    def change_selected_status(self):
+        """체크된 스케줄들의 상태를 일괄 변경"""
+        try:
+            from models.schedules import Schedule
+
+            # 선택된 상태 가져오기
+            selected_status_text = self.status_combo.currentText()
+            status_map = {
+                '대기': 'pending',
+                '입고예정': 'scheduled',
+                '입고': 'received',
+                '종료': 'completed'
+            }
+            new_status = status_map.get(selected_status_text, 'pending')
+
+            # 체크된 행 찾기
+            checked_rows = []
+            for row in range(self.schedule_table.rowCount()):
+                checkbox_widget = self.schedule_table.cellWidget(row, 0)
+                if checkbox_widget:
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox and checkbox.isChecked():
+                        checked_rows.append(row)
+
+            if not checked_rows:
+                QMessageBox.warning(self, "변경 실패", "변경할 스케줄을 체크하세요.")
+                return
+
+            # 확인 대화상자
+            reply = QMessageBox.question(
+                self, '상태 변경 확인',
+                f'{len(checked_rows)}개의 스케줄 상태를 "{selected_status_text}"(으)로 변경하시겠습니까?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if reply == QMessageBox.Yes:
+                success_count = 0
+                for row in checked_rows:
+                    schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
+                    if schedule_id_item:
+                        schedule_id = int(schedule_id_item.text())
+                        if Schedule.update_status(schedule_id, new_status):
+                            success_count += 1
+
+                QMessageBox.information(
+                    self, "변경 완료",
+                    f"{success_count}개의 스케줄 상태가 변경되었습니다."
+                )
+                self.load_schedules()
+
+        except Exception as e:
+            import traceback
+            error_msg = f"상태 변경 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)
+            QMessageBox.critical(self, "오류", error_msg)
+
     def add_sample_data(self):
         """샘플 데이터 추가 (테스트용)"""
         sample_data = [

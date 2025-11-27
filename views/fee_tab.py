@@ -62,7 +62,7 @@ class FeeTab(QWidget):
         self.fee_table = QTableWidget()
         self.fee_table.setColumnCount(7)  # 정렬순서 열 추가로 7개 열로 증가
         self.fee_table.setHorizontalHeaderLabels([
-            "선택", "검사항목", "식품 카테고리", "가격", "설명", "정렬순서", "생성일"
+            "선택", "검사항목", "식품 카테고리", "가격", "검체 수량(g)", "정렬순서", "생성일"
         ])
         # 체크박스 열의 너비 설정
         self.fee_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
@@ -259,7 +259,7 @@ class FeeTab(QWidget):
                 "검사항목": "test_item",
                 "식품 카테고리": "food_category",
                 "가격": "price",
-                "설명": "description",
+                "검체 수량(g)": "description",
                 "정렬순서": "display_order"  # 정렬순서 필드 추가
             }
             
@@ -387,7 +387,7 @@ class FeeTab(QWidget):
                     "검사항목": fee_dict["test_item"],
                     "식품 카테고리": fee_dict["food_category"] or "",
                     "가격": fee_dict["price"],
-                    "설명": fee_dict["description"] or "",
+                    "검체 수량(g)": fee_dict["description"] or "",
                     "정렬순서": fee_dict["display_order"],
                     "생성일": fee_dict["created_at"] or ""
                 })
@@ -451,7 +451,8 @@ class FeeDialog(QDialog):
         form_layout.addRow("* 가격:", self.price_input)
         
         self.description_input = QLineEdit()
-        form_layout.addRow("설명:", self.description_input)
+        self.description_input.setPlaceholderText("실험에 필요한 검체 수량 (예: 100)")
+        form_layout.addRow("검체 수량(g):", self.description_input)
         
         # 정렬순서 입력 추가
         self.order_input = QSpinBox()
