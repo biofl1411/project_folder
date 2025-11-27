@@ -15,6 +15,7 @@ env/
 
 # Database
 *.db
+!data/app.db
 
 # OS files
 .DS_Store
