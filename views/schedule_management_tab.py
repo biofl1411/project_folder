@@ -96,7 +96,10 @@ class ScheduleSelectDialog(QDialog):
                 self.schedule_table.setItem(row, 4, QTableWidgetItem(schedule.get('start_date', '') or '-'))
 
                 status = schedule.get('status', 'pending') or 'pending'
-                status_text = {'pending': '대기중', 'in_progress': '진행중', 'completed': '완료', 'cancelled': '취소'}.get(status, status)
+                status_text = {
+                    'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
+                    'in_progress': '입고', 'cancelled': '종료'
+                }.get(status, status)
                 self.schedule_table.setItem(row, 5, QTableWidgetItem(status_text))
         except Exception as e:
             print(f"스케줄 로드 오류: {e}")
@@ -116,7 +119,10 @@ class ScheduleSelectDialog(QDialog):
             self.schedule_table.setItem(row, 3, QTableWidgetItem(test_method_text))
             self.schedule_table.setItem(row, 4, QTableWidgetItem(schedule.get('start_date', '') or '-'))
             status = schedule.get('status', 'pending') or 'pending'
-            status_text = {'pending': '대기중', 'in_progress': '진행중', 'completed': '완료', 'cancelled': '취소'}.get(status, status)
+            status_text = {
+                'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
+                'in_progress': '입고', 'cancelled': '종료'
+            }.get(status, status)
             self.schedule_table.setItem(row, 5, QTableWidgetItem(status_text))
 
     def accept(self):
@@ -517,7 +523,10 @@ class ScheduleManagementTab(QWidget):
             self.last_test_date_value.setText('-')
 
         status = schedule.get('status', 'pending') or 'pending'
-        status_text = {'pending': '대기중', 'in_progress': '진행중', 'completed': '완료', 'cancelled': '취소'}.get(status, status)
+        status_text = {
+            'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
+            'in_progress': '입고', 'cancelled': '종료'
+        }.get(status, status)
         self.status_value.setText(status_text)
 
         self.update_temperature_panel(schedule)
