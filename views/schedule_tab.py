@@ -7,11 +7,139 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTableWidget, QTableWidgetItem, QHeaderView,
                            QFrame, QMessageBox, QComboBox, QCheckBox, QLabel,
-                           QApplication)
+                           QApplication, QDialog, QGroupBox, QScrollArea,
+                           QDialogButtonBox)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
+
+
+class ScheduleDisplaySettingsDialog(QDialog):
+    """스케줄 작성 탭 표시 컬럼 설정 다이얼로그"""
+
+    # 설정 가능한 컬럼 목록 (key, display_name, default_visible)
+    COLUMN_OPTIONS = [
+        ('client_name', '업체명', True),
+        ('product_name', '샘플명', True),
+        ('test_method', '실험방법', False),
+        ('storage_condition', '보관조건', False),
+        ('food_type', '식품유형', False),
+        ('start_date', '시작일', True),
+        ('end_date', '종료일', True),
+        ('sampling_count', '샘플링횟수', False),
+        ('status', '상태', True),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("표시 항목 설정")
+        self.setMinimumSize(350, 400)
+        self.checkboxes = {}
+        self.initUI()
+        self.load_settings()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        # 설명 라벨
+        info_label = QLabel("스케줄 목록에서 표시할 컬럼을 선택하세요:")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # 스크롤 영역
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        # 컬럼 설정 그룹
+        column_group = QGroupBox("표시 컬럼")
+        column_layout = QVBoxLayout(column_group)
+
+        for col_key, col_name, default_visible in self.COLUMN_OPTIONS:
+            checkbox = QCheckBox(col_name)
+            checkbox.setChecked(default_visible)
+            self.checkboxes[col_key] = checkbox
+            column_layout.addWidget(checkbox)
+
+        scroll_layout.addWidget(column_group)
+        scroll_layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        # 전체 선택/해제 버튼
+        btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(self.select_all)
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(self.deselect_all)
+        btn_layout.addWidget(select_all_btn)
+        btn_layout.addWidget(deselect_all_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        # 저장/취소 버튼
+        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.save_settings)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def select_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(True)
+
+    def deselect_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(False)
+
+    def load_settings(self):
+        """데이터베이스에서 설정 로드"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                visible_columns = result['value'].split(',')
+                for col_key, checkbox in self.checkboxes.items():
+                    checkbox.setChecked(col_key in visible_columns)
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
+    def save_settings(self):
+        """설정 저장"""
+        try:
+            from database import get_connection
+
+            visible_columns = [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+            value = ','.join(visible_columns)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE key = 'schedule_tab_columns'
+            """, (value,))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (key, value, description)
+                    VALUES ('schedule_tab_columns', ?, '스케줄 작성 탭 표시 컬럼')
+                """, (value,))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "표시 항목 설정이 저장되었습니다.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
 
 class ScheduleTab(QWidget):
     # 더블클릭 시 스케줄 ID를 전달하는 시그널
@@ -21,15 +149,30 @@ class ScheduleTab(QWidget):
         super().__init__(parent)
         self.initUI()
     
+    # 컬럼 정의 (key, header_name, data_key, column_index)
+    ALL_COLUMNS = [
+        ('select', '선택', None, 0),
+        ('id', 'ID', 'id', 1),
+        ('client_name', '업체명', 'client_name', 2),
+        ('product_name', '샘플명', 'product_name', 3),
+        ('test_method', '실험방법', 'test_method', 4),
+        ('storage_condition', '보관조건', 'storage_condition', 5),
+        ('food_type', '식품유형', 'food_type_id', 6),
+        ('start_date', '시작일', 'start_date', 7),
+        ('end_date', '종료일', 'end_date', 8),
+        ('sampling_count', '샘플링횟수', 'sampling_count', 9),
+        ('status', '상태', 'status', 10),
+    ]
+
     def initUI(self):
         """UI 초기화"""
         layout = QVBoxLayout(self)
-        
+
         # 상단 버튼 영역
         button_frame = QFrame()
         button_frame.setFrameShape(QFrame.StyledPanel)
         button_frame.setStyleSheet("background-color: #f0f0f0; border-radius: 5px;")
-        
+
         button_layout = QHBoxLayout(button_frame)
 
         new_schedule_btn = QPushButton("새 스케줄 작성")
@@ -68,13 +211,20 @@ class ScheduleTab(QWidget):
 
         button_layout.addStretch()
 
+        # 표시 설정 버튼
+        settings_btn = QPushButton("표시 설정")
+        settings_btn.setStyleSheet("background-color: #9b59b6; color: white;")
+        settings_btn.clicked.connect(self.open_display_settings)
+        button_layout.addWidget(settings_btn)
+
         layout.addWidget(button_frame)
-        
-        # 스케줄 목록 테이블
+
+        # 스케줄 목록 테이블 - 전체 컬럼 생성
         self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(7)
-        self.schedule_table.setHorizontalHeaderLabels(["선택", "ID", "업체명", "샘플명", "시작일", "종료일", "상태"])
-        self.schedule_table.setColumnHidden(1, True)  # ID 열 숨김
+        self.schedule_table.setColumnCount(len(self.ALL_COLUMNS))
+        headers = [col[1] for col in self.ALL_COLUMNS]
+        self.schedule_table.setHorizontalHeaderLabels(headers)
+        self.schedule_table.setColumnHidden(1, True)  # ID 열 항상 숨김
         self.schedule_table.setColumnWidth(0, 50)  # 선택 열 너비 고정
         self.schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -84,7 +234,10 @@ class ScheduleTab(QWidget):
         self.schedule_table.doubleClicked.connect(self.on_double_click)
 
         layout.addWidget(self.schedule_table)
-        
+
+        # 초기 컬럼 표시 설정 적용
+        self.apply_column_settings()
+
         # 초기 데이터 로드
         self.load_schedules()
     
@@ -99,7 +252,7 @@ class ScheduleTab(QWidget):
             for row, schedule in enumerate(schedules):
                 self.schedule_table.insertRow(row)
 
-                # 체크박스 (선택 열)
+                # 체크박스 (선택 열) - 0번
                 checkbox = QCheckBox()
                 checkbox_widget = QWidget()
                 checkbox_layout = QHBoxLayout(checkbox_widget)
@@ -108,34 +261,65 @@ class ScheduleTab(QWidget):
                 checkbox_layout.setContentsMargins(0, 0, 0, 0)
                 self.schedule_table.setCellWidget(row, 0, checkbox_widget)
 
-                # ID (숨김 열)
+                # ID (숨김 열) - 1번
                 schedule_id = schedule.get('id', '')
                 self.schedule_table.setItem(row, 1, QTableWidgetItem(str(schedule_id)))
 
-                # 업체명
+                # 업체명 - 2번
                 client_name = schedule.get('client_name', '') or ''
                 self.schedule_table.setItem(row, 2, QTableWidgetItem(client_name))
 
-                # 제품명/샘플명
+                # 제품명/샘플명 - 3번
                 product_name = schedule.get('product_name', '') or schedule.get('title', '') or ''
                 self.schedule_table.setItem(row, 3, QTableWidgetItem(product_name))
 
-                # 시작일
+                # 실험방법 - 4번
+                test_method = schedule.get('test_method', '') or ''
+                test_method_text = {
+                    'real': '실측', 'acceleration': '가속',
+                    'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'
+                }.get(test_method, test_method)
+                self.schedule_table.setItem(row, 4, QTableWidgetItem(test_method_text))
+
+                # 보관조건 - 5번
+                storage = schedule.get('storage_condition', '') or ''
+                storage_text = {
+                    'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'
+                }.get(storage, storage)
+                self.schedule_table.setItem(row, 5, QTableWidgetItem(storage_text))
+
+                # 식품유형 - 6번
+                food_type_id = schedule.get('food_type_id', '')
+                food_type_name = ''
+                if food_type_id:
+                    try:
+                        from models.product_types import ProductType
+                        food_type = ProductType.get_by_id(food_type_id)
+                        if food_type:
+                            food_type_name = food_type.get('type_name', '') or ''
+                    except:
+                        pass
+                self.schedule_table.setItem(row, 6, QTableWidgetItem(food_type_name))
+
+                # 시작일 - 7번
                 start_date = schedule.get('start_date', '') or ''
-                self.schedule_table.setItem(row, 4, QTableWidgetItem(start_date))
+                self.schedule_table.setItem(row, 7, QTableWidgetItem(start_date))
 
-                # 종료일
+                # 종료일 - 8번
                 end_date = schedule.get('end_date', '') or ''
-                self.schedule_table.setItem(row, 5, QTableWidgetItem(end_date))
+                self.schedule_table.setItem(row, 8, QTableWidgetItem(end_date))
 
-                # 상태 (새로운 상태값 매핑)
+                # 샘플링횟수 - 9번
+                sampling_count = schedule.get('sampling_count', '') or ''
+                self.schedule_table.setItem(row, 9, QTableWidgetItem(str(sampling_count) if sampling_count else ''))
+
+                # 상태 - 10번
                 status = schedule.get('status', 'pending') or 'pending'
                 status_text = {
                     'pending': '대기',
                     'scheduled': '입고예정',
                     'received': '입고',
                     'completed': '종료',
-                    # 기존 상태 호환
                     'in_progress': '입고',
                     'cancelled': '종료'
                 }.get(status, status)
@@ -148,7 +332,7 @@ class ScheduleTab(QWidget):
                 elif status in ['completed', 'cancelled']:
                     status_item.setBackground(Qt.green)
 
-                self.schedule_table.setItem(row, 6, status_item)
+                self.schedule_table.setItem(row, 10, status_item)
 
             print(f"스케줄 {len(schedules)}개 로드 완료")
         except Exception as e:
@@ -320,5 +504,49 @@ class ScheduleTab(QWidget):
                 status_item.setBackground(Qt.yellow)
             elif data["status"] == "완료":
                 status_item.setBackground(Qt.green)
-            
+
             self.schedule_table.setItem(row, 4, status_item)
+
+    def open_display_settings(self):
+        """표시 설정 다이얼로그 열기"""
+        dialog = ScheduleDisplaySettingsDialog(self)
+        if dialog.exec_():
+            self.apply_column_settings()
+
+    def get_column_settings(self):
+        """데이터베이스에서 컬럼 설정 로드"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return result['value'].split(',')
+            else:
+                # 기본값: 기본 표시 컬럼
+                return [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
+        except Exception as e:
+            print(f"컬럼 설정 로드 오류: {e}")
+            return [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
+
+    def apply_column_settings(self):
+        """컬럼 표시 설정을 테이블에 적용"""
+        visible_columns = self.get_column_settings()
+
+        # 컬럼 키와 인덱스 매핑
+        column_indices = {col[0]: col[3] for col in self.ALL_COLUMNS}
+
+        for col_key, col_index in column_indices.items():
+            if col_key == 'select':
+                # 선택 열은 항상 표시
+                self.schedule_table.setColumnHidden(col_index, False)
+            elif col_key == 'id':
+                # ID 열은 항상 숨김
+                self.schedule_table.setColumnHidden(col_index, True)
+            else:
+                # 설정에 따라 표시/숨김
+                is_hidden = col_key not in visible_columns
+                self.schedule_table.setColumnHidden(col_index, is_hidden)
