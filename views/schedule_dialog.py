@@ -46,6 +46,8 @@ class FoodTypeSelectionDialog(QDialog):
         self.search_input = QLineEdit(self)
         self.search_input.setPlaceholderText("검색어 입력...")
         self.search_button = QPushButton("검색", self)
+        self.search_button.setAutoDefault(False)
+        self.search_button.setDefault(False)
 
         # 테이블 위젯 설정
         self.food_type_table = QTableWidget(self)
@@ -63,7 +65,11 @@ class FoodTypeSelectionDialog(QDialog):
 
         # 선택/취소 버튼
         self.select_button = QPushButton("선택", self)
+        self.select_button.setAutoDefault(False)
+        self.select_button.setDefault(False)
         self.cancel_button = QPushButton("취소", self)
+        self.cancel_button.setAutoDefault(False)
+        self.cancel_button.setDefault(False)
 
         # 레이아웃 구성
         main_layout = QVBoxLayout(self)
@@ -267,7 +273,11 @@ class ScheduleCreateDialog(QDialog):
         self.client_input = QLineEdit()
         self.client_input.setPlaceholderText("업체명 검색...")
         self.client_search_btn = QPushButton("검색")
+        self.client_search_btn.setAutoDefault(False)  # 엔터 키 자동 실행 방지
+        self.client_search_btn.setDefault(False)
         self.client_detail_btn = QPushButton("신규 등록")
+        self.client_detail_btn.setAutoDefault(False)
+        self.client_detail_btn.setDefault(False)
 
         client_search_layout = QHBoxLayout()
         client_search_layout.addWidget(self.client_input)
@@ -487,6 +497,8 @@ class ScheduleCreateDialog(QDialog):
 
         # 식품 유형 선택 버튼 추가
         self.food_type_select_btn = QPushButton("검색")
+        self.food_type_select_btn.setAutoDefault(False)
+        self.food_type_select_btn.setDefault(False)
         food_type_layout.addWidget(self.food_type_combo)
         food_type_layout.addWidget(self.food_type_select_btn)
         product_layout.addRow("식품유형:", food_type_layout)
@@ -518,8 +530,14 @@ class ScheduleCreateDialog(QDialog):
         # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당
         button_layout = QHBoxLayout()
         self.preview_btn = QPushButton("미리보기")
+        self.preview_btn.setAutoDefault(False)
+        self.preview_btn.setDefault(False)
         self.save_btn = QPushButton("저장")
+        self.save_btn.setAutoDefault(False)
+        self.save_btn.setDefault(False)
         self.cancel_btn = QPushButton("취소")
+        self.cancel_btn.setAutoDefault(False)
+        self.cancel_btn.setDefault(False)
         
         button_layout.addStretch()
         button_layout.addWidget(self.preview_btn)
