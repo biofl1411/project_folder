@@ -40,7 +40,7 @@ class FoodTypeSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("식품 유형 선택")
-        self.resize(400, 500)
+        self.resize(900, 500)  # 가로 크기 확대
 
         # 검색 입력 필드 및 버튼
         self.search_input = QLineEdit(self)
@@ -59,6 +59,15 @@ class FoodTypeSelectionDialog(QDialog):
         self.food_type_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.food_type_table.setSelectionMode(QTableWidget.SingleSelection)
         self.food_type_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        # 컬럼 너비 설정 (검사항목 열은 넓게)
+        self.food_type_table.setColumnWidth(0, 40)   # ID
+        self.food_type_table.setColumnWidth(1, 100)  # 식품 유형명
+        self.food_type_table.setColumnWidth(2, 60)   # 카테고리
+        self.food_type_table.setColumnWidth(3, 60)   # 살균여부
+        self.food_type_table.setColumnWidth(4, 60)   # 멸균여부
+        self.food_type_table.setColumnWidth(5, 50)   # 성상
+        self.food_type_table.setColumnWidth(6, 450)  # 검사항목 (넓게)
         
         # 테이블 더블클릭 시그널 연결
         self.food_type_table.doubleClicked.connect(self.accept_selection)
@@ -190,8 +199,15 @@ class FoodTypeSelectionDialog(QDialog):
                 self.food_type_table.setItem(row_index, 5, QTableWidgetItem(appearance))
                 self.food_type_table.setItem(row_index, 6, QTableWidgetItem(test_items))
             
-            # 컬럼 너비 조정
-            self.food_type_table.resizeColumnsToContents()
+            # 컬럼 너비 조정 (검사항목 열은 넓게 유지)
+            header = self.food_type_table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.Fixed)   # ID
+            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # 식품 유형명
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # 카테고리
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 살균여부
+            header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 멸균여부
+            header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # 성상
+            header.setSectionResizeMode(6, QHeaderView.Stretch)  # 검사항목 (남은 공간 채우기)
             
             # 데이터가 없는 경우 메시지 표시
             if self.food_type_table.rowCount() == 0:
