@@ -797,9 +797,9 @@ class ScheduleCreateDialog(QDialog):
         try:
             # 로그 기록
             self.log_message("INFO", "보관 조건 업데이트 시작")
-            
-            # 실측실험 선택 시
-            if self.test_method_real.isChecked():
+
+            # 실측실험 또는 의뢰자 요청(실측) 선택 시
+            if self.test_method_real.isChecked() or self.test_method_custom_real.isChecked():
                 if self.storage_room_temp.isChecked():
                     self.storage_temp_label.setText(self.ROOM_TEMP_LABEL)
                     self.log_message("INFO", f"실측실험 - 상온 선택: {self.ROOM_TEMP_LABEL}")
@@ -811,14 +811,9 @@ class ScheduleCreateDialog(QDialog):
                     self.log_message("INFO", f"실측실험 - 냉동 선택: {self.FREEZE_TEMP_LABEL}")
                 elif self.storage_warm.isChecked():
                     self.storage_temp_label.setText(self.WARM_TEMP_LABEL)
-                    self.log_message("INFO", f"실측실험 - 항온 선택: {self.WARM_TEMP_LABEL}")
-                elif self.storage_custom.isChecked():
-                    self.storage_temp_label.setText(self.CUSTOM_TEMP_LABEL)
-                    # 의뢰자 요청 온도일 경우 입력창 표시
-                    self.show_custom_temp_inputs(is_acceleration=False)
-                    self.log_message("INFO", f"실측실험 - 의뢰자 요청 온도 선택")
-            
-            # 가속실험 선택 시
+                    self.log_message("INFO", f"실측실험 - 실온 선택: {self.WARM_TEMP_LABEL}")
+
+            # 가속실험 또는 의뢰자 요청(가속) 선택 시
             else:
                 if self.storage_room_temp.isChecked():
                     self.storage_temp_label.setText(self.ROOM_TEMP_ACCEL_LABEL)
@@ -832,11 +827,6 @@ class ScheduleCreateDialog(QDialog):
                 elif self.storage_warm.isChecked():
                     self.storage_temp_label.setText(self.WARM_TEMP_ACCEL_LABEL)
                     self.log_message("INFO", f"가속실험 - 실온 선택: {self.WARM_TEMP_ACCEL_LABEL}")
-                elif self.storage_custom.isChecked():
-                    self.storage_temp_label.setText(self.CUSTOM_TEMP_ACCEL_LABEL)
-                    # 의뢰자 요청 온도일 경우 입력창 표시
-                    self.show_custom_temp_inputs(is_acceleration=True)
-                    self.log_message("INFO", f"가속실험 - 의뢰자 요청 온도 선택")
         except Exception as e:
             import traceback
             error_msg = f"보관 조건 업데이트 중 오류 발생: {str(e)}"

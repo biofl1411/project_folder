@@ -711,26 +711,30 @@ class FoodTypeDialog(QDialog):
         
         # 버튼 영역
         button_layout = QHBoxLayout()
-        
+
         save_btn = QPushButton("저장")
+        save_btn.setAutoDefault(False)
+        save_btn.setDefault(False)
         save_btn.clicked.connect(self.save_food_type)
-        
+
         cancel_btn = QPushButton("취소")
+        cancel_btn.setAutoDefault(False)
+        cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
-        
+
         button_layout.addStretch()
         button_layout.addWidget(save_btn)
         button_layout.addWidget(cancel_btn)
-        
+
         layout.addLayout(button_layout)
-    
+
     def save_food_type(self):
         """식품유형 정보 저장"""
         # 필수 입력 확인
         if not self.name_input.text().strip():
             QMessageBox.warning(self, "입력 오류", "식품유형은 필수 입력입니다.")
             return
-        
+
         # 데이터 수집
         name = self.name_input.text().strip()
         category = self.category_input.text().strip()
@@ -738,81 +742,7 @@ class FoodTypeDialog(QDialog):
         pasteurization = self.pasteurization_input.text().strip()
         appearance = self.appearance_input.text().strip()
         test_items = self.test_items_input.text().strip()
-        
-        # 저장 (신규 또는 수정)
-        if self.food_type:  # 기존 식품유형 수정
-            if ProductType.update(self.food_type['id'], name, category, sterilization, pasteurization, appearance, test_items):
-                QMessageBox.information(self, "저장 완료", "식품유형 정보가 수정되었습니다.")
-                self.accept()
-            else:
-                QMessageBox.warning(self, "저장 실패", "식품유형 정보 수정 중 오류가 발생했습니다.")
-        else:  # 신규 식품유형 등록
-            type_id = ProductType.create(name, category, sterilization, pasteurization, appearance, test_items)
-            if type_id:
-                QMessageBox.information(self, "등록 완료", "새 식품유형이 등록되었습니다.")
-                self.accept()
-            else:
-                QMessageBox.warning(self, "등록 실패", "식품유형 등록 중 오류가 발생했습니다.")
-    
-    def initUI(self):
-        """UI 초기화"""
-        layout = QVBoxLayout(self)
-        
-        # 폼 레이아웃
-        form_layout = QFormLayout()
-        
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("필수 입력")
-        form_layout.addRow("* 식품유형:", self.name_input)
-        
-        self.category_input = QLineEdit()
-        form_layout.addRow("카테고리:", self.category_input)
-        
-        self.sterilization_input = QLineEdit()
-        form_layout.addRow("단서조항_1:", self.sterilization_input)
-        
-        self.pasteurization_input = QLineEdit()
-        form_layout.addRow("단서조항_2:", self.pasteurization_input)
-        
-        self.appearance_input = QLineEdit()
-        form_layout.addRow("성상:", self.appearance_input)
-        
-        self.test_items_input = QLineEdit()
-        self.test_items_input.setPlaceholderText("쉼표로 구분하여 입력")
-        form_layout.addRow("검사항목:", self.test_items_input)
-        
-        layout.addLayout(form_layout)
-        
-        # 버튼 영역
-        button_layout = QHBoxLayout()
-        
-        save_btn = QPushButton("저장")
-        save_btn.clicked.connect(self.save_food_type)
-        
-        cancel_btn = QPushButton("취소")
-        cancel_btn.clicked.connect(self.reject)
-        
-        button_layout.addStretch()
-        button_layout.addWidget(save_btn)
-        button_layout.addWidget(cancel_btn)
-        
-        layout.addLayout(button_layout)
-    
-    def save_food_type(self):
-        """식품유형 정보 저장"""
-        # 필수 입력 확인
-        if not self.name_input.text().strip():
-            QMessageBox.warning(self, "입력 오류", "식품유형은 필수 입력입니다.")
-            return
-        
-        # 데이터 수집
-        name = self.name_input.text().strip()
-        category = self.category_input.text().strip()
-        sterilization = self.sterilization_input.text().strip()
-        pasteurization = self.pasteurization_input.text().strip()
-        appearance = self.appearance_input.text().strip()
-        test_items = self.test_items_input.text().strip()
-        
+
         # 저장 (신규 또는 수정)
         if self.food_type:  # 기존 식품유형 수정
             if ProductType.update(self.food_type['id'], name, category, sterilization, pasteurization, appearance, test_items):
