@@ -41,6 +41,9 @@ class DisplaySettingsDialog(QDialog):
         ('interim_date', '중간보고일', True),
         ('last_test_date', '마지막실험일', True),
         ('status', '상태', True),
+        ('sample_per_test', '1회실험검체량', True),
+        ('packaging', '포장단위', True),
+        ('required_sample', '필요검체량', True),
         ('temp_zone1', '온도 1구간', True),
         ('temp_zone2', '온도 2구간', True),
         ('temp_zone3', '온도 3구간', True),
@@ -443,6 +446,20 @@ class ScheduleManagementTab(QWidget):
         self.status_value = self._create_value_label("-", value_style)
         grid.addWidget(self.status_value, 4, 5)
 
+        # 행 6 - 검체량 관련
+        self.sample_per_test_label = self._create_label("1회실험검체량", label_style)
+        grid.addWidget(self.sample_per_test_label, 5, 0)
+        self.sample_per_test_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.sample_per_test_value, 5, 1)
+        self.packaging_label = self._create_label("포장단위", label_style)
+        grid.addWidget(self.packaging_label, 5, 2)
+        self.packaging_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.packaging_value, 5, 3)
+        self.required_sample_label = self._create_label("필요검체량", label_style)
+        grid.addWidget(self.required_sample_label, 5, 4)
+        self.required_sample_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.required_sample_value, 5, 5)
+
         parent_layout.addWidget(group)
 
     def create_temperature_panel(self, parent_layout):
@@ -720,6 +737,9 @@ class ScheduleManagementTab(QWidget):
         }.get(status, status)
         self.status_value.setText(status_text)
 
+        # 검체량 계산
+        self.update_sample_info(schedule, sampling_count)
+
         self.update_temperature_panel(schedule)
 
     def update_temperature_panel(self, schedule):
@@ -754,6 +774,63 @@ class ScheduleManagementTab(QWidget):
                 self.temp_zone1_value.setText(temps[0])
                 self.temp_zone2_value.setText(temps[1])
                 self.temp_zone3_value.setText(temps[2])
+
+    def update_sample_info(self, schedule, sampling_count):
+        """검체량 정보 업데이트"""
+        try:
+            test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+            # 수수료 정보에서 sample_quantity 가져오기
+            sample_per_test = 0
+            try:
+                all_fees = Fee.get_all()
+                for fee in all_fees:
+                    if fee['test_item'] in test_items:
+                        sample_qty = fee.get('sample_quantity', 0) or 0
+                        sample_per_test += sample_qty
+            except:
+                pass
+
+            # 1회 실험 검체량 표시
+            self.sample_per_test_value.setText(f"{sample_per_test}g")
+
+            # 포장단위 가져오기
+            packaging_weight = schedule.get('packaging_weight', 0) or 0
+            packaging_unit = schedule.get('packaging_unit', 'g') or 'g'
+
+            # kg인 경우 g로 변환
+            packaging_weight_g = packaging_weight * 1000 if packaging_unit == 'kg' else packaging_weight
+
+            # 포장단위 표시
+            self.packaging_value.setText(f"{packaging_weight}{packaging_unit}")
+
+            # 필요 검체량 계산
+            # 1회 실험 검체량 <= 포장단위: 샘플링횟수 × 포장단위
+            # 1회 실험 검체량 > 포장단위: 초과분 계산
+            if packaging_weight_g > 0:
+                if sample_per_test <= packaging_weight_g:
+                    # 1회 검체량이 포장단위 이하인 경우
+                    required_sample = sampling_count * packaging_weight_g
+                else:
+                    # 1회 검체량이 포장단위 초과하는 경우
+                    # 1회당 필요한 포장 수 = ceil(1회검체량 / 포장단위)
+                    import math
+                    packages_per_test = math.ceil(sample_per_test / packaging_weight_g)
+                    required_sample = sampling_count * packages_per_test * packaging_weight_g
+
+                # 단위 변환 (1000g 이상이면 kg으로 표시)
+                if required_sample >= 1000:
+                    self.required_sample_value.setText(f"{required_sample / 1000:.1f}kg")
+                else:
+                    self.required_sample_value.setText(f"{required_sample}g")
+            else:
+                self.required_sample_value.setText("-")
+
+        except Exception as e:
+            print(f"검체량 정보 업데이트 오류: {e}")
+            self.sample_per_test_value.setText("-")
+            self.packaging_value.setText("-")
+            self.required_sample_value.setText("-")
 
     def load_memo_history(self):
         """메모 이력 로드"""
@@ -1018,6 +1095,9 @@ class ScheduleManagementTab(QWidget):
             'interim_date': (self.interim_date_label, self.interim_date_value),
             'last_test_date': (self.last_test_date_label, self.last_test_date_value),
             'status': (self.status_label, self.status_value),
+            'sample_per_test': (self.sample_per_test_label, self.sample_per_test_value),
+            'packaging': (self.packaging_label, self.packaging_value),
+            'required_sample': (self.required_sample_label, self.required_sample_value),
             'temp_zone1': (self.temp_zone1_label, self.temp_zone1_value),
             'temp_zone2': (self.temp_zone2_label, self.temp_zone2_value),
             'temp_zone3': (self.temp_zone3_label, self.temp_zone3_value),

@@ -192,6 +192,12 @@ def init_database():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
+
+    # 수수료 테이블에 sample_quantity 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
     
     # 기본 설정 데이터 삽입
     default_settings = [
