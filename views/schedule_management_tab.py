@@ -827,14 +827,14 @@ class ScheduleManagementTab(QWidget):
                     check_item.setTextAlignment(Qt.AlignCenter)
                     table.setItem(row_idx + 1, i + 1, check_item)
 
-                # 가격
+                # 가격 (수수료 탭에서 가져온 가격 그대로 표시)
                 price = fees.get(test_item, 0)
                 total_price_per_test += price
                 price_item = QTableWidgetItem(f"{price:,}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 table.setItem(row_idx + 1, col_count - 1, price_item)
 
-            # 1회 기준 비용 행
+            # 1회 기준 비용 행 (검사항목 합계)
             basis_item = QTableWidgetItem("(1회 기준)")
             basis_item.setBackground(QColor('#FFFF99'))
             table.setItem(row_count - 1, 0, basis_item)
@@ -844,6 +844,12 @@ class ScheduleManagementTab(QWidget):
                 cost_item.setTextAlignment(Qt.AlignCenter)
                 cost_item.setBackground(QColor('#FFFF99'))
                 table.setItem(row_count - 1, i + 1, cost_item)
+
+            # 1회 기준 가격 합계 (가격 열)
+            total_item = QTableWidgetItem(f"{total_price_per_test:,}")
+            total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            total_item.setBackground(QColor('#FFFF99'))
+            table.setItem(row_count - 1, col_count - 1, total_item)
 
             # 열 너비 조정
             header = table.horizontalHeader()
@@ -857,19 +863,35 @@ class ScheduleManagementTab(QWidget):
 
     def update_cost_summary(self, schedule, test_items, fees, sampling_count, zone_count):
         """비용 요약 업데이트"""
-        # 1회 기준 비용
+        test_method = schedule.get('test_method', '') or ''
+
+        # 1회 기준 비용 (검사항목 가격 합계 - 구간 곱하기 없음)
         cost_per_test = sum(fees.get(item, 0) for item in test_items)
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        # 실험 방법 가격 (1회 기준 x 샘플링 횟수 x 구간 수)
+        # 실험 방법 가격 (1회 기준 × 샘플링 횟수 × 온도 구간 수)
+        # 합계에만 온도 구간 곱하기 적용
         test_method_cost = cost_per_test * sampling_count * zone_count
         self.test_method_cost.setText(f"{test_method_cost:,}원")
 
-        # 보고서 비용 (임시값)
-        report_cost = 300000
+        # 보고서 비용 (수수료 탭에서 실험 방법에 해당하는 비용 - 곱하기 없음)
+        # 실험 방법에 따른 보고서 비용 키 매핑
+        report_fee_keys = {
+            'real': '보고서(실측)',
+            'acceleration': '보고서(가속)',
+            'custom_real': '보고서(실측)',
+            'custom_acceleration': '보고서(가속)'
+        }
+        report_key = report_fee_keys.get(test_method, '보고서')
+
+        # 수수료 탭에서 보고서 비용 조회 (없으면 기본값 300,000원)
+        report_cost = fees.get(report_key, 0)
+        if report_cost == 0:
+            # 기본 보고서 키로 다시 시도
+            report_cost = fees.get('보고서', 300000)
         self.report_cost.setText(f"{report_cost:,}원")
 
-        # 최종 비용
+        # 최종 비용 (실험 방법 가격 + 보고서 비용)
         final_cost = test_method_cost + report_cost
         self.final_cost.setText(f"{final_cost:,}원")
 
