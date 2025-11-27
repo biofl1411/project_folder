@@ -93,8 +93,8 @@ class MainWindow(QMainWindow):
         
         # 스케줄 작성 탭
         from .schedule_tab import ScheduleTab
-        schedule_create_tab = ScheduleTab()
-        self.tab_widget.addTab(schedule_create_tab, "스케줄 작성")
+        self.schedule_create_tab = ScheduleTab()
+        self.tab_widget.addTab(self.schedule_create_tab, "스케줄 작성")
         
         # 업체 관리 탭
         from .client_tab import ClientTab
@@ -117,8 +117,11 @@ class MainWindow(QMainWindow):
         
         # 스케줄 관리 탭
         from .schedule_management_tab import ScheduleManagementTab
-        schedule_management_tab = ScheduleManagementTab()
-        self.tab_widget.addTab(schedule_management_tab, "스케줄 관리")
+        self.schedule_management_tab = ScheduleManagementTab()
+        self.tab_widget.addTab(self.schedule_management_tab, "스케줄 관리")
+
+        # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
+        self.schedule_create_tab.schedule_double_clicked.connect(self.show_schedule_detail)
         
         # 사용자 관리 탭 (관리자만 접근 가능)
         users_tab = QWidget()
@@ -257,12 +260,19 @@ class MainWindow(QMainWindow):
     
     def logout(self):
         """로그아웃 처리"""
-        reply = QMessageBox.question(self, '로그아웃', 
+        reply = QMessageBox.question(self, '로그아웃',
                                      '정말 로그아웃 하시겠습니까?',
-                                     QMessageBox.Yes | QMessageBox.No, 
+                                     QMessageBox.Yes | QMessageBox.No,
                                      QMessageBox.No)
-        
+
         if reply == QMessageBox.Yes:
             self.current_user = None
             self.hide()
             self.show_login()
+
+    def show_schedule_detail(self, schedule_id):
+        """스케줄 관리 탭으로 이동하고 해당 스케줄 선택"""
+        # 스케줄 관리 탭으로 전환 (탭 인덱스 6)
+        self.tab_widget.setCurrentIndex(6)
+        # 스케줄 관리 탭에서 해당 스케줄 선택
+        self.schedule_management_tab.select_schedule_by_id(schedule_id)
