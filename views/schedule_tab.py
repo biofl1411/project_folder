@@ -30,12 +30,18 @@ class ScheduleTab(QWidget):
         button_frame.setStyleSheet("background-color: #f0f0f0; border-radius: 5px;")
         
         button_layout = QHBoxLayout(button_frame)
-        
+
         new_schedule_btn = QPushButton("새 스케줄 작성")
         new_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
         new_schedule_btn.clicked.connect(self.create_new_schedule)
-        
+
+        delete_schedule_btn = QPushButton("선택 삭제")
+        delete_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
+        delete_schedule_btn.setStyleSheet("background-color: #e74c3c; color: white;")
+        delete_schedule_btn.clicked.connect(self.delete_selected_schedule)
+
         button_layout.addWidget(new_schedule_btn)
+        button_layout.addWidget(delete_schedule_btn)
         button_layout.addStretch()
         
         layout.addWidget(button_frame)
@@ -120,7 +126,42 @@ class ScheduleTab(QWidget):
         if schedule_id_item:
             schedule_id = int(schedule_id_item.text())
             self.schedule_double_clicked.emit(schedule_id)
-    
+
+    def delete_selected_schedule(self):
+        """선택된 스케줄 삭제"""
+        selected_rows = self.schedule_table.selectedIndexes()
+        if not selected_rows:
+            QMessageBox.warning(self, "삭제 실패", "삭제할 스케줄을 선택하세요.")
+            return
+
+        row = selected_rows[0].row()
+        schedule_id_item = self.schedule_table.item(row, 0)
+        if not schedule_id_item:
+            return
+
+        schedule_id = int(schedule_id_item.text())
+        client_name = self.schedule_table.item(row, 1).text()
+        product_name = self.schedule_table.item(row, 2).text()
+
+        reply = QMessageBox.question(
+            self, '삭제 확인',
+            f'다음 스케줄을 삭제하시겠습니까?\n\n업체: {client_name}\n제품: {product_name}',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                from models.schedules import Schedule
+                success = Schedule.delete(schedule_id)
+                if success:
+                    QMessageBox.information(self, "삭제 완료", "스케줄이 삭제되었습니다.")
+                    self.load_schedules()
+                else:
+                    QMessageBox.warning(self, "삭제 실패", "스케줄 삭제에 실패했습니다.")
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"삭제 중 오류가 발생했습니다:\n{str(e)}")
+
     def create_new_schedule(self):
         """새 스케줄 작성 다이얼로그 표시"""
         try:
