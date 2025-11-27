@@ -266,8 +266,8 @@ class FeeTab(QWidget):
                 "검사항목": "test_item",
                 "식품 카테고리": "food_category",
                 "가격": "price",
-                "검체 수량(g)": "description",
-                "정렬순서": "display_order"  # 정렬순서 필드 추가
+                "검체 수량(g)": "sample_quantity",
+                "정렬순서": "display_order"
             }
             
             # 진행 상황 대화상자 표시
@@ -300,10 +300,10 @@ class FeeTab(QWidget):
                 for excel_col, db_field in column_mapping.items():
                     if excel_col in df.columns and not pd.isna(row[excel_col]):
                         if excel_col == "가격":
-                            # 정수로 변환 (소수점 제거)
                             fee_data[db_field] = int(float(row[excel_col]))
                         elif excel_col == "정렬순서":
-                            # 정렬순서도 정수로 변환
+                            fee_data[db_field] = int(float(row[excel_col]))
+                        elif excel_col == "검체 수량(g)":
                             fee_data[db_field] = int(float(row[excel_col]))
                         else:
                             fee_data[db_field] = str(row[excel_col]).strip()
@@ -311,7 +311,9 @@ class FeeTab(QWidget):
                         if excel_col == "가격":
                             fee_data[db_field] = 0
                         elif excel_col == "정렬순서":
-                            fee_data[db_field] = i + 1  # 기본값으로 행 번호+1 사용
+                            fee_data[db_field] = i + 1
+                        elif excel_col == "검체 수량(g)":
+                            fee_data[db_field] = 0
                         else:
                             fee_data[db_field] = ""
                 
@@ -325,8 +327,9 @@ class FeeTab(QWidget):
                         fee_data["test_item"],
                         fee_data.get("food_category", ""),
                         fee_data.get("price", 0),
-                        fee_data.get("description", ""),
-                        fee_data.get("display_order", i + 1)  # 정렬순서 추가
+                        "",  # description
+                        fee_data.get("display_order", i + 1),
+                        fee_data.get("sample_quantity", 0)
                     ):
                         updated_count += 1
                 else:
@@ -335,8 +338,9 @@ class FeeTab(QWidget):
                         fee_data["test_item"],
                         fee_data.get("food_category", ""),
                         fee_data.get("price", 0),
-                        fee_data.get("description", ""),
-                        fee_data.get("display_order", i + 1)  # 정렬순서 추가
+                        "",  # description
+                        fee_data.get("display_order", i + 1),
+                        fee_data.get("sample_quantity", 0)
                     ):
                         imported_count += 1
             
