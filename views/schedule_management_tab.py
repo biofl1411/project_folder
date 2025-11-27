@@ -633,8 +633,8 @@ class ScheduleManagementTab(QWidget):
         else:
             experiment_days = total_days // 2 if total_days > 0 else 0
 
-        # 시작일과 마지막실험일 사이의 간격을 샘플링 횟수로 나눔
-        interval_days = experiment_days // sampling_count if sampling_count > 0 else 0
+        # 시작일과 마지막실험일 사이의 간격을 샘플링 횟수로 나눔 (반올림 적용)
+        interval_days = round(experiment_days / sampling_count) if sampling_count > 0 else 0
 
         # 시작일 파싱
         start_date_str = schedule.get('start_date', '')
@@ -701,7 +701,7 @@ class ScheduleManagementTab(QWidget):
             table.setItem(1, 0, time_item)
 
             for i in range(sampling_count):
-                days_elapsed = i * interval_days
+                days_elapsed = int(round(i * interval_days))
                 time_value = f"{days_elapsed}일"
                 item = QTableWidgetItem(time_value)
                 item.setTextAlignment(Qt.AlignCenter)
