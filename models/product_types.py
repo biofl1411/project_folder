@@ -26,7 +26,21 @@ class ProductType:
         cursor.execute("SELECT * FROM food_types WHERE type_name = ?", (type_name,))
         type_info = cursor.fetchone()
         conn.close()
-        return type_info
+        return dict(type_info) if type_info else None
+
+    @staticmethod
+    def get_by_id(type_id):
+        """ID로 식품 유형 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM food_types WHERE id = ?", (type_id,))
+            type_info = cursor.fetchone()
+            conn.close()
+            return dict(type_info) if type_info else None
+        except Exception as e:
+            print(f"식품 유형 ID 조회 중 오류: {str(e)}")
+            return None
     
     @staticmethod
     def get_test_items(type_name):

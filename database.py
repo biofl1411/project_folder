@@ -50,15 +50,11 @@ def init_database():
     )
     ''')
     
-    # 업체정보 테이블 - 필드 수정
-    cursor.execute('''
-    DROP TABLE IF EXISTS clients
-    ''')
-    
-    # 식품 유형 테이블 - 초기화 코드 추가
-    cursor.execute('''
-    DROP TABLE IF EXISTS food_types
-    ''')
+    # 업체정보 테이블 - 필드 수정 (DROP 제거하여 데이터 유지)
+    # cursor.execute('''DROP TABLE IF EXISTS clients''')
+
+    # 식품 유형 테이블 - 초기화 코드 제거 (DROP 제거하여 데이터 유지)
+    # cursor.execute('''DROP TABLE IF EXISTS food_types''')
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS clients (
@@ -206,53 +202,59 @@ def init_database():
     VALUES (?, ?, ?, ?)
     ''', ('admin', 'admin123', '관리자', 'admin'))
     
-    # 샘플 업체 데이터
-    sample_clients = [
-        ('계림농장', '김대표', '02-123-4567', '경기도 용인시 처인구', '김담당', '010-1234-5678', '박영업'),
-        ('거성씨푸드', '이사장', '051-987-6543', '부산시 해운대구 우동', '최담당', '010-8765-4321', '정영업')
-    ]
+    # 샘플 업체 데이터 (테이블이 비어있을 때만 삽입)
+    cursor.execute("SELECT COUNT(*) FROM clients")
+    if cursor.fetchone()[0] == 0:
+        sample_clients = [
+            ('계림농장', '김대표', '02-123-4567', '경기도 용인시 처인구', '김담당', '010-1234-5678', '박영업'),
+            ('거성씨푸드', '이사장', '051-987-6543', '부산시 해운대구 우동', '최담당', '010-8765-4321', '정영업')
+        ]
+
+        for name, ceo, phone, address, contact, mobile, sales_rep in sample_clients:
+            cursor.execute('''
+            INSERT OR IGNORE INTO clients (name, ceo, phone, address, contact_person, mobile, sales_rep)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (name, ceo, phone, address, contact, mobile, sales_rep))
     
-    for name, ceo, phone, address, contact, mobile, sales_rep in sample_clients:
-        cursor.execute('''
-        INSERT OR IGNORE INTO clients (name, ceo, phone, address, contact_person, mobile, sales_rep)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (name, ceo, phone, address, contact, mobile, sales_rep))
+    # 샘플 식품 유형 데이터 (테이블이 비어있을 때만 삽입)
+    cursor.execute("SELECT COUNT(*) FROM food_types")
+    if cursor.fetchone()[0] == 0:
+        sample_food_types = [
+            ('일반제품', '일반', '살균', '멸균', '성상', '관능평가, 대장균군(정량), 세균수, 수분'),
+            ('과채음료', '음료', '살균', '', '성상', '관능평가, 대장균군(정량), 세균수, pH'),
+            ('조미료', '조미', '', '', '성상', '관능평가, 대장균군(정량), 발효도수 세균수(정량), 세균수, pH'),
+            ('과채가공품', '가공', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
+            ('과채가공품2', '가공', '', '', '향미', '관능평가, 대장균(정량), 세균수, 총아플라톡신'),
+            ('육류', '육가공', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
+            ('음류', '음료', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
+            ('기타수산가공품', '수산', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
+            ('두유/음료', '음료', '', '', '성상', '관능평가, 대장균군(정량), 세균수, pH')
+        ]
+
+        for type_name, category, sterilization, pasteurization, appearance, test_items in sample_food_types:
+            cursor.execute('''
+            INSERT OR IGNORE INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''', (type_name, category, sterilization, pasteurization, appearance, test_items))
     
-    # 샘플 식품 유형 데이터
-    sample_food_types = [
-        ('일반제품', '일반', '살균', '멸균', '성상', '관능평가, 대장균군(정량), 세균수, 수분'),
-        ('과채음료', '음료', '살균', '', '성상', '관능평가, 대장균군(정량), 세균수, pH'),
-        ('조미료', '조미', '', '', '성상', '관능평가, 대장균군(정량), 발효도수 세균수(정량), 세균수, pH'),
-        ('과채가공품', '가공', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
-        ('과채가공품2', '가공', '', '', '향미', '관능평가, 대장균(정량), 세균수, 총아플라톡신'),
-        ('육류', '육가공', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
-        ('음류', '음료', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
-        ('기타수산가공품', '수산', '', '', '성상', '관능평가, 대장균(정량), 세균수'),
-        ('두유/음료', '음료', '', '', '성상', '관능평가, 대장균군(정량), 세균수, pH')
-    ]
-    
-    for type_name, category, sterilization, pasteurization, appearance, test_items in sample_food_types:
-        cursor.execute('''
-        INSERT OR IGNORE INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ''', (type_name, category, sterilization, pasteurization, appearance, test_items))
-    
-    # 샘플 수수료 데이터
-    sample_fees = [
-        ('일반세균', '일반', 20000, '일반세균 검사'),
-        ('대장균군', '일반', 25000, '대장균군 검사'),
-        ('세균수', '일반', 22000, '세균수 검사'),
-        ('pH', '일반', 15000, 'pH 검사'),
-        ('수분', '일반', 18000, '수분 함량 검사'),
-        ('발효도수', '일반', 30000, '발효도수 검사'),
-        ('총아플라톡신', '일반', 50000, '총아플라톡신 검사')
-    ]
-    
-    for test_item, food_category, price, description in sample_fees:
-        cursor.execute('''
-        INSERT OR IGNORE INTO fees (test_item, food_category, price, description)
-        VALUES (?, ?, ?, ?)
-        ''', (test_item, food_category, price, description))
+    # 샘플 수수료 데이터 (테이블이 비어있을 때만 삽입)
+    cursor.execute("SELECT COUNT(*) FROM fees")
+    if cursor.fetchone()[0] == 0:
+        sample_fees = [
+            ('일반세균', '일반', 20000, '일반세균 검사'),
+            ('대장균군', '일반', 25000, '대장균군 검사'),
+            ('세균수', '일반', 22000, '세균수 검사'),
+            ('pH', '일반', 15000, 'pH 검사'),
+            ('수분', '일반', 18000, '수분 함량 검사'),
+            ('발효도수', '일반', 30000, '발효도수 검사'),
+            ('총아플라톡신', '일반', 50000, '총아플라톡신 검사')
+        ]
+
+        for test_item, food_category, price, description in sample_fees:
+            cursor.execute('''
+            INSERT OR IGNORE INTO fees (test_item, food_category, price, description)
+            VALUES (?, ?, ?, ?)
+            ''', (test_item, food_category, price, description))
     
     conn.commit()
     conn.close()

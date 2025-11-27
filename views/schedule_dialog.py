@@ -234,10 +234,12 @@ class FoodTypeSelectionDialog(QDialog):
         self.accept()
 
 class ScheduleCreateDialog(QDialog):
-    """스케줄 생성 다이얼로그 - 제품 정보 자동 채우기 기능 개선"""
-    def __init__(self, parent=None):
+    """스케줄 생성/수정 다이얼로그 - 제품 정보 자동 채우기 기능 개선"""
+    def __init__(self, parent=None, schedule_id=None):
         super().__init__(parent)
-        self.setWindowTitle("스케줄 작성")
+        self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
+        self.is_edit_mode = schedule_id is not None
+        self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
         self.resize(600, 700)
         
         # 온도 상수 정의 - 인스턴스 변수로 추가
@@ -549,9 +551,13 @@ class ScheduleCreateDialog(QDialog):
         # 필요한 변수 초기화
         self.selected_client_id = None
         self.selected_food_type_id = None
-                    
+
         # 모든 시그널 연결
         self.connect_signals()
+
+        # 수정 모드인 경우 기존 데이터 로드
+        if self.is_edit_mode:
+            self.load_schedule_data()
         
     def update_start_date(self, date):
         """의뢰 예상일이 변경되면 실험 시작일도 동일하게 변경"""
@@ -1173,52 +1179,81 @@ class ScheduleCreateDialog(QDialog):
                         temperatures.append(temp_value)
                 custom_temperatures = ','.join(temperatures) if temperatures else None
 
-            # 데이터베이스에 저장
+            # 데이터베이스에 저장/업데이트
             from models.schedules import Schedule
 
-            schedule_id = Schedule.create(
-                client_id=self.selected_client_id,
-                product_name=self.product_name_input.text().strip(),
-                food_type_id=self.selected_food_type_id,
-                test_method=self.get_test_method(),
-                storage_condition=self.get_storage_condition(),
-                test_start_date=self.test_start_date.date().toString('yyyy-MM-dd'),
-                test_period_days=self.days_spin.value(),
-                test_period_months=self.months_spin.value(),
-                test_period_years=self.years_spin.value(),
-                sampling_count=6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
-                report_interim=self.report_type_interim.isChecked(),
-                report_korean=self.report_type_korean.isChecked(),
-                report_english=self.report_type_english.isChecked(),
-                extension_test=self.extension_check.isChecked(),
-                custom_temperatures=custom_temperatures
-            )
+            schedule_data = {
+                'client_id': self.selected_client_id,
+                'product_name': self.product_name_input.text().strip(),
+                'food_type_id': self.selected_food_type_id,
+                'test_method': self.get_test_method(),
+                'storage_condition': self.get_storage_condition(),
+                'start_date': self.test_start_date.date().toString('yyyy-MM-dd'),
+                'test_period_days': self.days_spin.value(),
+                'test_period_months': self.months_spin.value(),
+                'test_period_years': self.years_spin.value(),
+                'sampling_count': 6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
+                'report_interim': 1 if self.report_type_interim.isChecked() else 0,
+                'report_korean': 1 if self.report_type_korean.isChecked() else 0,
+                'report_english': 1 if self.report_type_english.isChecked() else 0,
+                'extension_test': 1 if self.extension_check.isChecked() else 0,
+                'custom_temperatures': custom_temperatures
+            }
 
-            if schedule_id:
-                # 설정 기간 메시지 구성
-                period_msg = ""
-                days = self.days_spin.value()
-                months = self.months_spin.value()
-                years = self.years_spin.value()
-
-                if days > 0:
-                    period_msg += f"{days}일 "
-                if months > 0:
-                    period_msg += f"{months}개월 "
-                if years > 0:
-                    period_msg += f"{years}년"
-
-                if period_msg:
-                    period_msg = f"소비기한: {period_msg.strip()}"
-
-                save_msg = f"스케줄이 저장되었습니다.\n\n{period_msg}"
-                QMessageBox.information(self, "저장 완료", save_msg)
-                print(f"스케줄 저장 완료: ID {schedule_id}")
-
-                # 다이얼로그 닫기
-                super().accept()
+            if self.is_edit_mode:
+                # 수정 모드: 업데이트
+                success = Schedule.update(self.schedule_id, schedule_data)
+                if success:
+                    QMessageBox.information(self, "수정 완료", "스케줄이 수정되었습니다.")
+                    print(f"스케줄 수정 완료: ID {self.schedule_id}")
+                    super().accept()
+                else:
+                    QMessageBox.critical(self, "수정 실패", "스케줄 수정에 실패했습니다.")
             else:
-                QMessageBox.critical(self, "저장 실패", "스케줄을 저장하지 못했습니다.")
+                # 생성 모드: 새로 생성
+                schedule_id = Schedule.create(
+                    client_id=self.selected_client_id,
+                    product_name=self.product_name_input.text().strip(),
+                    food_type_id=self.selected_food_type_id,
+                    test_method=self.get_test_method(),
+                    storage_condition=self.get_storage_condition(),
+                    test_start_date=self.test_start_date.date().toString('yyyy-MM-dd'),
+                    test_period_days=self.days_spin.value(),
+                    test_period_months=self.months_spin.value(),
+                    test_period_years=self.years_spin.value(),
+                    sampling_count=6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
+                    report_interim=self.report_type_interim.isChecked(),
+                    report_korean=self.report_type_korean.isChecked(),
+                    report_english=self.report_type_english.isChecked(),
+                    extension_test=self.extension_check.isChecked(),
+                    custom_temperatures=custom_temperatures
+                )
+
+                if schedule_id:
+                    # 설정 기간 메시지 구성
+                    period_msg = ""
+                    days = self.days_spin.value()
+                    months = self.months_spin.value()
+                    years = self.years_spin.value()
+
+                    if days > 0:
+                        period_msg += f"{days}일 "
+                    if months > 0:
+                        period_msg += f"{months}개월 "
+                    if years > 0:
+                        period_msg += f"{years}년"
+
+                    if period_msg:
+                        period_msg = f"소비기한: {period_msg.strip()}"
+
+                    save_msg = f"스케줄이 저장되었습니다.\n\n{period_msg}"
+                    QMessageBox.information(self, "저장 완료", save_msg)
+                    print(f"스케줄 저장 완료: ID {schedule_id}")
+
+                    # 다이얼로그 닫기
+                    super().accept()
+                else:
+                    QMessageBox.critical(self, "저장 실패", "스케줄을 저장하지 못했습니다.")
 
         except Exception as e:
             import traceback
@@ -1436,6 +1471,117 @@ class ScheduleCreateDialog(QDialog):
             error_msg = f"온도 입력 필드 생성 중 오류 발생: {str(e)}"
             print(f"{error_msg}\n{traceback.format_exc()}")
     
+    def load_schedule_data(self):
+        """수정 모드일 때 기존 스케줄 데이터 로드"""
+        try:
+            from models.schedules import Schedule
+            from models.clients import Client
+            from models.product_types import ProductType
+
+            schedule = Schedule.get_by_id(self.schedule_id)
+            if not schedule:
+                QMessageBox.warning(self, "오류", "스케줄 정보를 찾을 수 없습니다.")
+                return
+
+            print(f"스케줄 데이터 로드: {schedule}")
+
+            # 업체 정보 로드
+            client_id = schedule.get('client_id')
+            if client_id:
+                self.selected_client_id = client_id
+                client = Client.get_by_id(client_id)
+                if client:
+                    self.client_input.setText(client.get('name', ''))
+                    self.client_ceo_label.setText(client.get('ceo', '-') or '-')
+                    self.client_name_label.setText(client.get('contact_person', '-') or '-')
+                    self.client_contact_label.setText(client.get('contact_person', '-') or '-')
+                    self.client_phone_label.setText(client.get('phone', '-') or '-')
+                    self.client_sales_label.setText(client.get('sales_rep', '-') or '-')
+
+            # 제품명
+            self.product_name_input.setText(schedule.get('product_name', '') or '')
+
+            # 식품유형 로드
+            food_type_id = schedule.get('food_type_id')
+            if food_type_id:
+                self.selected_food_type_id = food_type_id
+                food_type = ProductType.get_by_id(food_type_id)
+                if food_type:
+                    self.food_type_combo.setCurrentText(food_type.get('type_name', '') or '')
+                    self.sterilization_input.setText(food_type.get('sterilization', '') or '')
+                    self.pasteurization_input.setText(food_type.get('pasteurization', '') or '')
+                    self.appearance_input.setText(food_type.get('appearance', '') or '')
+                    self.test_items_label.setText(food_type.get('test_items', '') or '')
+
+            # 실험 방법 설정
+            test_method = schedule.get('test_method', '') or ''
+            if test_method == 'real':
+                self.test_method_real.setChecked(True)
+            elif test_method == 'acceleration':
+                self.test_method_acceleration.setChecked(True)
+            elif test_method == 'custom_real':
+                self.test_method_custom_real.setChecked(True)
+            elif test_method == 'custom_acceleration':
+                self.test_method_custom_accel.setChecked(True)
+
+            # 보관 조건 설정
+            storage = schedule.get('storage_condition', '') or ''
+            if storage == 'room_temp':
+                self.storage_room_temp.setChecked(True)
+            elif storage == 'warm':
+                self.storage_warm.setChecked(True)
+            elif storage == 'cool':
+                self.storage_cool.setChecked(True)
+            elif storage == 'freeze':
+                self.storage_freeze.setChecked(True)
+
+            # 실험 시작일 설정
+            start_date = schedule.get('start_date', '')
+            if start_date:
+                self.test_start_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
+                self.expected_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
+
+            # 소비기한 설정
+            self.days_spin.setValue(schedule.get('test_period_days', 0) or 0)
+            self.months_spin.setValue(schedule.get('test_period_months', 0) or 0)
+            self.years_spin.setValue(schedule.get('test_period_years', 0) or 0)
+
+            # 샘플링 횟수 설정
+            sampling_count = schedule.get('sampling_count', 6) or 6
+            if sampling_count == 6:
+                self.default_sampling_check.setChecked(True)
+            else:
+                self.default_sampling_check.setChecked(False)
+                self.sampling_spin.setValue(sampling_count)
+
+            # 보고서 종류 설정
+            self.report_type_interim.setChecked(bool(schedule.get('report_interim', 0)))
+            self.report_type_korean.setChecked(bool(schedule.get('report_korean', 1)))
+            self.report_type_english.setChecked(bool(schedule.get('report_english', 0)))
+
+            # 연장실험 설정
+            self.extension_check.setChecked(bool(schedule.get('extension_test', 0)))
+
+            # 의뢰자 요청 온도 설정
+            custom_temps = schedule.get('custom_temperatures', '')
+            if custom_temps and hasattr(self, 'temp_inputs'):
+                temps = custom_temps.split(',')
+                for i, temp in enumerate(temps):
+                    if i < len(self.temp_inputs):
+                        self.temp_inputs[i].setText(temp)
+
+            # 실험기간 업데이트
+            self.update_experiment_period()
+            self.update_storage_temp()
+
+            print("스케줄 데이터 로드 완료")
+
+        except Exception as e:
+            import traceback
+            error_msg = f"스케줄 데이터 로드 중 오류: {str(e)}"
+            print(f"{error_msg}\n{traceback.format_exc()}")
+            QMessageBox.critical(self, "오류", error_msg)
+
     def delete_food_type(food_type_id):
         """식품 유형 삭제"""
         try:

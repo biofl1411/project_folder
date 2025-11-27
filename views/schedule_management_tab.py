@@ -203,8 +203,8 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(2)
 
-        label_style = "font-weight: bold; background-color: #ecf0f1; padding: 2px; border: 1px solid #bdc3c7; font-size: 10px;"
-        value_style = "background-color: white; padding: 2px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 10px;"
+        label_style = "font-weight: bold; background-color: #ecf0f1; padding: 4px; border: 1px solid #bdc3c7; font-size: 13px;"
+        value_style = "background-color: white; padding: 4px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 13px;"
 
         # 행 1
         grid.addWidget(self._create_label("회사명", label_style), 0, 0)
@@ -274,8 +274,8 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(2)
 
-        label_style = "font-weight: bold; background-color: #d5f5e3; padding: 2px; border: 1px solid #27ae60; font-size: 10px;"
-        value_style = "background-color: white; padding: 2px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 10px;"
+        label_style = "font-weight: bold; background-color: #d5f5e3; padding: 4px; border: 1px solid #27ae60; font-size: 13px;"
+        value_style = "background-color: white; padding: 4px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 13px;"
 
         grid.addWidget(self._create_label("구분", label_style), 0, 0)
         grid.addWidget(self._create_label("1구간", label_style), 0, 1)
@@ -310,7 +310,7 @@ class ScheduleManagementTab(QWidget):
         left_layout.addWidget(QLabel("메모 입력"))
         self.memo_edit = QTextEdit()
         self.memo_edit.setPlaceholderText("새 메모를 입력하세요...")
-        self.memo_edit.setMaximumHeight(80)
+        self.memo_edit.setMaximumHeight(60)
         left_layout.addWidget(self.memo_edit)
 
         save_btn = QPushButton("메모 저장")
@@ -325,7 +325,7 @@ class ScheduleManagementTab(QWidget):
 
         right_layout.addWidget(QLabel("메모 이력"))
         self.memo_history_list = QListWidget()
-        self.memo_history_list.setMaximumHeight(100)
+        self.memo_history_list.setMaximumHeight(60)
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
@@ -463,7 +463,17 @@ class ScheduleManagementTab(QWidget):
         self.storage_value.setText(storage_text)
 
         food_type_id = schedule.get('food_type_id', '')
-        self.food_type_value.setText(str(food_type_id) if food_type_id else '-')
+        # 식품유형 ID로 이름 조회
+        food_type_name = '-'
+        if food_type_id:
+            try:
+                from models.product_types import ProductType
+                food_type = ProductType.get_by_id(food_type_id)
+                if food_type:
+                    food_type_name = food_type.get('type_name', '-') or '-'
+            except Exception as e:
+                print(f"식품유형 조회 오류: {e}")
+        self.food_type_value.setText(food_type_name)
 
         if test_method in ['real', 'custom_real']:
             experiment_days = total_days * 2
@@ -677,7 +687,7 @@ class ScheduleManagementTab(QWidget):
                     check_item.setTextAlignment(Qt.AlignCenter)
                     table.setItem(row_idx + 1, i + 1, check_item)
 
-                price = fees.get(test_item, 0)
+                price = int(fees.get(test_item, 0))
                 total_price_per_test += price
                 price_item = QTableWidgetItem(f"{price:,}")
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -710,18 +720,21 @@ class ScheduleManagementTab(QWidget):
         """비용 요약 업데이트"""
         test_method = schedule.get('test_method', '') or ''
 
-        cost_per_test = sum(fees.get(item, 0) for item in test_items)
+        # 1회 기준 비용 (소수점 제거)
+        cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
         self.cost_per_test.setText(f"{cost_per_test:,}원")
 
-        test_method_cost = cost_per_test * sampling_count * zone_count
+        # 실험 방법 가격 (검사항목 합계 × 샘플링 횟수 × 구간 수)
+        test_method_cost = int(cost_per_test * sampling_count * zone_count)
         self.test_method_cost.setText(f"{test_method_cost:,}원")
 
-        report_fee_keys = {'real': '보고서(실측)', 'acceleration': '보고서(가속)', 'custom_real': '보고서(실측)', 'custom_acceleration': '보고서(가속)'}
-        report_key = report_fee_keys.get(test_method, '보고서')
-
-        report_cost = fees.get(report_key, 0)
-        if report_cost == 0:
-            report_cost = fees.get('보고서', 300000)
+        # 보고서 비용: 실측/의뢰자요청(실측) = 200,000원, 가속/의뢰자요청(가속) = 300,000원
+        if test_method in ['real', 'custom_real']:
+            report_cost = 200000
+        elif test_method in ['acceleration', 'custom_acceleration']:
+            report_cost = 300000
+        else:
+            report_cost = 200000  # 기본값
         self.report_cost.setText(f"{report_cost:,}원")
 
         final_cost = test_method_cost + report_cost

@@ -167,6 +167,76 @@ class Schedule:
             return False
 
     @staticmethod
+    def update(schedule_id, data):
+        """스케줄 전체 업데이트"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 실험 종료일 계산
+            start_date = data.get('start_date')
+            end_date = None
+            if start_date:
+                from datetime import datetime, timedelta
+                start = datetime.strptime(start_date, '%Y-%m-%d')
+                total_days = (data.get('test_period_days', 0) or 0) + \
+                             ((data.get('test_period_months', 0) or 0) * 30) + \
+                             ((data.get('test_period_years', 0) or 0) * 365)
+                end_date = (start + timedelta(days=total_days)).strftime('%Y-%m-%d')
+
+            cursor.execute("""
+                UPDATE schedules SET
+                    client_id = ?,
+                    title = ?,
+                    start_date = ?,
+                    end_date = ?,
+                    product_name = ?,
+                    food_type_id = ?,
+                    test_method = ?,
+                    storage_condition = ?,
+                    test_period_days = ?,
+                    test_period_months = ?,
+                    test_period_years = ?,
+                    sampling_count = ?,
+                    report_interim = ?,
+                    report_korean = ?,
+                    report_english = ?,
+                    extension_test = ?,
+                    custom_temperatures = ?
+                WHERE id = ?
+            """, (
+                data.get('client_id'),
+                data.get('product_name'),
+                start_date,
+                end_date,
+                data.get('product_name'),
+                data.get('food_type_id'),
+                data.get('test_method'),
+                data.get('storage_condition'),
+                data.get('test_period_days', 0),
+                data.get('test_period_months', 0),
+                data.get('test_period_years', 0),
+                data.get('sampling_count', 6),
+                data.get('report_interim', 0),
+                data.get('report_korean', 1),
+                data.get('report_english', 0),
+                data.get('extension_test', 0),
+                data.get('custom_temperatures'),
+                schedule_id
+            ))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            print(f"스케줄 업데이트 완료: ID {schedule_id}")
+            return success
+        except Exception as e:
+            print(f"스케줄 업데이트 중 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    @staticmethod
     def get_filtered(keyword=None, status=None, date_from=None, date_to=None):
         """필터링된 스케줄 조회"""
         try:

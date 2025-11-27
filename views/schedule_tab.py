@@ -35,12 +35,18 @@ class ScheduleTab(QWidget):
         new_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
         new_schedule_btn.clicked.connect(self.create_new_schedule)
 
+        edit_schedule_btn = QPushButton("수정하기")
+        edit_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogContentsView))
+        edit_schedule_btn.setStyleSheet("background-color: #3498db; color: white;")
+        edit_schedule_btn.clicked.connect(self.edit_selected_schedule)
+
         delete_schedule_btn = QPushButton("선택 삭제")
         delete_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
         delete_schedule_btn.setStyleSheet("background-color: #e74c3c; color: white;")
         delete_schedule_btn.clicked.connect(self.delete_selected_schedule)
 
         button_layout.addWidget(new_schedule_btn)
+        button_layout.addWidget(edit_schedule_btn)
         button_layout.addWidget(delete_schedule_btn)
         button_layout.addStretch()
         
@@ -168,7 +174,7 @@ class ScheduleTab(QWidget):
             print("스케줄 생성 시작")  # 디버깅 로그
             dialog = ScheduleCreateDialog(self)
             print("ScheduleCreateDialog 인스턴스 생성 성공")  # 디버깅 로그
-            
+
             if dialog.exec_():
                 print("다이얼로그 실행 성공")  # 디버깅 로그
                 # 스케줄 저장 후 목록 새로고침
@@ -177,6 +183,33 @@ class ScheduleTab(QWidget):
             import traceback
             error_msg = f"스케줄 생성 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
             print(error_msg)  # 콘솔에 오류 출력
+            QMessageBox.critical(self, "오류", error_msg)
+
+    def edit_selected_schedule(self):
+        """선택된 스케줄 수정 다이얼로그 표시"""
+        selected_rows = self.schedule_table.selectedIndexes()
+        if not selected_rows:
+            QMessageBox.warning(self, "수정 실패", "수정할 스케줄을 선택하세요.")
+            return
+
+        row = selected_rows[0].row()
+        schedule_id_item = self.schedule_table.item(row, 0)
+        if not schedule_id_item:
+            return
+
+        schedule_id = int(schedule_id_item.text())
+
+        try:
+            print(f"스케줄 수정 시작: ID {schedule_id}")
+            dialog = ScheduleCreateDialog(self, schedule_id=schedule_id)
+
+            if dialog.exec_():
+                print("스케줄 수정 완료")
+                self.load_schedules()
+        except Exception as e:
+            import traceback
+            error_msg = f"스케줄 수정 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)
             QMessageBox.critical(self, "오류", error_msg)
     
     def add_sample_data(self):
