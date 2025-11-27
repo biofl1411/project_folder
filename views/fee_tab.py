@@ -428,10 +428,17 @@ class FeeDialog(QDialog):
             self.food_category_input.setText(fee['food_category'] or "")
             # 소수점 값을 정수로 변환하여 설정
             self.price_input.setValue(int(fee['price']))
-            self.description_input.setText(fee['description'] or "")
+            # 검체 수량 설정
+            try:
+                sample_qty = fee['sample_quantity'] or 0
+                self.sample_quantity_input.setValue(int(sample_qty))
+            except (KeyError, IndexError, TypeError):
+                self.sample_quantity_input.setValue(0)
             # 정렬순서 값 설정
-            if 'display_order' in fee:
-                self.order_input.setValue(fee['display_order'])
+            try:
+                self.order_input.setValue(fee['display_order'] or 100)
+            except (KeyError, IndexError):
+                self.order_input.setValue(100)
     
     def initUI(self):
         """UI 초기화"""
@@ -457,9 +464,11 @@ class FeeDialog(QDialog):
         self.price_input.setGroupSeparatorShown(True)
         form_layout.addRow("* 가격:", self.price_input)
         
-        self.description_input = QLineEdit()
-        self.description_input.setPlaceholderText("실험에 필요한 검체 수량 (예: 100)")
-        form_layout.addRow("검체 수량(g):", self.description_input)
+        self.sample_quantity_input = QSpinBox()
+        self.sample_quantity_input.setRange(0, 10000)
+        self.sample_quantity_input.setValue(0)
+        self.sample_quantity_input.setSuffix(" g")
+        form_layout.addRow("검체 수량(g):", self.sample_quantity_input)
         
         # 정렬순서 입력 추가
         self.order_input = QSpinBox()
@@ -504,18 +513,18 @@ class FeeDialog(QDialog):
         test_item = self.test_item_input.text().strip()
         food_category = self.food_category_input.text().strip()
         price = self.price_input.value()
-        description = self.description_input.text().strip()
-        display_order = self.order_input.value()  # 정렬순서 값 가져오기
-        
+        sample_quantity = self.sample_quantity_input.value()
+        display_order = self.order_input.value()
+
         # 저장 (신규 또는 수정)
         if self.fee:  # 기존 수수료 수정
-            if Fee.update(self.fee['id'], test_item, food_category, price, description, display_order):
+            if Fee.update(self.fee['id'], test_item, food_category, price, "", display_order, sample_quantity):
                 QMessageBox.information(self, "저장 완료", "수수료 정보가 수정되었습니다.")
                 self.accept()
             else:
                 QMessageBox.warning(self, "저장 실패", "수수료 정보 수정 중 오류가 발생했습니다.")
         else:  # 신규 수수료 등록
-            fee_id = Fee.create(test_item, food_category, price, description, display_order)
+            fee_id = Fee.create(test_item, food_category, price, "", display_order, sample_quantity)
             if fee_id:
                 QMessageBox.information(self, "등록 완료", "새 수수료가 등록되었습니다.")
                 self.accept()
