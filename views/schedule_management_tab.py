@@ -327,6 +327,11 @@ class ScheduleManagementTab(QWidget):
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
+        edit_memo_btn = QPushButton("메모 수정")
+        edit_memo_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px;")
+        edit_memo_btn.clicked.connect(self.edit_selected_memo)
+        right_layout.addWidget(edit_memo_btn)
+
         # 비율 설정 (1:1 동일 크기)
         layout.addWidget(left_widget, 1)
         layout.addWidget(right_widget, 1)
@@ -343,29 +348,15 @@ class ScheduleManagementTab(QWidget):
 
         layout = QVBoxLayout(group)
 
-        # 탭 위젯
-        self.zone_tab_widget = QTabWidget()
-        self.zone_tab_widget.setStyleSheet("""
-            QTabBar::tab { background-color: #f39c12; color: white; padding: 5px 15px; margin-right: 2px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
-            QTabBar::tab:selected { background-color: #e67e22; font-weight: bold; }
-        """)
-
+        # 단일 테이블 (탭 없이)
         self.zone_tables = []
         for i in range(3):
-            zone_widget = QWidget()
-            zone_layout = QVBoxLayout(zone_widget)
-            zone_layout.setContentsMargins(0, 0, 0, 0)
-
             table = QTableWidget()
             table.setEditTriggers(QTableWidget.NoEditTriggers)
-            table.setMinimumHeight(150)
-            table.setMaximumHeight(200)
+            table.setMinimumHeight(180)
+            table.setVisible(False)  # 초기에는 숨김
             self.zone_tables.append(table)
-            zone_layout.addWidget(table)
-
-            self.zone_tab_widget.addTab(zone_widget, f"{i+1}구간")
-
-        layout.addWidget(self.zone_tab_widget)
+            layout.addWidget(table)
 
         # 비용 요약
         self.create_cost_summary(layout)
@@ -583,6 +574,14 @@ class ScheduleManagementTab(QWidget):
         """메모 이력 더블클릭 시 편집"""
         self.memo_edit.setText(item.text())
 
+    def edit_selected_memo(self):
+        """선택된 메모를 수정창에 로드"""
+        current_item = self.memo_history_list.currentItem()
+        if current_item:
+            self.memo_edit.setText(current_item.text())
+        else:
+            QMessageBox.warning(self, "선택 필요", "수정할 메모를 선택하세요.")
+
     def save_memo(self):
         """메모 저장"""
         if not self.current_schedule:
@@ -662,11 +661,14 @@ class ScheduleManagementTab(QWidget):
         for zone_idx in range(3):
             table = self.zone_tables[zone_idx]
 
+            # 필요한 구간만 표시
             if zone_idx >= zone_count:
+                table.setVisible(False)
                 table.setRowCount(0)
                 table.setColumnCount(0)
                 continue
 
+            table.setVisible(True)
             col_count = sampling_count + 2
             table.setColumnCount(col_count)
             headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
@@ -685,7 +687,7 @@ class ScheduleManagementTab(QWidget):
                 if start_date and interval_days > 0:
                     from datetime import timedelta
                     sample_date = start_date + timedelta(days=i * interval_days)
-                    date_value = sample_date.strftime('%Y-%m-%d')
+                    date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
                 else:
                     date_value = "-"
                 date_item = QTableWidgetItem(date_value)
@@ -701,10 +703,7 @@ class ScheduleManagementTab(QWidget):
 
             for i in range(sampling_count):
                 hours = i * interval_hours
-                if hours >= 24:
-                    time_value = f"{hours}시간"
-                else:
-                    time_value = f"{hours}시간"
+                time_value = f"{hours}h"  # 짧은 형식
                 item = QTableWidgetItem(time_value)
                 item.setTextAlignment(Qt.AlignCenter)
                 table.setItem(1, i + 1, item)
@@ -742,11 +741,9 @@ class ScheduleManagementTab(QWidget):
             total_item.setBackground(QColor('#FFFF99'))
             table.setItem(row_count - 1, col_count - 1, total_item)
 
+            # 모든 열 균등 배분
             header = table.horizontalHeader()
-            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-            for i in range(1, col_count - 1):
-                header.setSectionResizeMode(i, QHeaderView.Stretch)
-            header.setSectionResizeMode(col_count - 1, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(QHeaderView.Stretch)
 
         self.update_cost_summary(schedule, test_items, fees, sampling_count, zone_count)
 
