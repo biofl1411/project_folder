@@ -276,8 +276,8 @@ class MainWindow(QMainWindow):
 
     def show_schedule_detail(self, schedule_id):
         """스케줄 관리 탭으로 이동하고 해당 스케줄 선택"""
-        # 스케줄 관리 탭으로 전환 (탭 인덱스 7)
-        self.tab_widget.setCurrentIndex(7)
+        # 스케줄 관리 탭으로 전환 (탭 인덱스 6)
+        self.tab_widget.setCurrentIndex(6)
         # 스케줄 관리 탭에서 해당 스케줄 선택
         self.schedule_management_tab.select_schedule_by_id(schedule_id)
 

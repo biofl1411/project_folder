@@ -920,8 +920,8 @@ class ScheduleCreateDialog(QDialog):
             # 실험 방법에 따라 실험기간 계산
             experiment_days = 0
             if self.test_method_real.isChecked() or self.test_method_custom_real.isChecked():
-                # 실측실험: 소비기한의 2배
-                experiment_days = total_days * 2
+                # 실측실험: 소비기한의 1.5배
+                experiment_days = int(total_days * 1.5)
             elif self.test_method_acceleration.isChecked() or self.test_method_custom_accel.isChecked():
                 # 가속실험: 소비기한의 1/2
                 experiment_days = total_days // 2
