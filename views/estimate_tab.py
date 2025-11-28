@@ -558,11 +558,37 @@ FAX: (070) 7410-1430""")
         self.remark_text.setText(remark_text)
 
     def print_estimate(self):
-        """견적서 인쇄"""
+        """견적서 인쇄 - A4 사이즈"""
+        from PyQt5.QtCore import QMarginsF
+        from PyQt5.QtGui import QPainter, QPageLayout, QPageSize
+
         printer = QPrinter(QPrinter.HighResolution)
+
+        # A4 사이즈 설정
+        page_layout = QPageLayout(
+            QPageSize(QPageSize.A4),
+            QPageLayout.Portrait,
+            QMarginsF(10, 10, 10, 10)  # 여백 설정 (mm)
+        )
+        printer.setPageLayout(page_layout)
+
         dialog = QPrintDialog(printer, self)
         if dialog.exec_() == QPrintDialog.Accepted:
-            self.estimate_container.render(printer)
+            # QPainter를 사용하여 더 나은 렌더링
+            painter = QPainter()
+            if painter.begin(printer):
+                # 페이지 크기에 맞게 스케일 조정
+                page_rect = printer.pageRect(QPrinter.DevicePixel)
+                widget_rect = self.estimate_container.rect()
+
+                # 스케일 비율 계산 (여백 고려)
+                scale_x = page_rect.width() / widget_rect.width()
+                scale_y = page_rect.height() / widget_rect.height()
+                scale = min(scale_x, scale_y) * 0.95  # 95%로 여유 확보
+
+                painter.scale(scale, scale)
+                self.estimate_container.render(painter)
+                painter.end()
 
     def save_as_pdf(self):
         """PDF로 저장"""
