@@ -265,18 +265,17 @@ FAX: (070) 7410-1430""")
 
         self.estimate_layout.addWidget(self.items_table)
 
-        # 5. Remark 섹션
+        # 5. Remark 섹션 (스크롤 없이 전체 표시)
         remark_group = QGroupBox("※ Remark")
         remark_layout = QVBoxLayout(remark_group)
 
-        self.remark_text = QTextEdit()
-        self.remark_text.setReadOnly(True)
-        self.remark_text.setMinimumHeight(150)
+        self.remark_text = QLabel()
+        self.remark_text.setWordWrap(True)
         self.remark_text.setStyleSheet("""
-            QTextEdit {
-                border: none;
-                background-color: transparent;
-                font-size: 11px;
+            QLabel {
+                font-size: 10px;
+                line-height: 1.3;
+                padding: 5px;
             }
         """)
         remark_layout.addWidget(self.remark_text)
@@ -439,41 +438,33 @@ FAX: (070) 7410-1430""")
         self.items_table.setItem(0, 4, QTableWidgetItem(f"{total_price:,} 원"))
 
     def calculate_total_price(self, schedule):
-        """총 금액 계산"""
+        """총 금액 계산 - 스케줄 관리와 동일한 방식"""
         total = 0
 
-        # 검사항목 수수료
+        # 실험방법 확인
+        test_method = schedule.get('test_method', 'real')
+        sampling_count = schedule.get('sampling_count', 6) or 6
+
+        # 온도 구간 수 결정 (실측=1구간, 가속=3구간)
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 검사항목 수수료 계산
         test_items = schedule.get('test_items', '')
         if test_items:
-            total += Fee.calculate_total_fee(test_items)
+            # 검사항목별 수수료 합계
+            item_cost = Fee.calculate_total_fee(test_items)
+            # 회차별 총계 × 구간수
+            total += item_cost * sampling_count * zone_count
 
-        # 실험방법 수수료
-        test_method = schedule.get('test_method', 'real')
-        if test_method == 'acceleration':
-            # 가속실험 추가 비용
-            accel_fee = Fee.get_by_item('가속')
-            if accel_fee:
-                total += accel_fee['price']
+        # 보고서 비용 (실측: 200,000원, 가속: 300,000원)
+        if test_method in ['real', 'custom_real']:
+            report_cost = 200000
         else:
-            real_fee = Fee.get_by_item('실측')
-            if real_fee:
-                total += real_fee['price']
-
-        # 보고서 수수료
-        if schedule.get('report_interim'):
-            interim_fee = Fee.get_by_item('중간보고서')
-            if interim_fee:
-                total += interim_fee['price']
-
-        if schedule.get('report_korean'):
-            korean_fee = Fee.get_by_item('완료보고서')
-            if korean_fee:
-                total += korean_fee['price']
-
-        if schedule.get('report_english'):
-            english_fee = Fee.get_by_item('영문')
-            if english_fee:
-                total += english_fee['price']
+            report_cost = 300000
+        total += report_cost
 
         return int(total)
 
@@ -558,36 +549,49 @@ FAX: (070) 7410-1430""")
         self.remark_text.setText(remark_text)
 
     def print_estimate(self):
-        """견적서 인쇄 - A4 사이즈"""
-        from PyQt5.QtCore import QMarginsF
+        """견적서 인쇄 - A4 사이즈 전체 활용"""
+        from PyQt5.QtCore import QMarginsF, QRectF
         from PyQt5.QtGui import QPainter, QPageLayout, QPageSize
 
         printer = QPrinter(QPrinter.HighResolution)
 
-        # A4 사이즈 설정
+        # A4 사이즈 설정 (여백 최소화)
         page_layout = QPageLayout(
             QPageSize(QPageSize.A4),
             QPageLayout.Portrait,
-            QMarginsF(10, 10, 10, 10)  # 여백 설정 (mm)
+            QMarginsF(15, 15, 15, 15)  # 여백 설정 (mm)
         )
         printer.setPageLayout(page_layout)
 
         dialog = QPrintDialog(printer, self)
         if dialog.exec_() == QPrintDialog.Accepted:
-            # QPainter를 사용하여 더 나은 렌더링
             painter = QPainter()
             if painter.begin(printer):
-                # 페이지 크기에 맞게 스케일 조정
+                # 페이지 크기
                 page_rect = printer.pageRect(QPrinter.DevicePixel)
-                widget_rect = self.estimate_container.rect()
 
-                # 스케일 비율 계산 (여백 고려)
-                scale_x = page_rect.width() / widget_rect.width()
-                scale_y = page_rect.height() / widget_rect.height()
-                scale = min(scale_x, scale_y) * 0.95  # 95%로 여유 확보
+                # 위젯의 실제 내용 크기 계산
+                widget = self.estimate_container
+                widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
+                widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
 
+                # A4 비율에 맞게 스케일 계산 (가로 기준으로 확대)
+                scale_x = page_rect.width() / widget_width
+                scale_y = page_rect.height() / widget_height
+
+                # 가로 기준으로 스케일 적용 (A4 너비에 맞춤)
+                # 세로가 넘치지 않도록 min 사용
+                scale = min(scale_x, scale_y) * 0.92
+
+                # 중앙 정렬을 위한 오프셋 계산
+                scaled_width = widget_width * scale
+                scaled_height = widget_height * scale
+                offset_x = (page_rect.width() - scaled_width) / 2
+                offset_y = (page_rect.height() - scaled_height) / 2
+
+                painter.translate(offset_x, offset_y)
                 painter.scale(scale, scale)
-                self.estimate_container.render(painter)
+                widget.render(painter)
                 painter.end()
 
     def save_as_pdf(self):
