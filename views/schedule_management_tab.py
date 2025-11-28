@@ -880,7 +880,7 @@ class ScheduleManagementTab(QWidget):
         self.food_type_value.setText(food_type_name)
 
         if test_method in ['real', 'custom_real']:
-            experiment_days = total_days * 2
+            experiment_days = int(total_days * 1.5)
         else:
             experiment_days = total_days // 2 if total_days > 0 else 0
 
@@ -1159,7 +1159,7 @@ class ScheduleManagementTab(QWidget):
         total_days = days + (months * 30) + (years * 365)
 
         if test_method in ['real', 'custom_real']:
-            experiment_days = total_days * 2
+            experiment_days = int(total_days * 1.5)
         else:
             experiment_days = total_days // 2 if total_days > 0 else 0
 
