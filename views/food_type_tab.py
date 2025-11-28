@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QFrame, QMessageBox, QFileDialog, QProgressDialog,
                           QDialog, QFormLayout, QLineEdit, QCheckBox, QApplication,
                           QComboBox)
-from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 import pandas as pd
 import os
 
@@ -19,6 +19,12 @@ class FoodTypeTab(QWidget):
         self.all_food_types = []  # 전체 식품유형 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+
+        # 검색 디바운싱을 위한 타이머 (300ms 지연)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.filter_food_types)
+
         self.initUI()
         self.load_food_types()
         
@@ -101,7 +107,36 @@ class FoodTypeTab(QWidget):
 
         # 검색 영역
         search_frame = QFrame()
-        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f3e5f5;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 3px 8px;
+            }
+            QComboBox:hover {
+                border: 1px solid #ab47bc;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #e1bee7;
+                selection-color: #000000;
+            }
+            QLineEdit {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #ab47bc;
+            }
+        """)
         search_layout = QHBoxLayout(search_frame)
 
         search_layout.addWidget(QLabel("검색:"))
@@ -116,11 +151,11 @@ class FoodTypeTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
         self.search_input.setMinimumWidth(300)
-        self.search_input.textChanged.connect(self.filter_food_types)
+        self.search_input.textChanged.connect(self.on_search_text_changed)
         search_layout.addWidget(self.search_input)
 
         # 검색 필드 변경 시에도 필터 적용
-        self.search_field_combo.currentIndexChanged.connect(self.filter_food_types)
+        self.search_field_combo.currentIndexChanged.connect(self.on_search_text_changed)
 
         # 초기화 버튼
         reset_btn = QPushButton("초기화")
@@ -195,27 +230,33 @@ class FoodTypeTab(QWidget):
 
     def display_food_types(self, food_types):
         """식품유형 목록을 테이블에 표시"""
-        self.food_type_table.setRowCount(len(food_types) if food_types else 0)
+        # UI 업데이트 일시 중지 (성능 최적화)
+        self.food_type_table.setUpdatesEnabled(False)
+        try:
+            self.food_type_table.setRowCount(len(food_types) if food_types else 0)
 
-        if food_types:
-            for row, food_type in enumerate(food_types):
-                # 체크박스 추가
-                checkbox = QCheckBox()
-                checkbox_widget = QWidget()
-                checkbox_layout = QHBoxLayout(checkbox_widget)
-                checkbox_layout.addWidget(checkbox)
-                checkbox_layout.setAlignment(Qt.AlignCenter)
-                checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                self.food_type_table.setCellWidget(row, 0, checkbox_widget)
+            if food_types:
+                for row, food_type in enumerate(food_types):
+                    # 체크박스 추가
+                    checkbox = QCheckBox()
+                    checkbox_widget = QWidget()
+                    checkbox_layout = QHBoxLayout(checkbox_widget)
+                    checkbox_layout.addWidget(checkbox)
+                    checkbox_layout.setAlignment(Qt.AlignCenter)
+                    checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                    self.food_type_table.setCellWidget(row, 0, checkbox_widget)
 
-                # 나머지 데이터 설정
-                self.food_type_table.setItem(row, 1, QTableWidgetItem(food_type['type_name']))
-                self.food_type_table.setItem(row, 2, QTableWidgetItem(food_type['category'] or ""))
-                self.food_type_table.setItem(row, 3, QTableWidgetItem(food_type['sterilization'] or ""))
-                self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))
-                self.food_type_table.setItem(row, 5, QTableWidgetItem(food_type['appearance'] or ""))
-                self.food_type_table.setItem(row, 6, QTableWidgetItem(food_type['test_items'] or ""))
-                self.food_type_table.setItem(row, 7, QTableWidgetItem(food_type['created_at'] or ""))
+                    # 나머지 데이터 설정
+                    self.food_type_table.setItem(row, 1, QTableWidgetItem(food_type['type_name']))
+                    self.food_type_table.setItem(row, 2, QTableWidgetItem(food_type['category'] or ""))
+                    self.food_type_table.setItem(row, 3, QTableWidgetItem(food_type['sterilization'] or ""))
+                    self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))
+                    self.food_type_table.setItem(row, 5, QTableWidgetItem(food_type['appearance'] or ""))
+                    self.food_type_table.setItem(row, 6, QTableWidgetItem(food_type['test_items'] or ""))
+                    self.food_type_table.setItem(row, 7, QTableWidgetItem(food_type['created_at'] or ""))
+        finally:
+            # UI 업데이트 재개
+            self.food_type_table.setUpdatesEnabled(True)
 
     def get_chosung(self, text):
         """문자열에서 초성 추출"""
@@ -240,6 +281,11 @@ class FoodTypeTab(QWidget):
         """초성 검색 매칭"""
         text_chosung = self.get_chosung(text)
         return search_text.lower() in text_chosung.lower()
+
+    def on_search_text_changed(self):
+        """검색어 변경 시 타이머 시작 (디바운싱)"""
+        self.search_timer.stop()
+        self.search_timer.start(300)  # 300ms 후 필터링 실행
 
     def filter_food_types(self):
         """실시간 검색 필터링 (초성 검색 지원)"""

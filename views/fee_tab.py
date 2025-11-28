@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QFrame, QMessageBox, QFileDialog, QProgressDialog,
                           QDialog, QFormLayout, QLineEdit, QSpinBox, QCheckBox,
                           QComboBox)
-from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 import pandas as pd
 
 from models.fees import Fee
@@ -17,6 +17,12 @@ class FeeTab(QWidget):
         self.all_fees = []  # 전체 수수료 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+
+        # 검색 디바운싱을 위한 타이머 (300ms 지연)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.filter_fees)
+
         self.initUI()
         self.load_fees()
     
@@ -67,7 +73,36 @@ class FeeTab(QWidget):
 
         # 검색 영역
         search_frame = QFrame()
-        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f3e5f5;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 3px 8px;
+            }
+            QComboBox:hover {
+                border: 1px solid #ab47bc;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #e1bee7;
+                selection-color: #000000;
+            }
+            QLineEdit {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #ab47bc;
+            }
+        """)
         search_layout = QHBoxLayout(search_frame)
 
         search_layout.addWidget(QLabel("검색:"))
@@ -82,11 +117,11 @@ class FeeTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
         self.search_input.setMinimumWidth(300)
-        self.search_input.textChanged.connect(self.filter_fees)
+        self.search_input.textChanged.connect(self.on_search_text_changed)
         search_layout.addWidget(self.search_input)
 
         # 검색 필드 변경 시에도 필터 적용
-        self.search_field_combo.currentIndexChanged.connect(self.filter_fees)
+        self.search_field_combo.currentIndexChanged.connect(self.on_search_text_changed)
 
         # 초기화 버튼
         reset_btn = QPushButton("초기화")
@@ -151,45 +186,51 @@ class FeeTab(QWidget):
 
     def display_fees(self, fees):
         """수수료 목록을 테이블에 표시"""
-        self.fee_table.setRowCount(len(fees) if fees else 0)
+        # UI 업데이트 일시 중지 (성능 최적화)
+        self.fee_table.setUpdatesEnabled(False)
+        try:
+            self.fee_table.setRowCount(len(fees) if fees else 0)
 
-        if fees:
-            for row, fee in enumerate(fees):
-                # 체크박스 추가
-                checkbox = QCheckBox()
-                checkbox_widget = QWidget()
-                checkbox_layout = QHBoxLayout(checkbox_widget)
-                checkbox_layout.addWidget(checkbox)
-                checkbox_layout.setAlignment(Qt.AlignCenter)
-                checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                self.fee_table.setCellWidget(row, 0, checkbox_widget)
+            if fees:
+                for row, fee in enumerate(fees):
+                    # 체크박스 추가
+                    checkbox = QCheckBox()
+                    checkbox_widget = QWidget()
+                    checkbox_layout = QHBoxLayout(checkbox_widget)
+                    checkbox_layout.addWidget(checkbox)
+                    checkbox_layout.setAlignment(Qt.AlignCenter)
+                    checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                    self.fee_table.setCellWidget(row, 0, checkbox_widget)
 
-                # 나머지 데이터 설정
-                self.fee_table.setItem(row, 1, QTableWidgetItem(fee['test_item']))
-                self.fee_table.setItem(row, 2, QTableWidgetItem(fee['food_category'] or ""))
-                price_item = QTableWidgetItem(f"{int(fee['price']):,}")
-                price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.fee_table.setItem(row, 3, price_item)
-                # 검체 수량 표시
-                try:
-                    sample_qty = fee['sample_quantity'] or 0
-                except (KeyError, IndexError):
-                    sample_qty = 0
-                sample_qty_item = QTableWidgetItem(str(sample_qty))
-                sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.fee_table.setItem(row, 4, sample_qty_item)
+                    # 나머지 데이터 설정
+                    self.fee_table.setItem(row, 1, QTableWidgetItem(fee['test_item']))
+                    self.fee_table.setItem(row, 2, QTableWidgetItem(fee['food_category'] or ""))
+                    price_item = QTableWidgetItem(f"{int(fee['price']):,}")
+                    price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.fee_table.setItem(row, 3, price_item)
+                    # 검체 수량 표시
+                    try:
+                        sample_qty = fee['sample_quantity'] or 0
+                    except (KeyError, IndexError):
+                        sample_qty = 0
+                    sample_qty_item = QTableWidgetItem(str(sample_qty))
+                    sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.fee_table.setItem(row, 4, sample_qty_item)
 
-                # 정렬순서 설정 - 기존 데이터에 없을 경우 기본값 사용
-                try:
-                    display_order = fee['display_order']
-                except (KeyError, IndexError):
-                    display_order = row + 1  # 기본값으로 행 번호+1 사용
+                    # 정렬순서 설정 - 기존 데이터에 없을 경우 기본값 사용
+                    try:
+                        display_order = fee['display_order']
+                    except (KeyError, IndexError):
+                        display_order = row + 1  # 기본값으로 행 번호+1 사용
 
-                order_item = QTableWidgetItem(str(display_order))
-                order_item.setTextAlignment(Qt.AlignCenter)
-                self.fee_table.setItem(row, 5, order_item)
+                    order_item = QTableWidgetItem(str(display_order))
+                    order_item.setTextAlignment(Qt.AlignCenter)
+                    self.fee_table.setItem(row, 5, order_item)
 
-                self.fee_table.setItem(row, 6, QTableWidgetItem(fee['created_at'] or ""))
+                    self.fee_table.setItem(row, 6, QTableWidgetItem(fee['created_at'] or ""))
+        finally:
+            # UI 업데이트 재개
+            self.fee_table.setUpdatesEnabled(True)
 
     def get_chosung(self, text):
         """문자열에서 초성 추출"""
@@ -214,6 +255,11 @@ class FeeTab(QWidget):
         """초성 검색 매칭"""
         text_chosung = self.get_chosung(text)
         return search_text.lower() in text_chosung.lower()
+
+    def on_search_text_changed(self):
+        """검색어 변경 시 타이머 시작 (디바운싱)"""
+        self.search_timer.stop()
+        self.search_timer.start(300)  # 300ms 후 필터링 실행
 
     def filter_fees(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
