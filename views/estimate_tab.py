@@ -445,6 +445,9 @@ FAX: (070) 7410-1430""")
                 # 실측실험: 1구간 온도
                 temps = [real_temps.get(storage_code, '15')]
 
+        # 샘플링 횟수
+        sampling_count = schedule.get('sampling_count', 6) or 6
+
         # 검사항목 (스케줄에서 동적으로 가져오기)
         test_items_str = schedule.get('test_items', '')
         if test_items_str:
