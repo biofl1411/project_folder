@@ -306,21 +306,27 @@ class ScheduleCreateDialog(QDialog):
         client_search_layout.addWidget(self.client_detail_btn)
         client_layout.addRow("업체명:", client_search_layout)
 
-        # 업체 정보 표시 - 새로운 필드 추가
+        # 업체 정보 표시 - 필드 확장
         self.client_ceo_label = QLabel("- ")  # 대표자 정보
         client_layout.addRow("대표자:", self.client_ceo_label)
-
-        self.client_name_label = QLabel("- ")  # 담당명
-        client_layout.addRow("담당명:", self.client_name_label)
 
         self.client_contact_label = QLabel("- ")  # 담당자
         client_layout.addRow("담당자:", self.client_contact_label)
 
-        self.client_phone_label = QLabel("- ")  # 연락처
-        client_layout.addRow("연락처:", self.client_phone_label)
+        self.client_email_label = QLabel("- ")  # 이메일
+        client_layout.addRow("이메일:", self.client_email_label)
 
-        self.client_sales_label = QLabel("- ")  # 영업담당자 정보
-        client_layout.addRow("영업담당자:", self.client_sales_label)
+        self.client_phone_label = QLabel("- ")  # 전화번호
+        client_layout.addRow("전화번호:", self.client_phone_label)
+
+        self.client_address_label = QLabel("- ")  # 소재지
+        client_layout.addRow("소재지:", self.client_address_label)
+
+        self.client_detail_address_label = QLabel("- ")  # 상세주소
+        client_layout.addRow("상세주소:", self.client_detail_address_label)
+
+        self.client_memo_label = QLabel("- ")  # 메모
+        client_layout.addRow("메모:", self.client_memo_label)
 
         self.main_layout.addWidget(client_group)
             
@@ -392,7 +398,20 @@ class ScheduleCreateDialog(QDialog):
         self.test_start_date.setDate(QDate.currentDate())
         self.test_start_date.setCalendarPopup(True)
         test_layout.addRow("실험 시작일(필수):", self.test_start_date)
-        
+
+        # 견적일자
+        estimate_date_layout = QHBoxLayout()
+        self.estimate_date = QDateEdit()
+        self.estimate_date.setDate(QDate.currentDate())
+        self.estimate_date.setCalendarPopup(True)
+        self.estimate_date_check = QCheckBox("미정")
+        self.estimate_date_check.setChecked(True)  # 기본값은 미정
+        self.estimate_date.setEnabled(False)  # 미정 체크 시 비활성화
+        estimate_date_layout.addWidget(self.estimate_date)
+        estimate_date_layout.addWidget(self.estimate_date_check)
+        estimate_date_layout.addStretch()
+        test_layout.addRow("견적일자:", estimate_date_layout)
+
         # "설정 기간" 라벨을 "소비기한"으로 변경하고 UI 구성
         period_layout = QHBoxLayout()
                 
@@ -602,6 +621,10 @@ class ScheduleCreateDialog(QDialog):
         if state:
             self.sampling_spin.setValue(6)  # 기본값으로 복원
 
+    def toggle_estimate_date(self, state):
+        """견적일자 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
+        self.estimate_date.setEnabled(not state)
+
     def connect_signals(self):
         """모든 시그널 연결을 한 곳에서 처리"""
         # 클라이언트 관련
@@ -640,7 +663,10 @@ class ScheduleCreateDialog(QDialog):
         
         # 샘플링 관련
         self.default_sampling_check.stateChanged.connect(self.toggle_sampling_input)
-        
+
+        # 견적일자 관련
+        self.estimate_date_check.stateChanged.connect(self.toggle_estimate_date)
+
         # 버튼 관련
         self.preview_btn.clicked.connect(self.preview_schedule)
         self.save_btn.clicked.connect(self.accept)
@@ -762,10 +788,12 @@ class ScheduleCreateDialog(QDialog):
                     self.selected_client_id = client_id
                     self.client_input.setText(client_data.get('name', ''))
                     self.client_ceo_label.setText(client_data.get('ceo', '-') or '-')
-                    self.client_name_label.setText(client_data.get('contact_person', '-') or '-')
                     self.client_contact_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_email_label.setText(client_data.get('email', '-') or '-')
                     self.client_phone_label.setText(client_data.get('phone', '-') or '-')
-                    self.client_sales_label.setText(client_data.get('sales_rep', '-') or '-')
+                    self.client_address_label.setText(client_data.get('address', '-') or '-')
+                    self.client_detail_address_label.setText(client_data.get('detail_address', '-') or '-')
+                    self.client_memo_label.setText(client_data.get('notes', '-') or '-')
 
                     print(f"업체 검색 완료: {client_data.get('name', '')}")
             else:
@@ -813,10 +841,12 @@ class ScheduleCreateDialog(QDialog):
                     self.selected_client_id = client_id
                     self.client_input.setText(client_data.get('name', ''))
                     self.client_ceo_label.setText(client_data.get('ceo', '-') or '-')
-                    self.client_name_label.setText(client_data.get('contact_person', '-') or '-')
                     self.client_contact_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_email_label.setText(client_data.get('email', '-') or '-')
                     self.client_phone_label.setText(client_data.get('phone', '-') or '-')
-                    self.client_sales_label.setText(client_data.get('sales_rep', '-') or '-')
+                    self.client_address_label.setText(client_data.get('address', '-') or '-')
+                    self.client_detail_address_label.setText(client_data.get('detail_address', '-') or '-')
+                    self.client_memo_label.setText(client_data.get('notes', '-') or '-')
 
                     print(f"새 업체 등록 완료: {client_data.get('name', '')}")
             else:
@@ -1220,6 +1250,11 @@ class ScheduleCreateDialog(QDialog):
             # 데이터베이스에 저장/업데이트
             from models.schedules import Schedule
 
+            # 견적일자 값 처리
+            estimate_date_value = None
+            if not self.estimate_date_check.isChecked():
+                estimate_date_value = self.estimate_date.date().toString('yyyy-MM-dd')
+
             schedule_data = {
                 'client_id': self.selected_client_id,
                 'product_name': self.product_name_input.text().strip(),
@@ -1237,7 +1272,8 @@ class ScheduleCreateDialog(QDialog):
                 'extension_test': 1 if self.extension_check.isChecked() else 0,
                 'custom_temperatures': custom_temperatures,
                 'packaging_weight': self.packaging_weight_spin.value(),
-                'packaging_unit': self.packaging_unit_combo.currentText()
+                'packaging_unit': self.packaging_unit_combo.currentText(),
+                'estimate_date': estimate_date_value
             }
 
             if self.is_edit_mode:
@@ -1268,7 +1304,8 @@ class ScheduleCreateDialog(QDialog):
                     extension_test=self.extension_check.isChecked(),
                     custom_temperatures=custom_temperatures,
                     packaging_weight=self.packaging_weight_spin.value(),
-                    packaging_unit=self.packaging_unit_combo.currentText()
+                    packaging_unit=self.packaging_unit_combo.currentText(),
+                    estimate_date=estimate_date_value
                 )
 
                 if schedule_id:
@@ -1535,10 +1572,12 @@ class ScheduleCreateDialog(QDialog):
                 if client:
                     self.client_input.setText(client.get('name', ''))
                     self.client_ceo_label.setText(client.get('ceo', '-') or '-')
-                    self.client_name_label.setText(client.get('contact_person', '-') or '-')
                     self.client_contact_label.setText(client.get('contact_person', '-') or '-')
+                    self.client_email_label.setText(client.get('email', '-') or '-')
                     self.client_phone_label.setText(client.get('phone', '-') or '-')
-                    self.client_sales_label.setText(client.get('sales_rep', '-') or '-')
+                    self.client_address_label.setText(client.get('address', '-') or '-')
+                    self.client_detail_address_label.setText(client.get('detail_address', '-') or '-')
+                    self.client_memo_label.setText(client.get('notes', '-') or '-')
 
             # 제품명
             self.product_name_input.setText(schedule.get('product_name', '') or '')
@@ -1590,6 +1629,16 @@ class ScheduleCreateDialog(QDialog):
             if start_date:
                 self.test_start_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
                 self.expected_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
+
+            # 견적일자 설정
+            estimate_date = schedule.get('estimate_date', '')
+            if estimate_date:
+                self.estimate_date.setDate(QDate.fromString(estimate_date, 'yyyy-MM-dd'))
+                self.estimate_date_check.setChecked(False)
+                self.estimate_date.setEnabled(True)
+            else:
+                self.estimate_date_check.setChecked(True)
+                self.estimate_date.setEnabled(False)
 
             # 소비기한 설정
             self.days_spin.setValue(schedule.get('test_period_days', 0) or 0)

@@ -27,6 +27,7 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('food_type', '식품유형', False),
         ('start_date', '시작일', True),
         ('end_date', '종료일', True),
+        ('estimate_date', '견적일자', True),
         ('sampling_count', '샘플링횟수', False),
         ('status', '상태', True),
     ]
@@ -160,8 +161,9 @@ class ScheduleTab(QWidget):
         ('food_type', '식품유형', 'food_type_id', 6),
         ('start_date', '시작일', 'start_date', 7),
         ('end_date', '종료일', 'end_date', 8),
-        ('sampling_count', '샘플링횟수', 'sampling_count', 9),
-        ('status', '상태', 'status', 10),
+        ('estimate_date', '견적일자', 'estimate_date', 9),
+        ('sampling_count', '샘플링횟수', 'sampling_count', 10),
+        ('status', '상태', 'status', 11),
     ]
 
     def initUI(self):
@@ -229,6 +231,15 @@ class ScheduleTab(QWidget):
         self.schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        # 헤더 클릭으로 정렬 기능 활성화
+        self.schedule_table.setSortingEnabled(True)
+        self.schedule_table.horizontalHeader().setSortIndicatorShown(True)
+        self.schedule_table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
+
+        # 정렬 상태 저장
+        self.current_sort_column = -1
+        self.current_sort_order = Qt.AscendingOrder
 
         # 더블클릭 이벤트 연결
         self.schedule_table.doubleClicked.connect(self.on_double_click)
@@ -309,11 +320,15 @@ class ScheduleTab(QWidget):
                 end_date = schedule.get('end_date', '') or ''
                 self.schedule_table.setItem(row, 8, QTableWidgetItem(end_date))
 
-                # 샘플링횟수 - 9번
-                sampling_count = schedule.get('sampling_count', '') or ''
-                self.schedule_table.setItem(row, 9, QTableWidgetItem(str(sampling_count) if sampling_count else ''))
+                # 견적일자 - 9번
+                estimate_date = schedule.get('estimate_date', '') or ''
+                self.schedule_table.setItem(row, 9, QTableWidgetItem(estimate_date))
 
-                # 상태 - 10번
+                # 샘플링횟수 - 10번
+                sampling_count = schedule.get('sampling_count', '') or ''
+                self.schedule_table.setItem(row, 10, QTableWidgetItem(str(sampling_count) if sampling_count else ''))
+
+                # 상태 - 11번
                 status = schedule.get('status', 'pending') or 'pending'
                 status_text = {
                     'pending': '대기',
@@ -332,7 +347,7 @@ class ScheduleTab(QWidget):
                 elif status in ['completed', 'cancelled']:
                     status_item.setBackground(Qt.green)
 
-                self.schedule_table.setItem(row, 10, status_item)
+                self.schedule_table.setItem(row, 11, status_item)
 
             print(f"스케줄 {len(schedules)}개 로드 완료")
         except Exception as e:
@@ -550,3 +565,22 @@ class ScheduleTab(QWidget):
                 # 설정에 따라 표시/숨김
                 is_hidden = col_key not in visible_columns
                 self.schedule_table.setColumnHidden(col_index, is_hidden)
+
+    def on_header_clicked(self, logical_index):
+        """헤더 클릭 시 해당 컬럼으로 정렬"""
+        # 선택 열(0번)과 ID 열(1번)은 정렬 제외
+        if logical_index in [0, 1]:
+            return
+
+        # 같은 컬럼을 다시 클릭하면 정렬 순서 변경
+        if self.current_sort_column == logical_index:
+            if self.current_sort_order == Qt.AscendingOrder:
+                self.current_sort_order = Qt.DescendingOrder
+            else:
+                self.current_sort_order = Qt.AscendingOrder
+        else:
+            self.current_sort_column = logical_index
+            self.current_sort_order = Qt.AscendingOrder
+
+        # 정렬 실행
+        self.schedule_table.sortItems(logical_index, self.current_sort_order)
