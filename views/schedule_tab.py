@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
+from utils.logger import log_message, log_error, log_exception
 
 
 class ScheduleDisplaySettingsDialog(QDialog):
@@ -327,13 +328,15 @@ class ScheduleTab(QWidget):
         """스케줄 목록 로드"""
         try:
             from models.schedules import Schedule
+            log_message('ScheduleTab', '스케줄 목록 로드 시작')
 
-            self.all_schedules = Schedule.get_all()
+            raw_schedules = Schedule.get_all() or []
+            # sqlite3.Row를 딕셔너리로 변환하여 .get() 메서드 사용 가능하게 함
+            self.all_schedules = [dict(s) for s in raw_schedules]
             self.display_schedules(self.all_schedules)
+            log_message('ScheduleTab', f'스케줄 {len(self.all_schedules)}개 로드 완료')
         except Exception as e:
-            import traceback
-            print(f"스케줄 로드 중 오류: {str(e)}")
-            traceback.print_exc()
+            log_exception('ScheduleTab', f'스케줄 로드 중 오류: {str(e)}')
 
     def display_schedules(self, schedules):
         """스케줄 목록을 테이블에 표시"""
@@ -431,11 +434,9 @@ class ScheduleTab(QWidget):
 
                 self.schedule_table.setItem(row, 11, status_item)
 
-            print(f"스케줄 {len(schedules)}개 표시 완료")
+            log_message('ScheduleTab', f'스케줄 {len(schedules)}개 표시 완료')
         except Exception as e:
-            import traceback
-            print(f"스케줄 표시 중 오류: {str(e)}")
-            traceback.print_exc()
+            log_exception('ScheduleTab', f'스케줄 표시 중 오류: {str(e)}')
         finally:
             # UI 업데이트 재개
             self.schedule_table.setUpdatesEnabled(True)
@@ -471,58 +472,64 @@ class ScheduleTab(QWidget):
 
     def filter_schedules(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
-        search_text = self.search_input.text().strip()
-        search_field = self.search_field_combo.currentText()
+        try:
+            search_text = self.search_input.text().strip()
+            search_field = self.search_field_combo.currentText()
 
-        if not search_text:
-            self.display_schedules(self.all_schedules)
-            return
+            if not search_text:
+                self.display_schedules(self.all_schedules)
+                return
 
-        filtered = []
-        is_chosung = self.is_chosung_only(search_text)
+            log_message('ScheduleTab', f'스케줄 검색 시작: "{search_text}" (필드: {search_field})')
 
-        for schedule in self.all_schedules:
-            client_name = schedule.get('client_name', '') or ''
-            product_name = schedule.get('product_name', '') or ''
-            status = schedule.get('status', '') or ''
-            status_text = {
-                'pending': '대기', 'scheduled': '입고예정',
-                'received': '입고', 'completed': '종료',
-                'in_progress': '입고', 'cancelled': '종료'
-            }.get(status, status)
+            filtered = []
+            is_chosung = self.is_chosung_only(search_text)
 
-            match = False
+            for schedule in self.all_schedules:
+                client_name = schedule.get('client_name', '') or ''
+                product_name = schedule.get('product_name', '') or ''
+                status = schedule.get('status', '') or ''
+                status_text = {
+                    'pending': '대기', 'scheduled': '입고예정',
+                    'received': '입고', 'completed': '종료',
+                    'in_progress': '입고', 'cancelled': '종료'
+                }.get(status, status)
 
-            if search_field == "전체":
-                if is_chosung:
-                    match = (self.match_chosung(client_name, search_text) or
-                             self.match_chosung(product_name, search_text) or
-                             self.match_chosung(status_text, search_text))
-                else:
-                    search_lower = search_text.lower()
-                    match = (search_lower in client_name.lower() or
-                             search_lower in product_name.lower() or
-                             search_lower in status_text.lower())
-            elif search_field == "업체명":
-                if is_chosung:
-                    match = self.match_chosung(client_name, search_text)
-                else:
-                    match = search_text.lower() in client_name.lower()
-            elif search_field == "샘플명":
-                if is_chosung:
-                    match = self.match_chosung(product_name, search_text)
-                else:
-                    match = search_text.lower() in product_name.lower()
-            elif search_field == "상태":
-                if is_chosung:
-                    match = self.match_chosung(status_text, search_text)
-                else:
-                    match = search_text.lower() in status_text.lower()
+                match = False
 
-            if match:
-                filtered.append(schedule)
+                if search_field == "전체":
+                    if is_chosung:
+                        match = (self.match_chosung(client_name, search_text) or
+                                 self.match_chosung(product_name, search_text) or
+                                 self.match_chosung(status_text, search_text))
+                    else:
+                        search_lower = search_text.lower()
+                        match = (search_lower in client_name.lower() or
+                                 search_lower in product_name.lower() or
+                                 search_lower in status_text.lower())
+                elif search_field == "업체명":
+                    if is_chosung:
+                        match = self.match_chosung(client_name, search_text)
+                    else:
+                        match = search_text.lower() in client_name.lower()
+                elif search_field == "샘플명":
+                    if is_chosung:
+                        match = self.match_chosung(product_name, search_text)
+                    else:
+                        match = search_text.lower() in product_name.lower()
+                elif search_field == "상태":
+                    if is_chosung:
+                        match = self.match_chosung(status_text, search_text)
+                    else:
+                        match = search_text.lower() in status_text.lower()
 
-        self.display_schedules(filtered)
+                if match:
+                    filtered.append(schedule)
+
+            log_message('ScheduleTab', f'스케줄 검색 완료: {len(filtered)}개 결과')
+            self.display_schedules(filtered)
+        except Exception as e:
+            log_exception('ScheduleTab', f'스케줄 검색 중 오류: {str(e)}')
 
     def reset_search(self):
         """검색 초기화"""

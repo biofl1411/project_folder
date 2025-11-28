@@ -16,6 +16,7 @@ import pandas as pd
 import os
 
 from models.clients import Client
+from utils.logger import log_message, log_error, log_exception
 
 class ClientTab(QWidget):
     # 한글 초성 매핑
@@ -291,8 +292,16 @@ class ClientTab(QWidget):
 
     def load_clients(self):
         """업체 목록 로드"""
-        self.all_clients = Client.get_all() or []
-        self.display_clients(self.all_clients)
+        try:
+            log_message('ClientTab', '업체 목록 로드 시작')
+            raw_clients = Client.get_all() or []
+            # sqlite3.Row를 딕셔너리로 변환
+            self.all_clients = [dict(c) for c in raw_clients]
+            self.display_clients(self.all_clients)
+            log_message('ClientTab', f'업체 {len(self.all_clients)}개 로드 완료')
+        except Exception as e:
+            log_exception('ClientTab', f'업체 로드 중 오류: {str(e)}')
+            QMessageBox.critical(self, "오류", f"업체 로드 중 오류 발생: {str(e)}")
 
     def display_clients(self, clients):
         """업체 목록을 테이블에 표시"""
@@ -351,57 +360,61 @@ class ClientTab(QWidget):
 
     def filter_clients(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
-        search_text = self.search_input.text().strip()
-        search_field = self.search_field_combo.currentText()
+        try:
+            search_text = self.search_input.text().strip()
+            search_field = self.search_field_combo.currentText()
 
-        if not search_text:
-            self.display_clients(self.all_clients)
-            return
+            if not search_text:
+                self.display_clients(self.all_clients)
+                return
 
-        filtered = []
-        is_chosung = self.is_chosung_only(search_text)
+            filtered = []
+            is_chosung = self.is_chosung_only(search_text)
 
-        for client in self.all_clients:
-            name = client.get('name', '') or ''
-            ceo = client.get('ceo', '') or ''
-            contact_person = client.get('contact_person', '') or ''
-            business_no = client.get('business_no', '') or ''
+            for client in self.all_clients:
+                # 안전한 값 접근 (딕셔너리로 변환됨)
+                name = str(client.get('name', '') or '')
+                ceo = str(client.get('ceo', '') or '')
+                contact_person = str(client.get('contact_person', '') or '')
+                business_no = str(client.get('business_no', '') or '')
 
-            match = False
+                match = False
 
-            if search_field == "전체":
-                if is_chosung:
-                    match = (self.match_chosung(name, search_text) or
-                             self.match_chosung(ceo, search_text) or
-                             self.match_chosung(contact_person, search_text))
-                else:
-                    search_lower = search_text.lower()
-                    match = (search_lower in name.lower() or
-                             search_lower in ceo.lower() or
-                             search_lower in contact_person.lower() or
-                             search_lower in business_no.lower())
-            elif search_field == "고객/회사명":
-                if is_chosung:
-                    match = self.match_chosung(name, search_text)
-                else:
-                    match = search_text.lower() in name.lower()
-            elif search_field == "대표자":
-                if is_chosung:
-                    match = self.match_chosung(ceo, search_text)
-                else:
-                    match = search_text.lower() in ceo.lower()
-            elif search_field == "담당자":
-                if is_chosung:
-                    match = self.match_chosung(contact_person, search_text)
-                else:
-                    match = search_text.lower() in contact_person.lower()
-            elif search_field == "사업자번호":
-                match = search_text.lower() in business_no.lower()
+                if search_field == "전체":
+                    if is_chosung:
+                        match = (self.match_chosung(name, search_text) or
+                                 self.match_chosung(ceo, search_text) or
+                                 self.match_chosung(contact_person, search_text))
+                    else:
+                        search_lower = search_text.lower()
+                        match = (search_lower in name.lower() or
+                                 search_lower in ceo.lower() or
+                                 search_lower in contact_person.lower() or
+                                 search_lower in business_no.lower())
+                elif search_field == "고객/회사명":
+                    if is_chosung:
+                        match = self.match_chosung(name, search_text)
+                    else:
+                        match = search_text.lower() in name.lower()
+                elif search_field == "대표자":
+                    if is_chosung:
+                        match = self.match_chosung(ceo, search_text)
+                    else:
+                        match = search_text.lower() in ceo.lower()
+                elif search_field == "담당자":
+                    if is_chosung:
+                        match = self.match_chosung(contact_person, search_text)
+                    else:
+                        match = search_text.lower() in contact_person.lower()
+                elif search_field == "사업자번호":
+                    match = search_text.lower() in business_no.lower()
 
-            if match:
-                filtered.append(client)
+                if match:
+                    filtered.append(client)
 
-        self.display_clients(filtered)
+            self.display_clients(filtered)
+        except Exception as e:
+            log_exception('ClientTab', f'검색 필터링 중 오류: {str(e)}')
 
     def reset_search(self):
         """검색 초기화"""
