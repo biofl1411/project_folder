@@ -247,7 +247,7 @@ class FoodTypeTab(QWidget):
                     self.food_type_table.setCellWidget(row, 0, checkbox_widget)
 
                     # 나머지 데이터 설정
-                    self.food_type_table.setItem(row, 1, QTableWidgetItem(str(food_type.get('type_name', '') or '')))
+                    self.food_type_table.setItem(row, 1, QTableWidgetItem(str(food_type['type_name'] or '')))
                     self.food_type_table.setItem(row, 2, QTableWidgetItem(food_type['category'] or ""))
                     self.food_type_table.setItem(row, 3, QTableWidgetItem(food_type['sterilization'] or ""))
                     self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))

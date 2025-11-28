@@ -203,7 +203,7 @@ class FeeTab(QWidget):
                     self.fee_table.setCellWidget(row, 0, checkbox_widget)
 
                     # 나머지 데이터 설정
-                    self.fee_table.setItem(row, 1, QTableWidgetItem(str(fee.get('test_item', '') or '')))
+                    self.fee_table.setItem(row, 1, QTableWidgetItem(str(fee['test_item'] or '')))
                     self.fee_table.setItem(row, 2, QTableWidgetItem(fee['food_category'] or ""))
                     price_item = QTableWidgetItem(f"{int(fee['price']):,}")
                     price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -274,8 +274,8 @@ class FeeTab(QWidget):
         is_chosung = self.is_chosung_only(search_text)
 
         for fee in self.all_fees:
-            test_item = fee.get('test_item', '') or ''
-            food_category = fee.get('food_category', '') or ''
+            test_item = fee['test_item'] or ''
+            food_category = fee['food_category'] or ''
 
             match = False
 
