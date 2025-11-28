@@ -568,10 +568,13 @@ FAX: (070) 7410-1430""")
 
     def update_remark(self, schedule):
         """Remark 섹션 업데이트"""
+        from datetime import datetime, timedelta
+
         sampling_count = schedule.get('sampling_count', 6) or 6
         test_method = schedule.get('test_method', 'real')
 
-        if test_method in ['acceleration', 'custom_accel']:
+        # 온도 구간 수 결정
+        if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
             zone_count = 3
             zone_text = "3온도"
         else:
@@ -580,15 +583,72 @@ FAX: (070) 7410-1430""")
 
         total_samples = sampling_count * zone_count
 
+        # 포장단위 정보 가져오기
+        packaging_weight = schedule.get('packaging_weight', 0) or 0
+        packaging_unit = schedule.get('packaging_unit', 'g') or 'g'
+        if packaging_weight > 0:
+            packaging_text = f"{packaging_weight}{packaging_unit}"
+        else:
+            packaging_text = "100g"
+
+        # 실험기간 계산
+        test_period_days = schedule.get('test_period_days', 0) or 0
+        test_period_months = schedule.get('test_period_months', 0) or 0
+        test_period_years = schedule.get('test_period_years', 0) or 0
+        total_experiment_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+
+        # 샘플링 간격 계산
+        if total_experiment_days > 0 and sampling_count > 0:
+            interval = total_experiment_days // sampling_count
+        else:
+            interval = 15  # 기본값
+
+        # 중간보고서 실험일수 (6회차 기준)
+        interim_experiment_days = interval * 6
+
+        # 시작일과 예상 날짜 계산
+        start_date_str = schedule.get('start_date', '')
+        interim_expected_date = ""
+        final_expected_date = ""
+
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                # 중간보고서 예상일 (실험 완료 + 분석시간 약 15일)
+                interim_date = start_date + timedelta(days=interim_experiment_days + 15)
+                interim_expected_date = interim_date.strftime('%Y-%m-%d')
+                # 최종보고서 예상일 (실험 완료 + 분석시간 약 15일)
+                final_date = start_date + timedelta(days=total_experiment_days + 15)
+                final_expected_date = final_date.strftime('%Y-%m-%d')
+            except:
+                pass
+
+        # 소비기한 개월 수 계산
+        total_months = test_period_months + (test_period_years * 12)
+        if test_period_days >= 15:
+            total_months += 1
+
+        # 검사 소요기간 문구 생성
+        report_interim = schedule.get('report_interim', False)
+
+        test_period_text = ""
+        # 중간보고서가 체크된 경우에만 중간보고서 라인 추가
+        if report_interim:
+            interim_date_text = f" / {interim_expected_date}" if interim_expected_date else ""
+            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. ({total_months // 2}개월 중간 보고서{interim_date_text})\n"
+
+        # 최종 보고서 라인
+        final_date_text = f" / {final_expected_date}" if final_expected_date else ""
+        test_period_text += f"→ 실험기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
+
         remark_text = f"""※ 검체량
 → 검체는 판매 또는 판매 예정인 제품과 동일하게 검사제품을 준비해주시기 바랍니다.
-→ 검체량 : 온도구간별({zone_text}) 총 {sampling_count}회씩 실험 = {total_samples}ea
-    = > 포장단위 100g 이상 제품 기준 총 {total_samples}ea 이상 준비
+→ 검체량 : 온도 구간별({zone_text}) 총 {sampling_count}회씩 실험 = {total_samples}ea
+    => 포장단위 {packaging_text} 이상 제품 기준 총 {total_samples}ea 이상 준비
 
 ※ 검사 소요기간
-→ 실험기간 : 48일 + 데이터 분석시간 (약 7일~15일), 소요예정입니다. (3개월 중간보고서)
-→ 실험기간 : 90일 + 데이터 분석시간 (약 7일~15일), 소요예정입니다. (6개월 보고서)
-약 8~12일에 온도별({zone_text}) 1회씩 실험- 실험스케줄(구간 및 횟수)은 실험결과의 유의성에 따라 변경될 수 있습니다.
+{test_period_text}
+약 8~12일에 온도별({zone_text}) 1회씩 실험- 실험스케쥴(구간 및 횟수)은 실험결과의 유의성에 따라 보고서 발행일 수가 변경될 수 있습니다.
 
 ※ 제시해 주신 예상소비기한 설정 실험에 대한 견적이며 품질안전한계기간 도달하지 않더라도 실험연장은 불가합니다.
 ※ 지표항목으로 수정하고 싶으신 항목이 있으시면 연락바랍니다.
