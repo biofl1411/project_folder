@@ -548,39 +548,43 @@ class ScheduleManagementTab(QWidget):
         for col in range(6):
             grid.setColumnStretch(col, 1)
 
+        # 8행으로 설정하여 여유 공간 확보
+        for row in range(8):
+            grid.setRowStretch(row, 1)
+
         label_style = "font-weight: bold; background-color: #ecf0f1; padding: 4px; border: 1px solid #bdc3c7; font-size: 13px;"
         value_style = "background-color: white; padding: 4px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 13px;"
 
-        # 행 1
-        self.company_label = self._create_label("회사명", label_style)
+        # 행 1 (공백으로 글자 간격 균일하게)
+        self.company_label = self._create_label("회  사  명", label_style)
         grid.addWidget(self.company_label, 0, 0)
         self.company_value = self._create_value_label("-", value_style)
         grid.addWidget(self.company_value, 0, 1)
-        self.test_method_label = self._create_label("실험방법", label_style)
+        self.test_method_label = self._create_label("실 험 방 법", label_style)
         grid.addWidget(self.test_method_label, 0, 2)
         self.test_method_value = self._create_value_label("-", value_style)
         grid.addWidget(self.test_method_value, 0, 3)
-        self.product_label = self._create_label("제품명", label_style)
+        self.product_label = self._create_label("제  품  명", label_style)
         grid.addWidget(self.product_label, 0, 4)
         self.product_value = self._create_value_label("-", value_style)
         grid.addWidget(self.product_value, 0, 5)
 
         # 행 2
-        self.expiry_label = self._create_label("소비기한", label_style)
+        self.expiry_label = self._create_label("소 비 기 한", label_style)
         grid.addWidget(self.expiry_label, 1, 0)
         self.expiry_value = self._create_value_label("-", value_style)
         grid.addWidget(self.expiry_value, 1, 1)
-        self.storage_label = self._create_label("보관조건", label_style)
+        self.storage_label = self._create_label("보 관 조 건", label_style)
         grid.addWidget(self.storage_label, 1, 2)
         self.storage_value = self._create_value_label("-", value_style)
         grid.addWidget(self.storage_value, 1, 3)
-        self.food_type_label = self._create_label("식품유형", label_style)
+        self.food_type_label = self._create_label("식 품 유 형", label_style)
         grid.addWidget(self.food_type_label, 1, 4)
         self.food_type_value = self._create_value_label("-", value_style)
         grid.addWidget(self.food_type_value, 1, 5)
 
         # 행 3
-        self.period_label = self._create_label("실험기간", label_style)
+        self.period_label = self._create_label("실 험 기 간", label_style)
         grid.addWidget(self.period_label, 2, 0)
         self.period_value = self._create_value_label("-", value_style)
         grid.addWidget(self.period_value, 2, 1)
@@ -588,7 +592,7 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.interim_report_label, 2, 2)
         self.interim_report_value = self._create_value_label("-", value_style)
         grid.addWidget(self.interim_report_value, 2, 3)
-        self.extension_label = self._create_label("연장실험", label_style)
+        self.extension_label = self._create_label("연 장 실 험", label_style)
         grid.addWidget(self.extension_label, 2, 4)
         self.extension_value = self._create_value_label("-", value_style)
         grid.addWidget(self.extension_value, 2, 5)
@@ -602,7 +606,7 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.sampling_interval_label, 3, 2)
         self.sampling_interval_value = self._create_value_label("-", value_style)
         grid.addWidget(self.sampling_interval_value, 3, 3)
-        self.start_date_label = self._create_label("시작일", label_style)
+        self.start_date_label = self._create_label("시  작  일", label_style)
         grid.addWidget(self.start_date_label, 3, 4)
         self.start_date_value = self._create_value_label("-", value_style)
         grid.addWidget(self.start_date_value, 3, 5)
@@ -616,7 +620,7 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.last_test_date_label, 4, 2)
         self.last_test_date_value = self._create_value_label("-", value_style)
         grid.addWidget(self.last_test_date_value, 4, 3)
-        self.status_label = self._create_label("상태", label_style)
+        self.status_label = self._create_label("상      태", label_style)
         grid.addWidget(self.status_label, 4, 4)
         self.status_value = self._create_value_label("-", value_style)
         grid.addWidget(self.status_value, 4, 5)
@@ -626,7 +630,7 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.sample_per_test_label, 5, 0)
         self.sample_per_test_value = self._create_value_label("-", value_style)
         grid.addWidget(self.sample_per_test_value, 5, 1)
-        self.packaging_label = self._create_label("포장단위", label_style)
+        self.packaging_label = self._create_label("포 장 단 위", label_style)
         grid.addWidget(self.packaging_label, 5, 2)
         self.packaging_value = self._create_value_label("-", value_style)
         grid.addWidget(self.packaging_value, 5, 3)
@@ -640,6 +644,8 @@ class ScheduleManagementTab(QWidget):
         self.required_sample_value.setPlaceholderText("개수 입력")
         grid.addWidget(self.required_sample_value, 5, 5)
         self.current_required_sample = 0  # 계산된 필요 검체량 저장
+
+        # 행 7, 8 - 여유 공간 (빈 행)
 
         parent_layout.addWidget(group)
 
