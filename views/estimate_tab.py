@@ -465,7 +465,9 @@ FAX: (070) 7410-1430""")
 소비기한 : {storage} {period_str}
 시험기간 : {test_duration}
 실험방법 : {method_str}
-실험 온도: {temp_str}"""
+실험 온도: {temp_str}
+연장시험 : {'진행' if schedule.get('extension_test') else '미진행'}
+실험 횟수: {sampling_count}회"""
 
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
@@ -659,7 +661,7 @@ FAX: (070) 7410-1430""")
 
         # 최종 보고서 라인
         final_date_text = f" / {final_expected_date}" if final_expected_date else ""
-        test_period_text += f"→ 실험기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
+        test_period_text += f"→ 실험 기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
 
         remark_text = f"""※ 검체량
 → 검체는 판매 또는 판매 예정인 제품과 동일하게 검사제품을 준비해주시기 바랍니다.
