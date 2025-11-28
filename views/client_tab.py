@@ -11,14 +11,21 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QFileDialog, QProgressDialog, QGridLayout, QScrollArea,
                           QGroupBox, QComboBox, QCheckBox, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, QCoreApplication, QSettings
+from PyQt5.QtGui import QColor
 import pandas as pd
 import os
 
 from models.clients import Client
 
 class ClientTab(QWidget):
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.all_clients = []  # 전체 업체 목록 저장
+        self.current_sort_column = -1
+        self.current_sort_order = Qt.AscendingOrder
         self.initUI()
         self.load_clients()
 
@@ -72,6 +79,38 @@ class ClientTab(QWidget):
         button_layout.addStretch()
 
         layout.addWidget(button_frame)
+
+        # 검색 영역
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_layout = QHBoxLayout(search_frame)
+
+        search_layout.addWidget(QLabel("검색:"))
+
+        # 검색 필드 선택
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItems(["전체", "고객/회사명", "대표자", "담당자", "사업자번호"])
+        self.search_field_combo.setMinimumWidth(100)
+        search_layout.addWidget(self.search_field_combo)
+
+        # 검색 입력
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
+        self.search_input.setMinimumWidth(300)
+        self.search_input.textChanged.connect(self.filter_clients)
+        search_layout.addWidget(self.search_input)
+
+        # 검색 필드 변경 시에도 필터 적용
+        self.search_field_combo.currentIndexChanged.connect(self.filter_clients)
+
+        # 초기화 버튼
+        reset_btn = QPushButton("초기화")
+        reset_btn.clicked.connect(self.reset_search)
+        search_layout.addWidget(reset_btn)
+
+        search_layout.addStretch()
+
+        layout.addWidget(search_frame)
 
         # 2. 업체 목록 테이블
         self.client_table = QTableWidget()
@@ -151,6 +190,11 @@ class ClientTab(QWidget):
         self.client_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.client_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
+        # 헤더 클릭으로 정렬 기능 활성화
+        self.client_table.setSortingEnabled(True)
+        self.client_table.horizontalHeader().setSortIndicatorShown(True)
+        self.client_table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
+
         # 기존 연결 해제 후 재연결 (중복 연결 방지)
         try:
             self.client_table.doubleClicked.disconnect()
@@ -212,8 +256,11 @@ class ClientTab(QWidget):
 
     def load_clients(self):
         """업체 목록 로드"""
-        clients = Client.get_all()
+        self.all_clients = Client.get_all() or []
+        self.display_clients(self.all_clients)
 
+    def display_clients(self, clients):
+        """업체 목록을 테이블에 표시"""
         self.client_table.setRowCount(len(clients) if clients else 0)
 
         if clients:
@@ -231,6 +278,109 @@ class ClientTab(QWidget):
                     else:
                         value = client.get(field, '') or ''
                         self.client_table.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filter_clients(self):
+        """실시간 검색 필터링 (초성 검색 지원)"""
+        search_text = self.search_input.text().strip()
+        search_field = self.search_field_combo.currentText()
+
+        if not search_text:
+            self.display_clients(self.all_clients)
+            return
+
+        filtered = []
+        is_chosung = self.is_chosung_only(search_text)
+
+        for client in self.all_clients:
+            name = client.get('name', '') or ''
+            ceo = client.get('ceo', '') or ''
+            contact_person = client.get('contact_person', '') or ''
+            business_no = client.get('business_no', '') or ''
+
+            match = False
+
+            if search_field == "전체":
+                if is_chosung:
+                    match = (self.match_chosung(name, search_text) or
+                             self.match_chosung(ceo, search_text) or
+                             self.match_chosung(contact_person, search_text))
+                else:
+                    search_lower = search_text.lower()
+                    match = (search_lower in name.lower() or
+                             search_lower in ceo.lower() or
+                             search_lower in contact_person.lower() or
+                             search_lower in business_no.lower())
+            elif search_field == "고객/회사명":
+                if is_chosung:
+                    match = self.match_chosung(name, search_text)
+                else:
+                    match = search_text.lower() in name.lower()
+            elif search_field == "대표자":
+                if is_chosung:
+                    match = self.match_chosung(ceo, search_text)
+                else:
+                    match = search_text.lower() in ceo.lower()
+            elif search_field == "담당자":
+                if is_chosung:
+                    match = self.match_chosung(contact_person, search_text)
+                else:
+                    match = search_text.lower() in contact_person.lower()
+            elif search_field == "사업자번호":
+                match = search_text.lower() in business_no.lower()
+
+            if match:
+                filtered.append(client)
+
+        self.display_clients(filtered)
+
+    def reset_search(self):
+        """검색 초기화"""
+        self.search_input.clear()
+        self.search_field_combo.setCurrentIndex(0)
+        self.display_clients(self.all_clients)
+
+    def on_header_clicked(self, logical_index):
+        """헤더 클릭 시 해당 컬럼으로 정렬"""
+        # 선택 열(0번)은 정렬 제외
+        if logical_index == 0:
+            return
+
+        # 같은 컬럼을 다시 클릭하면 정렬 순서 변경
+        if self.current_sort_column == logical_index:
+            if self.current_sort_order == Qt.AscendingOrder:
+                self.current_sort_order = Qt.DescendingOrder
+            else:
+                self.current_sort_order = Qt.AscendingOrder
+        else:
+            self.current_sort_column = logical_index
+            self.current_sort_order = Qt.AscendingOrder
+
+        # 정렬 실행
+        self.client_table.sortItems(logical_index, self.current_sort_order)
 
     def create_new_client(self):
         """신규 업체 등록"""

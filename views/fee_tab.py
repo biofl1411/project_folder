@@ -1,15 +1,22 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                           QFrame, QMessageBox, QFileDialog, QProgressDialog,
-                          QDialog, QFormLayout, QLineEdit, QSpinBox, QCheckBox)
+                          QDialog, QFormLayout, QLineEdit, QSpinBox, QCheckBox,
+                          QComboBox)
 from PyQt5.QtCore import Qt, QCoreApplication
 import pandas as pd
 
 from models.fees import Fee
 
 class FeeTab(QWidget):
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.all_fees = []  # 전체 수수료 목록 저장
+        self.current_sort_column = -1
+        self.current_sort_order = Qt.AscendingOrder
         self.initUI()
         self.load_fees()
     
@@ -57,7 +64,39 @@ class FeeTab(QWidget):
         button_layout.addStretch()
         
         layout.addWidget(button_frame)
-        
+
+        # 검색 영역
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_layout = QHBoxLayout(search_frame)
+
+        search_layout.addWidget(QLabel("검색:"))
+
+        # 검색 필드 선택
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItems(["전체", "검사항목", "식품 카테고리"])
+        self.search_field_combo.setMinimumWidth(100)
+        search_layout.addWidget(self.search_field_combo)
+
+        # 검색 입력
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
+        self.search_input.setMinimumWidth(300)
+        self.search_input.textChanged.connect(self.filter_fees)
+        search_layout.addWidget(self.search_input)
+
+        # 검색 필드 변경 시에도 필터 적용
+        self.search_field_combo.currentIndexChanged.connect(self.filter_fees)
+
+        # 초기화 버튼
+        reset_btn = QPushButton("초기화")
+        reset_btn.clicked.connect(self.reset_search)
+        search_layout.addWidget(reset_btn)
+
+        search_layout.addStretch()
+
+        layout.addWidget(search_frame)
+
         # 2. 수수료 목록 테이블
         self.fee_table = QTableWidget()
         self.fee_table.setColumnCount(7)  # 정렬순서 열 추가로 7개 열로 증가
@@ -76,7 +115,12 @@ class FeeTab(QWidget):
             
         self.fee_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.fee_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        
+
+        # 헤더 클릭으로 정렬 기능 활성화
+        self.fee_table.setSortingEnabled(True)
+        self.fee_table.horizontalHeader().setSortIndicatorShown(True)
+        self.fee_table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
+
         layout.addWidget(self.fee_table)
     
     def select_all_rows(self, checked):
@@ -102,10 +146,13 @@ class FeeTab(QWidget):
     
     def load_fees(self):
         """수수료 목록 로드"""
-        fees = Fee.get_all()
-        
+        self.all_fees = Fee.get_all() or []
+        self.display_fees(self.all_fees)
+
+    def display_fees(self, fees):
+        """수수료 목록을 테이블에 표시"""
         self.fee_table.setRowCount(len(fees) if fees else 0)
-        
+
         if fees:
             for row, fee in enumerate(fees):
                 # 체크박스 추가
@@ -116,7 +163,7 @@ class FeeTab(QWidget):
                 checkbox_layout.setAlignment(Qt.AlignCenter)
                 checkbox_layout.setContentsMargins(0, 0, 0, 0)
                 self.fee_table.setCellWidget(row, 0, checkbox_widget)
-                
+
                 # 나머지 데이터 설정
                 self.fee_table.setItem(row, 1, QTableWidgetItem(fee['test_item']))
                 self.fee_table.setItem(row, 2, QTableWidgetItem(fee['food_category'] or ""))
@@ -131,19 +178,113 @@ class FeeTab(QWidget):
                 sample_qty_item = QTableWidgetItem(str(sample_qty))
                 sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.fee_table.setItem(row, 4, sample_qty_item)
-                
+
                 # 정렬순서 설정 - 기존 데이터에 없을 경우 기본값 사용
-                # sqlite3.Row 객체는 get() 메서드가 없으므로 다른 방식으로 접근
                 try:
                     display_order = fee['display_order']
                 except (KeyError, IndexError):
                     display_order = row + 1  # 기본값으로 행 번호+1 사용
-                
+
                 order_item = QTableWidgetItem(str(display_order))
                 order_item.setTextAlignment(Qt.AlignCenter)
                 self.fee_table.setItem(row, 5, order_item)
-                
+
                 self.fee_table.setItem(row, 6, QTableWidgetItem(fee['created_at'] or ""))
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filter_fees(self):
+        """실시간 검색 필터링 (초성 검색 지원)"""
+        search_text = self.search_input.text().strip()
+        search_field = self.search_field_combo.currentText()
+
+        if not search_text:
+            self.display_fees(self.all_fees)
+            return
+
+        filtered = []
+        is_chosung = self.is_chosung_only(search_text)
+
+        for fee in self.all_fees:
+            test_item = fee.get('test_item', '') or fee['test_item'] or ''
+            food_category = fee.get('food_category', '') or ''
+            try:
+                food_category = fee['food_category'] or ''
+            except:
+                food_category = ''
+
+            match = False
+
+            if search_field == "전체":
+                if is_chosung:
+                    match = (self.match_chosung(test_item, search_text) or
+                             self.match_chosung(food_category, search_text))
+                else:
+                    search_lower = search_text.lower()
+                    match = (search_lower in test_item.lower() or
+                             search_lower in food_category.lower())
+            elif search_field == "검사항목":
+                if is_chosung:
+                    match = self.match_chosung(test_item, search_text)
+                else:
+                    match = search_text.lower() in test_item.lower()
+            elif search_field == "식품 카테고리":
+                if is_chosung:
+                    match = self.match_chosung(food_category, search_text)
+                else:
+                    match = search_text.lower() in food_category.lower()
+
+            if match:
+                filtered.append(fee)
+
+        self.display_fees(filtered)
+
+    def reset_search(self):
+        """검색 초기화"""
+        self.search_input.clear()
+        self.search_field_combo.setCurrentIndex(0)
+        self.display_fees(self.all_fees)
+
+    def on_header_clicked(self, logical_index):
+        """헤더 클릭 시 해당 컬럼으로 정렬"""
+        # 선택 열(0번)은 정렬 제외
+        if logical_index == 0:
+            return
+
+        # 같은 컬럼을 다시 클릭하면 정렬 순서 변경
+        if self.current_sort_column == logical_index:
+            if self.current_sort_order == Qt.AscendingOrder:
+                self.current_sort_order = Qt.DescendingOrder
+            else:
+                self.current_sort_order = Qt.AscendingOrder
+        else:
+            self.current_sort_column = logical_index
+            self.current_sort_order = Qt.AscendingOrder
+
+        # 정렬 실행
+        self.fee_table.sortItems(logical_index, self.current_sort_order)
     
     def create_new_fee(self):
         """새 수수료 등록"""
