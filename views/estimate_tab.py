@@ -415,22 +415,35 @@ FAX: (070) 7410-1430""")
         }
         method_str = method_map.get(test_method, '실측실험')
 
-        # 시험기간 계산
+        # 시험기간 계산 (스케줄 관리와 동일한 방식)
+        total_expiry_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
         if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
-            test_duration = "약 45~90일"
+            experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
         else:
-            total_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
-            test_duration = f"약 {total_days}일"
+            experiment_days = int(total_expiry_days * 1.5)
+        test_duration = f"약 {experiment_days}일"
 
-        # 온도 구간 처리
+        # 온도 구간 처리 (스케줄 관리와 동일한 방식)
+        # 보관조건별 기본 온도 설정
+        real_temps = {'room_temp': '15', 'warm': '25', 'cool': '10', 'freeze': '-18'}
+        accel_temps = {
+            'room_temp': ['15', '25', '35'],
+            'warm': ['25', '35', '45'],
+            'cool': ['5', '10', '15'],
+            'freeze': ['-6', '-12', '-18']
+        }
+
         custom_temps = schedule.get('custom_temperatures', '')
         if custom_temps:
+            # 의뢰자 요청온도 사용
             temps = [t.strip().replace('℃', '') for t in custom_temps.split(',')]
         else:
             if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
-                temps = ['25', '35', '45']
+                # 가속실험: 3구간 온도
+                temps = accel_temps.get(storage_code, ['25', '35', '45'])
             else:
-                temps = [storage]
+                # 실측실험: 1구간 온도
+                temps = [real_temps.get(storage_code, '15')]
 
         # 검사항목 (스케줄에서 동적으로 가져오기)
         test_items_str = schedule.get('test_items', '')
@@ -440,18 +453,19 @@ FAX: (070) 7410-1430""")
             test_items_list = ['관능평가', '세균수', '대장균(정량)', 'pH']
 
         # 식품유형 열 텍스트 (식품유형 위에 + 상세정보 아래)
+        # 온도 문자열 생성
+        if len(temps) == 1:
+            temp_str = f"{temps[0]}℃"
+        else:
+            # 여러 온도는 슬래시로 구분하여 한 줄에 표시
+            temp_str = " / ".join([f"{t}℃" for t in temps])
+
         food_type_text = f"""{food_type}
 
 소비기한 : {storage} {period_str}
 시험기간 : {test_duration}
 실험방법 : {method_str}
-실험 온도: {temps[0]} ℃"""
-
-        # 온도 구간이 여러 개인 경우 추가
-        if len(temps) > 1:
-            food_type_text += f"\n                 {temps[1]} ℃"
-        if len(temps) > 2:
-            food_type_text += f"\n                 {temps[2]} ℃"
+실험 온도: {temp_str}"""
 
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
