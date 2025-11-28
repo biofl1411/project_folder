@@ -44,26 +44,32 @@ class EstimateTab(QWidget):
 
         main_layout.addWidget(button_frame)
 
-        # 스크롤 영역 - 수직 스크롤만, 수평은 창에 맞춤
+        # 스크롤 영역 - 수직 스크롤만
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 수평 스크롤 비활성화
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)    # 수직 스크롤만 필요시 표시
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setStyleSheet("QScrollArea { border: none; background-color: #e0e0e0; }")
 
-        # 견적서 컨테이너 - 창 너비에 맞게 확장
+        # 견적서 컨테이너 - A4 비율에 맞게 너비 제한 (210:297)
         self.estimate_container = QWidget()
         self.estimate_container.setStyleSheet("background-color: white;")
-        self.estimate_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.estimate_container.setFixedWidth(700)  # A4 비율에 맞는 고정 너비
 
         self.estimate_layout = QVBoxLayout(self.estimate_container)
-        self.estimate_layout.setContentsMargins(50, 30, 50, 30)
-        self.estimate_layout.setSpacing(15)
+        self.estimate_layout.setContentsMargins(30, 25, 30, 25)  # 여백 축소
+        self.estimate_layout.setSpacing(10)
 
         # 견적서 내용 생성
         self.create_estimate_content()
 
-        scroll_area.setWidget(self.estimate_container)
+        # 스크롤 영역에 컨테이너 배치 (중앙 정렬)
+        scroll_content = QWidget()
+        scroll_layout = QHBoxLayout(scroll_content)
+        scroll_layout.addStretch()
+        scroll_layout.addWidget(self.estimate_container)
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_content)
 
         main_layout.addWidget(scroll_area)
 
