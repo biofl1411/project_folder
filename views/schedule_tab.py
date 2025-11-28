@@ -233,7 +233,36 @@ class ScheduleTab(QWidget):
 
         # 검색 영역
         search_frame = QFrame()
-        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f3e5f5;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 3px 8px;
+            }
+            QComboBox:hover {
+                border: 1px solid #ab47bc;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #e1bee7;
+                selection-color: #000000;
+            }
+            QLineEdit {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #ab47bc;
+            }
+        """)
         search_layout = QHBoxLayout(search_frame)
 
         search_layout.addWidget(QLabel("검색:"))
