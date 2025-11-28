@@ -917,7 +917,9 @@ class ScheduleManagementTab(QWidget):
         start_date = schedule.get('start_date', '-') or '-'
         self.start_date_value.setText(start_date)
 
-        if start_date != '-' and experiment_days > 0 and sampling_count >= 6:
+        # 중간보고서가 요청된 경우에만 중간보고일 표시
+        report_interim = schedule.get('report_interim', False)
+        if report_interim and start_date != '-' and experiment_days > 0 and sampling_count >= 6:
             try:
                 from datetime import datetime, timedelta
                 start = datetime.strptime(start_date, '%Y-%m-%d')
@@ -1163,8 +1165,12 @@ class ScheduleManagementTab(QWidget):
         else:
             experiment_days = total_days // 2 if total_days > 0 else 0
 
-        # 시작일과 마지막실험일 사이의 간격을 샘플링 횟수로 나눔 (반올림 적용)
-        interval_days = round(experiment_days / sampling_count) if sampling_count > 0 else 0
+        # 시작일(0일)과 마지막실험일(experiment_days) 사이를 균등 분배
+        # 첫 회차(0일)부터 마지막 회차(experiment_days)까지
+        if sampling_count > 1:
+            interval_days = experiment_days / (sampling_count - 1)
+        else:
+            interval_days = 0
 
         # 시작일 파싱
         start_date_str = schedule.get('start_date', '')
@@ -1219,9 +1225,14 @@ class ScheduleManagementTab(QWidget):
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
                 date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
-            elif start_date and interval_days > 0:
+            elif start_date:
                 from datetime import timedelta
-                sample_date = start_date + timedelta(days=i * interval_days)
+                # 마지막 회차는 정확히 experiment_days, 그 외는 균등 분배
+                if i == sampling_count - 1:
+                    days_offset = experiment_days
+                else:
+                    days_offset = round(i * interval_days)
+                sample_date = start_date + timedelta(days=days_offset)
                 date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
@@ -1250,7 +1261,11 @@ class ScheduleManagementTab(QWidget):
                 # 사용자 정의 날짜인 경우 강조 표시
                 is_custom = col_idx in self.custom_dates
             else:
-                days_elapsed = int(round(i * interval_days))
+                # 마지막 회차는 정확히 experiment_days
+                if i == sampling_count - 1:
+                    days_elapsed = experiment_days
+                else:
+                    days_elapsed = int(round(i * interval_days))
                 is_custom = False
 
             time_value = f"{days_elapsed}일"
