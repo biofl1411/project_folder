@@ -251,10 +251,10 @@ FAX: (070) 7410-1430""")
         self.items_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.items_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         self.items_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
-        self.items_table.setColumnWidth(0, 40)
-        self.items_table.setColumnWidth(1, 100)
-        self.items_table.setColumnWidth(3, 80)
-        self.items_table.setColumnWidth(4, 100)
+        self.items_table.setColumnWidth(0, 35)
+        self.items_table.setColumnWidth(1, 180)
+        self.items_table.setColumnWidth(3, 70)
+        self.items_table.setColumnWidth(4, 90)
         self.items_table.setMinimumHeight(200)
         self.items_table.setStyleSheet("""
             QTableWidget {
@@ -415,55 +415,63 @@ FAX: (070) 7410-1430""")
         }
         method_str = method_map.get(test_method, '실측실험')
 
-        # 보고서 종류
-        report_parts = []
-        if schedule.get('report_interim'):
-            report_parts.append("중간보고서")
-        if schedule.get('report_korean'):
-            report_parts.append("국문")
-        if schedule.get('report_english'):
-            report_parts.append("영문")
+        # 시험기간 계산
+        if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+            test_duration = "약 45~90일"
+        else:
+            total_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+            test_duration = f"약 {total_days}일"
+
+        # 온도 구간 처리
+        custom_temps = schedule.get('custom_temperatures', '')
+        if custom_temps:
+            temps = [t.strip().replace('℃', '') for t in custom_temps.split(',')]
+        else:
+            if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+                temps = ['25', '35', '45']
+            else:
+                temps = [storage]
 
         # 검사항목 (스케줄에서 동적으로 가져오기)
         test_items_str = schedule.get('test_items', '')
         if test_items_str:
-            # 쉼표로 구분된 문자열을 리스트로 변환
             test_items_list = [item.strip() for item in test_items_str.split(',') if item.strip()]
         else:
-            # 기본 검사항목
             test_items_list = ['관능평가', '세균수', '대장균(정량)', 'pH']
 
-        # 검사항목 목록 텍스트 생성
+        # 식품유형 열 텍스트 (식품유형 위에 + 상세정보 아래)
+        food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temps[0]} ℃"""
+
+        # 온도 구간이 여러 개인 경우 추가
+        if len(temps) > 1:
+            food_type_text += f"\n                 {temps[1]} ℃"
+        if len(temps) > 2:
+            food_type_text += f"\n                 {temps[2]} ℃"
+
+        # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
-
-        # 온도 표시
-        custom_temps = schedule.get('custom_temperatures', '')
-        if custom_temps:
-            # 쉼표로 구분된 온도 값에 ℃ 추가
-            temps = [t.strip() for t in custom_temps.split(',')]
-            temp_display = ', '.join([f"{t}℃" if not t.endswith('℃') else t for t in temps])
-        else:
-            temp_display = '-'
-
-        # 검사항목 정보 텍스트
-        info_text = f"""소비기한: {storage} {period_str}
-    ({', '.join(report_parts) if report_parts else '국문'})
-실험방법: {method_str}
-실험온도: {temp_display}
-
-{test_items_text}"""
 
         # 테이블에 데이터 추가
         self.items_table.setItem(0, 0, QTableWidgetItem("1."))
-        self.items_table.setItem(0, 1, QTableWidgetItem(food_type))
 
-        info_item = QTableWidgetItem(info_text)
-        self.items_table.setItem(0, 2, info_item)
+        # 식품유형 열에 상세 정보 포함
+        food_type_item = QTableWidgetItem(food_type_text)
+        self.items_table.setItem(0, 1, food_type_item)
 
-        # 검사항목 개수에 따라 행 높이 동적 조정
-        base_height = 120
+        # 검사 항목 열에 검사항목만 표시 (위에 배치)
+        test_items_item = QTableWidgetItem(test_items_text)
+        self.items_table.setItem(0, 2, test_items_item)
+
+        # 행 높이 동적 조정
+        base_height = 140
         item_height = 18
-        row_height = base_height + (len(test_items_list) * item_height)
+        temp_lines = len(temps) - 1 if len(temps) > 1 else 0
+        row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
         # 금액 계산
