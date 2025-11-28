@@ -43,19 +43,19 @@ class EstimateTab(QWidget):
 
         main_layout.addWidget(button_frame)
 
-        # 스크롤 영역
+        # 스크롤 영역 (세로 스크롤만)
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: #e0e0e0; }")
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 좌우 스크롤 비활성화
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)     # 세로 스크롤만
+        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: white; }")
 
-        # 견적서 컨테이너
+        # 견적서 컨테이너 (전체 너비 사용)
         self.estimate_container = QWidget()
         self.estimate_container.setStyleSheet("background-color: white;")
-        self.estimate_container.setMinimumWidth(800)
-        self.estimate_container.setMaximumWidth(900)
 
         self.estimate_layout = QVBoxLayout(self.estimate_container)
-        self.estimate_layout.setContentsMargins(40, 30, 40, 30)
+        self.estimate_layout.setContentsMargins(50, 30, 50, 30)
         self.estimate_layout.setSpacing(15)
 
         # 견적서 내용 생성
@@ -63,13 +63,7 @@ class EstimateTab(QWidget):
 
         scroll_area.setWidget(self.estimate_container)
 
-        # 스크롤 영역을 중앙에 배치
-        scroll_layout = QHBoxLayout()
-        scroll_layout.addStretch()
-        scroll_layout.addWidget(scroll_area)
-        scroll_layout.addStretch()
-
-        main_layout.addLayout(scroll_layout)
+        main_layout.addWidget(scroll_area)
 
     def create_estimate_content(self):
         """견적서 내용 생성"""
