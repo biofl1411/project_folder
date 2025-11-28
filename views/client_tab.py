@@ -149,12 +149,41 @@ class ClientTab(QWidget):
 
         self.client_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.client_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.client_table.doubleClicked.connect(self.edit_client)
+
+        # 기존 연결 해제 후 재연결 (중복 연결 방지)
+        try:
+            self.client_table.doubleClicked.disconnect()
+        except:
+            pass
+        self.client_table.doubleClicked.connect(self.on_table_double_clicked)
 
         layout = self.layout()
         # 기존 테이블이 레이아웃에 있으면 유지
         if layout.indexOf(self.client_table) == -1:
             layout.addWidget(self.client_table)
+
+    def on_table_double_clicked(self, index):
+        """테이블 더블클릭 시 해당 행 수정"""
+        row = index.row()
+        if row < 0:
+            return
+
+        # 고객/회사명 컬럼 인덱스 찾기
+        name_col = self.get_name_column_index()
+        name_item = self.client_table.item(row, name_col)
+        if not name_item:
+            return
+
+        client_name = name_item.text()
+        clients = Client.search(client_name)
+        if not clients:
+            QMessageBox.warning(self, "데이터 오류", "선택한 업체 정보를 찾을 수 없습니다.")
+            return
+
+        client = clients[0]
+        dialog = ClientDialog(self, client)
+        if dialog.exec_():
+            self.load_clients()
 
     def select_all_rows(self, checked):
         """모든 행 선택/해제"""
@@ -375,7 +404,7 @@ class ClientTab(QWidget):
                         client_data.get("contact_person"),
                         client_data.get("email"),
                         client_data.get("sales_rep"),
-                        client_data.get("toll_free"),
+                        None,  # toll_free (사용 안 함)
                         client_data.get("zip_code"),
                         client_data.get("address"),
                         client_data.get("notes"),
@@ -397,7 +426,7 @@ class ClientTab(QWidget):
                         client_data.get("contact_person"),
                         client_data.get("email"),
                         client_data.get("sales_rep"),
-                        client_data.get("toll_free"),
+                        None,  # toll_free (사용 안 함)
                         client_data.get("zip_code"),
                         client_data.get("address"),
                         client_data.get("notes"),
