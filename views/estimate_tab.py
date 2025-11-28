@@ -591,11 +591,17 @@ FAX: (070) 7410-1430""")
         else:
             packaging_text = "100g"
 
-        # 실험기간 계산
+        # 소비기한을 일수로 변환
         test_period_days = schedule.get('test_period_days', 0) or 0
         test_period_months = schedule.get('test_period_months', 0) or 0
         test_period_years = schedule.get('test_period_years', 0) or 0
-        total_experiment_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+        total_expiry_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+
+        # 실험기간 계산 (실측: 소비기한×1.5, 가속: 소비기한÷2)
+        if test_method in ['real', 'custom_real']:
+            total_experiment_days = int(total_expiry_days * 1.5)
+        else:
+            total_experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
 
         # 샘플링 간격 계산
         if total_experiment_days > 0 and sampling_count > 0:
