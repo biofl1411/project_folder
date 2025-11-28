@@ -4,14 +4,29 @@ import datetime
 
 class Schedule:
     @staticmethod
+    def _ensure_estimate_date_column():
+        """estimate_date 컬럼이 없으면 추가"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(schedules)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'estimate_date' not in columns:
+                cursor.execute("ALTER TABLE schedules ADD COLUMN estimate_date TEXT")
+                conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"컬럼 추가 중 오류: {str(e)}")
+    @staticmethod
     def create(client_id, product_name, food_type_id=None, test_method=None,
                storage_condition=None, test_start_date=None, test_period_days=0,
                test_period_months=0, test_period_years=0, sampling_count=6,
                report_interim=False, report_korean=True, report_english=False,
                extension_test=False, custom_temperatures=None, status='pending',
-               packaging_weight=0, packaging_unit='g'):
+               packaging_weight=0, packaging_unit='g', estimate_date=None):
         """새 스케줄 생성"""
         try:
+            Schedule._ensure_estimate_date_column()
             conn = get_connection()
             cursor = conn.cursor()
 
@@ -30,15 +45,17 @@ class Schedule:
                     product_name, food_type_id, test_method, storage_condition,
                     test_period_days, test_period_months, test_period_years,
                     sampling_count, report_interim, report_korean, report_english,
-                    extension_test, custom_temperatures, packaging_weight, packaging_unit
+                    extension_test, custom_temperatures, packaging_weight, packaging_unit,
+                    estimate_date
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 client_id, product_name, test_start_date, end_date, status,
                 product_name, food_type_id, test_method, storage_condition,
                 test_period_days, test_period_months, test_period_years,
                 sampling_count, report_interim, report_korean, report_english,
-                extension_test, custom_temperatures, packaging_weight, packaging_unit
+                extension_test, custom_temperatures, packaging_weight, packaging_unit,
+                estimate_date
             ))
 
             schedule_id = cursor.lastrowid
@@ -55,6 +72,7 @@ class Schedule:
     def get_by_id(schedule_id):
         """ID로 스케줄 조회"""
         try:
+            Schedule._ensure_estimate_date_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
@@ -77,6 +95,7 @@ class Schedule:
     def get_all():
         """모든 스케줄 조회"""
         try:
+            Schedule._ensure_estimate_date_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
@@ -171,6 +190,7 @@ class Schedule:
     def update(schedule_id, data):
         """스케줄 전체 업데이트"""
         try:
+            Schedule._ensure_estimate_date_column()
             conn = get_connection()
             cursor = conn.cursor()
 
@@ -205,7 +225,8 @@ class Schedule:
                     extension_test = ?,
                     custom_temperatures = ?,
                     packaging_weight = ?,
-                    packaging_unit = ?
+                    packaging_unit = ?,
+                    estimate_date = ?
                 WHERE id = ?
             """, (
                 data.get('client_id'),
@@ -227,6 +248,7 @@ class Schedule:
                 data.get('custom_temperatures'),
                 data.get('packaging_weight', 0),
                 data.get('packaging_unit', 'g'),
+                data.get('estimate_date'),
                 schedule_id
             ))
 
