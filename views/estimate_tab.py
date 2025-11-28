@@ -475,19 +475,19 @@ FAX: (070) 7410-1430""")
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
 
-        # 테이블에 데이터 추가
+        # 테이블에 데이터 추가 (수직 가운데 정렬)
         no_item = QTableWidgetItem("1.")
-        no_item.setTextAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        no_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.items_table.setItem(0, 0, no_item)
 
         # 식품유형 열에 상세 정보 포함
         food_type_item = QTableWidgetItem(food_type_text)
-        food_type_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
+        food_type_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.items_table.setItem(0, 1, food_type_item)
 
-        # 검사 항목 열에 검사항목만 표시 (위에 배치)
+        # 검사 항목 열에 검사항목만 표시
         test_items_item = QTableWidgetItem(test_items_text)
-        test_items_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
+        test_items_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.items_table.setItem(0, 2, test_items_item)
 
         # 행 높이 동적 조정
@@ -497,14 +497,14 @@ FAX: (070) 7410-1430""")
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 금액 계산
+        # 금액 계산 (수직 가운데 정렬)
         total_price = self.calculate_total_price(schedule)
         price_item = QTableWidgetItem(f"{total_price:,}")
-        price_item.setTextAlignment(Qt.AlignTop | Qt.AlignRight)
+        price_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.items_table.setItem(0, 3, price_item)
 
         subtotal_item = QTableWidgetItem(f"{total_price:,} 원")
-        subtotal_item.setTextAlignment(Qt.AlignTop | Qt.AlignRight)
+        subtotal_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.items_table.setItem(0, 4, subtotal_item)
 
     def calculate_total_price(self, schedule):
@@ -673,14 +673,14 @@ FAX: (070) 7410-1430""")
 
 ※ 검사 소요기간
 {test_period_text}
-약 8~12일에 온도별({zone_text}) 1회씩 실험- 실험스케쥴(구간 및 횟수)은 실험결과의 유의성에 따라 보고서 발행일 수가 변경될 수 있습니다.
+→ 실험스케쥴(구간 및 횟수)은 실험결과의 유의성에 따라 보고서 발행일 수가 변경될 수 있습니다.
 
 * 예상 소비기한은 견적이며, 품질안전한계기간 미도달 시에도 실험연장 불가합니다.
 * 견적 금액은 검사비용 외 보관비 및 보고서작성 비용 포함입니다.
 * 지표 항목의 수정(추가)이나 삭제가 필요한 경우 사전 연락을 해주시고 문의사항은 연락 바랍니다.
-* 모든 실험은 온도 구간별 1회 실험을 진행하며, 반복 실험은 진행하지 않습니다. 반복 실험이 필요한 경우 연락 바랍니다.
+* 온도 구간별 1회 시험을 하며, 반복 실험이 필요한 경우 연락 바랍니다.
 
-소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다."""
+* 소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다."""
 
         self.remark_text.setText(remark_text)
 

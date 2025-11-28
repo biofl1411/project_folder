@@ -161,13 +161,27 @@ class FoodTypeTab(QWidget):
             "선택", "식품유형", "카테고리", "단서조항_1", "단서조항_2", "성상", "검사항목", "생성일"
         ])
         
-        # 체크박스 열의 너비 설정
-        self.food_type_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        # 열 너비 조절 설정
+        header = self.food_type_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)  # 사용자가 마우스로 조절 가능
+        header.setStretchLastSection(True)  # 마지막 열이 남은 공간을 채움
+
+        # 체크박스 열(0번) 고정
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
         self.food_type_table.setColumnWidth(0, 50)
-        
-        # 나머지 열은 자동 조정
-        for i in range(1, 8):  # 1~7 인덱스 (8개 열)
-            self.food_type_table.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
+
+        # 각 열의 기본 너비 설정
+        column_widths = {
+            1: 150,   # 식품유형
+            2: 100,   # 카테고리
+            3: 100,   # 단서조항_1
+            4: 100,   # 단서조항_2
+            5: 80,    # 성상
+            6: 200,   # 검사항목
+            7: 100,   # 생성일
+        }
+        for col, width in column_widths.items():
+            self.food_type_table.setColumnWidth(col, width)
             
         self.food_type_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.food_type_table.setEditTriggers(QTableWidget.NoEditTriggers)

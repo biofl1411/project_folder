@@ -139,15 +139,29 @@ class FeeTab(QWidget):
         self.fee_table.setHorizontalHeaderLabels([
             "선택", "검사항목", "식품 카테고리", "가격", "검체 수량(g)", "정렬순서", "생성일"
         ])
-        # 체크박스 열의 너비 설정
-        self.fee_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        # 열 너비 조절 설정
+        header = self.fee_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)  # 사용자가 마우스로 조절 가능
+        header.setStretchLastSection(True)  # 마지막 열이 남은 공간을 채움
+
+        # 체크박스 열(0번) 고정
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
         self.fee_table.setColumnWidth(0, 50)
-        # 정렬순서 열의 너비 설정
-        self.fee_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+
+        # 정렬순서 열(5번) 고정
+        header.setSectionResizeMode(5, QHeaderView.Fixed)
         self.fee_table.setColumnWidth(5, 80)
-        # 나머지 열은 자동 조정
-        for i in [1, 2, 3, 4, 6]:
-            self.fee_table.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
+
+        # 각 열의 기본 너비 설정
+        column_widths = {
+            1: 150,   # 검사항목
+            2: 150,   # 식품 카테고리
+            3: 100,   # 가격
+            4: 100,   # 검체 수량(g)
+            6: 100,   # 생성일
+        }
+        for col, width in column_widths.items():
+            self.fee_table.setColumnWidth(col, width)
             
         self.fee_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.fee_table.setEditTriggers(QTableWidget.NoEditTriggers)
