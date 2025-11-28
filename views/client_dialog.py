@@ -10,12 +10,16 @@ from models.clients import Client
 class ClientSearchDialog(QDialog):
     """업체 검색 및 선택 다이얼로그"""
 
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("업체 검색")
-        self.setMinimumWidth(900)
+        self.setMinimumWidth(1000)
         self.setMinimumHeight(400)
         self.selected_client = None
+        self.all_clients = []  # 전체 업체 목록 저장
         self.initUI()
         self.loadClients()
 
@@ -26,12 +30,14 @@ class ClientSearchDialog(QDialog):
         # 검색 영역
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("업체명, CEO, 담당자명, 사업자번호로 검색...")
+        self.search_input.setPlaceholderText("업체명, CEO, 담당자명, 사업자번호로 검색... (초성 검색 가능: ㅂㅇㅍㄷㄹ)")
         search_btn = QPushButton("검색")
         search_btn.setAutoDefault(False)
         search_btn.setDefault(False)
         search_btn.clicked.connect(self.searchClients)
         self.search_input.returnPressed.connect(self.searchClients)
+        # 실시간 검색 필터링
+        self.search_input.textChanged.connect(self.filterClients)
 
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(search_btn)
@@ -39,10 +45,10 @@ class ClientSearchDialog(QDialog):
 
         # 업체 목록 테이블
         self.client_table = QTableWidget()
-        self.client_table.setColumnCount(10)
+        self.client_table.setColumnCount(12)
         self.client_table.setHorizontalHeaderLabels([
             "ID", "고객/회사명", "대표자", "사업자번호", "담당자",
-            "전화번호", "EMAIL", "영업담당", "분류", "소재지"
+            "전화번호", "EMAIL", "영업담당", "분류", "소재지", "상세주소", "메모"
         ])
         self.client_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.client_table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -60,6 +66,8 @@ class ClientSearchDialog(QDialog):
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # 영업담당
         header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # 분류
         header.setSectionResizeMode(9, QHeaderView.Stretch)  # 소재지
+        header.setSectionResizeMode(10, QHeaderView.Stretch)  # 상세주소
+        header.setSectionResizeMode(11, QHeaderView.Stretch)  # 메모
 
         layout.addWidget(self.client_table)
 
@@ -82,14 +90,14 @@ class ClientSearchDialog(QDialog):
     def loadClients(self):
         """데이터베이스에서 업체 정보 불러오기"""
         try:
-            clients = Client.get_all()
-            self.displayClients(clients)
+            self.all_clients = Client.get_all()
+            self.displayClients(self.all_clients)
         except Exception as e:
             print(f"업체 정보 로드 중 오류 발생: {str(e)}")
             QMessageBox.critical(self, "오류", f"업체 정보를 불러오는 중 오류가 발생했습니다: {str(e)}")
 
     def searchClients(self):
-        """검색어로 업체 검색"""
+        """검색어로 업체 검색 (DB 검색)"""
         search_text = self.search_input.text().strip()
         if not search_text:
             self.loadClients()
@@ -101,6 +109,64 @@ class ClientSearchDialog(QDialog):
         except Exception as e:
             print(f"업체 검색 중 오류 발생: {str(e)}")
             QMessageBox.critical(self, "오류", f"업체 검색 중 오류가 발생했습니다: {str(e)}")
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                # 한글 유니코드에서 초성 인덱스 계산
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filterClients(self, search_text):
+        """실시간 필터링 (초성 검색 지원)"""
+        search_text = search_text.strip()
+        if not search_text:
+            self.displayClients(self.all_clients)
+            return
+
+        filtered = []
+        is_chosung = self.is_chosung_only(search_text)
+
+        for client in self.all_clients:
+            name = client.get('name', '') or ''
+            ceo = client.get('ceo', '') or ''
+            contact_person = client.get('contact_person', '') or ''
+            business_no = client.get('business_no', '') or ''
+
+            if is_chosung:
+                # 초성 검색
+                if (self.match_chosung(name, search_text) or
+                    self.match_chosung(ceo, search_text) or
+                    self.match_chosung(contact_person, search_text)):
+                    filtered.append(client)
+            else:
+                # 일반 검색
+                search_lower = search_text.lower()
+                if (search_lower in name.lower() or
+                    search_lower in ceo.lower() or
+                    search_lower in contact_person.lower() or
+                    search_lower in business_no.lower()):
+                    filtered.append(client)
+
+        self.displayClients(filtered)
 
     def displayClients(self, clients):
         """업체 목록을 테이블에 표시"""
@@ -121,6 +187,8 @@ class ClientSearchDialog(QDialog):
             self.client_table.setItem(row, 7, QTableWidgetItem(client.get('sales_rep', '') or ''))
             self.client_table.setItem(row, 8, QTableWidgetItem(client.get('category', '') or ''))
             self.client_table.setItem(row, 9, QTableWidgetItem(client.get('address', '') or ''))
+            self.client_table.setItem(row, 10, QTableWidgetItem(client.get('detail_address', '') or ''))
+            self.client_table.setItem(row, 11, QTableWidgetItem(client.get('notes', '') or ''))
 
     def selectClient(self):
         """선택한 업체 정보 반환"""
@@ -143,7 +211,9 @@ class ClientSearchDialog(QDialog):
                 'email': self.client_table.item(row, 6).text(),
                 'sales_rep': self.client_table.item(row, 7).text(),
                 'category': self.client_table.item(row, 8).text(),
-                'address': self.client_table.item(row, 9).text()
+                'address': self.client_table.item(row, 9).text(),
+                'detail_address': self.client_table.item(row, 10).text(),
+                'notes': self.client_table.item(row, 11).text()
             }
         )
 
