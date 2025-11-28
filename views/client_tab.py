@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QFrame, QMessageBox, QDialog, QFormLayout, QLineEdit,
                           QFileDialog, QProgressDialog, QGridLayout, QScrollArea,
                           QGroupBox, QComboBox, QCheckBox, QListWidget, QListWidgetItem)
-from PyQt5.QtCore import Qt, QCoreApplication, QSettings
+from PyQt5.QtCore import Qt, QCoreApplication, QSettings, QTimer
 from PyQt5.QtGui import QColor
 import pandas as pd
 import os
@@ -26,6 +26,12 @@ class ClientTab(QWidget):
         self.all_clients = []  # 전체 업체 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+
+        # 검색 디바운싱을 위한 타이머 (300ms 지연)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.filter_clients)
+
         self.initUI()
         self.load_clients()
 
@@ -97,11 +103,11 @@ class ClientTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
         self.search_input.setMinimumWidth(300)
-        self.search_input.textChanged.connect(self.filter_clients)
+        self.search_input.textChanged.connect(self.on_search_text_changed)
         search_layout.addWidget(self.search_input)
 
         # 검색 필드 변경 시에도 필터 적용
-        self.search_field_combo.currentIndexChanged.connect(self.filter_clients)
+        self.search_field_combo.currentIndexChanged.connect(self.on_search_text_changed)
 
         # 초기화 버튼
         reset_btn = QPushButton("초기화")
@@ -261,23 +267,29 @@ class ClientTab(QWidget):
 
     def display_clients(self, clients):
         """업체 목록을 테이블에 표시"""
-        self.client_table.setRowCount(len(clients) if clients else 0)
+        # UI 업데이트 일시 중지 (성능 최적화)
+        self.client_table.setUpdatesEnabled(False)
+        try:
+            self.client_table.setRowCount(len(clients) if clients else 0)
 
-        if clients:
-            for row, client in enumerate(clients):
-                for col, (header, field) in enumerate(self.columns):
-                    if header == "선택":
-                        # 체크박스 추가
-                        checkbox = QCheckBox()
-                        checkbox_widget = QWidget()
-                        checkbox_layout = QHBoxLayout(checkbox_widget)
-                        checkbox_layout.addWidget(checkbox)
-                        checkbox_layout.setAlignment(Qt.AlignCenter)
-                        checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                        self.client_table.setCellWidget(row, col, checkbox_widget)
-                    else:
-                        value = client.get(field, '') or ''
-                        self.client_table.setItem(row, col, QTableWidgetItem(str(value)))
+            if clients:
+                for row, client in enumerate(clients):
+                    for col, (header, field) in enumerate(self.columns):
+                        if header == "선택":
+                            # 체크박스 추가
+                            checkbox = QCheckBox()
+                            checkbox_widget = QWidget()
+                            checkbox_layout = QHBoxLayout(checkbox_widget)
+                            checkbox_layout.addWidget(checkbox)
+                            checkbox_layout.setAlignment(Qt.AlignCenter)
+                            checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                            self.client_table.setCellWidget(row, col, checkbox_widget)
+                        else:
+                            value = client.get(field, '') or ''
+                            self.client_table.setItem(row, col, QTableWidgetItem(str(value)))
+        finally:
+            # UI 업데이트 재개
+            self.client_table.setUpdatesEnabled(True)
 
     def get_chosung(self, text):
         """문자열에서 초성 추출"""
@@ -302,6 +314,11 @@ class ClientTab(QWidget):
         """초성 검색 매칭"""
         text_chosung = self.get_chosung(text)
         return search_text.lower() in text_chosung.lower()
+
+    def on_search_text_changed(self):
+        """검색어 변경 시 타이머 시작 (디바운싱)"""
+        self.search_timer.stop()
+        self.search_timer.start(300)  # 300ms 후 필터링 실행
 
     def filter_clients(self):
         """실시간 검색 필터링 (초성 검색 지원)"""

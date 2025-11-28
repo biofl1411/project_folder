@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QFrame, QMessageBox, QComboBox, QCheckBox, QLabel,
                            QApplication, QDialog, QGroupBox, QScrollArea,
                            QDialogButtonBox, QLineEdit)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
@@ -152,6 +152,12 @@ class ScheduleTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.all_schedules = []  # 전체 스케줄 목록 저장
+
+        # 검색 디바운싱을 위한 타이머 (300ms 지연)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.filter_schedules)
+
         self.initUI()
     
     # 컬럼 정의 (key, header_name, data_key, column_index)
@@ -242,11 +248,11 @@ class ScheduleTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㅂㅇㅍㄷㄹ)")
         self.search_input.setMinimumWidth(300)
-        self.search_input.textChanged.connect(self.filter_schedules)
+        self.search_input.textChanged.connect(self.on_search_text_changed)
         search_layout.addWidget(self.search_input)
 
         # 검색 필드 변경 시에도 필터 적용
-        self.search_field_combo.currentIndexChanged.connect(self.filter_schedules)
+        self.search_field_combo.currentIndexChanged.connect(self.on_search_text_changed)
 
         # 초기화 버튼
         reset_btn = QPushButton("초기화")
@@ -302,6 +308,8 @@ class ScheduleTab(QWidget):
 
     def display_schedules(self, schedules):
         """스케줄 목록을 테이블에 표시"""
+        # UI 업데이트 일시 중지 (성능 최적화)
+        self.schedule_table.setUpdatesEnabled(False)
         try:
             self.schedule_table.setRowCount(0)
 
@@ -399,6 +407,9 @@ class ScheduleTab(QWidget):
             import traceback
             print(f"스케줄 표시 중 오류: {str(e)}")
             traceback.print_exc()
+        finally:
+            # UI 업데이트 재개
+            self.schedule_table.setUpdatesEnabled(True)
 
     def get_chosung(self, text):
         """문자열에서 초성 추출"""
@@ -423,6 +434,11 @@ class ScheduleTab(QWidget):
         """초성 검색 매칭"""
         text_chosung = self.get_chosung(text)
         return search_text.lower() in text_chosung.lower()
+
+    def on_search_text_changed(self):
+        """검색어 변경 시 타이머 시작 (디바운싱)"""
+        self.search_timer.stop()
+        self.search_timer.start(300)  # 300ms 후 필터링 실행
 
     def filter_schedules(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
