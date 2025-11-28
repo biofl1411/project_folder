@@ -757,14 +757,16 @@ class ScheduleCreateDialog(QDialog):
                 if dialog.exec_():
                     # 선택된 업체 정보 가져오기
                     client_id, client_data = dialog.selected_client
-                    
+
                     # 업체 정보 설정
                     self.selected_client_id = client_id
                     self.client_input.setText(client_data.get('name', ''))
-                    self.client_name_label.setText(client_data.get('manager_name', '-'))
-                    self.client_contact_label.setText(client_data.get('contact_person', '-'))
-                    self.client_phone_label.setText(client_data.get('phone', '-'))
-                    
+                    self.client_ceo_label.setText(client_data.get('ceo', '-') or '-')
+                    self.client_name_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_contact_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_phone_label.setText(client_data.get('phone', '-') or '-')
+                    self.client_sales_label.setText(client_data.get('sales_rep', '-') or '-')
+
                     print(f"업체 검색 완료: {client_data.get('name', '')}")
             else:
                 # 임시 구현
@@ -806,14 +808,16 @@ class ScheduleCreateDialog(QDialog):
                     # 신규 등록된 업체 정보 가져오기
                     client_id = dialog.client_id
                     client_data = dialog.client_data
-                    
+
                     # 업체 정보 설정
                     self.selected_client_id = client_id
                     self.client_input.setText(client_data.get('name', ''))
-                    self.client_name_label.setText(client_data.get('manager_name', '-'))
-                    self.client_contact_label.setText(client_data.get('contact_person', '-'))
-                    self.client_phone_label.setText(client_data.get('phone', '-'))
-                    
+                    self.client_ceo_label.setText(client_data.get('ceo', '-') or '-')
+                    self.client_name_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_contact_label.setText(client_data.get('contact_person', '-') or '-')
+                    self.client_phone_label.setText(client_data.get('phone', '-') or '-')
+                    self.client_sales_label.setText(client_data.get('sales_rep', '-') or '-')
+
                     print(f"새 업체 등록 완료: {client_data.get('name', '')}")
             else:
                 # 임시 구현
