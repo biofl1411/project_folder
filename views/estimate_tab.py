@@ -550,16 +550,16 @@ FAX: (070) 7410-1430""")
 
     def print_estimate(self):
         """견적서 인쇄 - A4 사이즈 전체 활용"""
-        from PyQt5.QtCore import QMarginsF, QRectF
+        from PyQt5.QtCore import QMarginsF
         from PyQt5.QtGui import QPainter, QPageLayout, QPageSize
 
         printer = QPrinter(QPrinter.HighResolution)
 
-        # A4 사이즈 설정 (여백 최소화)
+        # A4 사이즈 설정
         page_layout = QPageLayout(
             QPageSize(QPageSize.A4),
             QPageLayout.Portrait,
-            QMarginsF(15, 15, 15, 15)  # 여백 설정 (mm)
+            QMarginsF(10, 10, 10, 10)  # 여백 설정 (mm)
         )
         printer.setPageLayout(page_layout)
 
@@ -575,21 +575,17 @@ FAX: (070) 7410-1430""")
                 widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
                 widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
 
-                # A4 비율에 맞게 스케일 계산 (가로 기준으로 확대)
-                scale_x = page_rect.width() / widget_width
-                scale_y = page_rect.height() / widget_height
+                # A4 너비에 맞게 스케일 계산
+                scale = page_rect.width() / widget_width
 
-                # 가로 기준으로 스케일 적용 (A4 너비에 맞춤)
-                # 세로가 넘치지 않도록 min 사용
-                scale = min(scale_x, scale_y) * 0.92
+                # 세로가 넘치면 세로 기준으로 스케일 조정
+                if widget_height * scale > page_rect.height():
+                    scale = page_rect.height() / widget_height
 
-                # 중앙 정렬을 위한 오프셋 계산
-                scaled_width = widget_width * scale
-                scaled_height = widget_height * scale
-                offset_x = (page_rect.width() - scaled_width) / 2
-                offset_y = (page_rect.height() - scaled_height) / 2
+                # 여유 공간 확보
+                scale = scale * 0.95
 
-                painter.translate(offset_x, offset_y)
+                # 왼쪽 상단에서 시작 (중앙 정렬 제거)
                 painter.scale(scale, scale)
                 widget.render(painter)
                 painter.end()

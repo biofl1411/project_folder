@@ -1341,22 +1341,40 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.warning(self, "알림", "먼저 스케줄을 선택해주세요.")
             return
 
-        # 스케줄 데이터에 추가 정보 포함
-        schedule_data = dict(self.current_schedule)
+        # DB에서 최신 스케줄 데이터 가져오기
+        schedule_id = self.current_schedule.get('id')
+        if schedule_id:
+            from models.schedules import Schedule
+            fresh_schedule = Schedule.get_by_id(schedule_id)
+            if fresh_schedule:
+                schedule_data = dict(fresh_schedule)
+            else:
+                schedule_data = dict(self.current_schedule)
+        else:
+            schedule_data = dict(self.current_schedule)
 
-        # 식품유형 이름 추가
-        if self.current_schedule.get('food_type_id'):
-            food_type = ProductType.get_by_id(self.current_schedule['food_type_id'])
+        # 식품유형 이름 및 검사항목 추가
+        if schedule_data.get('food_type_id'):
+            food_type = ProductType.get_by_id(schedule_data['food_type_id'])
             if food_type:
-                schedule_data['food_type_name'] = food_type['type_name']
-                schedule_data['test_items'] = food_type.get('test_items', '')
+                schedule_data['food_type_name'] = food_type.get('type_name', '')
+                # 기본 검사항목 + 추가 검사항목
+                base_items = food_type.get('test_items', '')
+                if self.additional_test_items:
+                    additional = ', '.join(self.additional_test_items)
+                    if base_items:
+                        schedule_data['test_items'] = f"{base_items}, {additional}"
+                    else:
+                        schedule_data['test_items'] = additional
+                else:
+                    schedule_data['test_items'] = base_items
 
         # 업체명 추가
-        if self.current_schedule.get('client_id'):
+        if schedule_data.get('client_id'):
             from models.clients import Client
-            client = Client.get_by_id(self.current_schedule['client_id'])
+            client = Client.get_by_id(schedule_data['client_id'])
             if client:
-                schedule_data['client_name'] = client['name']
+                schedule_data['client_name'] = client.get('name', '')
 
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
