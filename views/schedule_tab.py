@@ -299,8 +299,30 @@ class ScheduleTab(QWidget):
         headers = [col[1] for col in self.ALL_COLUMNS]
         self.schedule_table.setHorizontalHeaderLabels(headers)
         self.schedule_table.setColumnHidden(1, True)  # ID 열 항상 숨김
-        self.schedule_table.setColumnWidth(0, 50)  # 선택 열 너비 고정
-        self.schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # 열 너비 조절 설정
+        header = self.schedule_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)  # 사용자가 마우스로 조절 가능
+        header.setStretchLastSection(True)  # 마지막 열이 남은 공간을 채움
+
+        # 체크박스 열(0번) 고정
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
+        self.schedule_table.setColumnWidth(0, 50)
+
+        # 각 열의 기본 너비 설정
+        column_widths = {
+            2: 150,   # 업체명
+            3: 150,   # 샘플명
+            4: 80,    # 실험방법
+            5: 80,    # 보관조건
+            6: 120,   # 식품유형
+            7: 100,   # 시작일
+            8: 100,   # 종료일
+            9: 100,   # 견적일자
+            10: 80,   # 샘플링횟수
+            11: 80,   # 상태
+        }
+        for col, width in column_widths.items():
+            self.schedule_table.setColumnWidth(col, width)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
