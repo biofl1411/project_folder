@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTableWidget, QTableWidgetItem, QHeaderView,
                            QFrame, QMessageBox, QComboBox, QCheckBox, QLabel,
                            QApplication, QDialog, QGroupBox, QScrollArea,
-                           QDialogButtonBox)
+                           QDialogButtonBox, QLineEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
@@ -146,8 +146,12 @@ class ScheduleTab(QWidget):
     # 더블클릭 시 스케줄 ID를 전달하는 시그널
     schedule_double_clicked = pyqtSignal(int)
 
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.all_schedules = []  # 전체 스케줄 목록 저장
         self.initUI()
     
     # 컬럼 정의 (key, header_name, data_key, column_index)
@@ -221,6 +225,38 @@ class ScheduleTab(QWidget):
 
         layout.addWidget(button_frame)
 
+        # 검색 영역
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_layout = QHBoxLayout(search_frame)
+
+        search_layout.addWidget(QLabel("검색:"))
+
+        # 검색 필드 선택
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItems(["전체", "업체명", "샘플명", "상태"])
+        self.search_field_combo.setMinimumWidth(80)
+        search_layout.addWidget(self.search_field_combo)
+
+        # 검색 입력
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㅂㅇㅍㄷㄹ)")
+        self.search_input.setMinimumWidth(300)
+        self.search_input.textChanged.connect(self.filter_schedules)
+        search_layout.addWidget(self.search_input)
+
+        # 검색 필드 변경 시에도 필터 적용
+        self.search_field_combo.currentIndexChanged.connect(self.filter_schedules)
+
+        # 초기화 버튼
+        reset_btn = QPushButton("초기화")
+        reset_btn.clicked.connect(self.reset_search)
+        search_layout.addWidget(reset_btn)
+
+        search_layout.addStretch()
+
+        layout.addWidget(search_frame)
+
         # 스케줄 목록 테이블 - 전체 컬럼 생성
         self.schedule_table = QTableWidget()
         self.schedule_table.setColumnCount(len(self.ALL_COLUMNS))
@@ -257,7 +293,16 @@ class ScheduleTab(QWidget):
         try:
             from models.schedules import Schedule
 
-            schedules = Schedule.get_all()
+            self.all_schedules = Schedule.get_all()
+            self.display_schedules(self.all_schedules)
+        except Exception as e:
+            import traceback
+            print(f"스케줄 로드 중 오류: {str(e)}")
+            traceback.print_exc()
+
+    def display_schedules(self, schedules):
+        """스케줄 목록을 테이블에 표시"""
+        try:
             self.schedule_table.setRowCount(0)
 
             for row, schedule in enumerate(schedules):
@@ -349,11 +394,96 @@ class ScheduleTab(QWidget):
 
                 self.schedule_table.setItem(row, 11, status_item)
 
-            print(f"스케줄 {len(schedules)}개 로드 완료")
+            print(f"스케줄 {len(schedules)}개 표시 완료")
         except Exception as e:
             import traceback
-            print(f"스케줄 로드 중 오류: {str(e)}")
+            print(f"스케줄 표시 중 오류: {str(e)}")
             traceback.print_exc()
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filter_schedules(self):
+        """실시간 검색 필터링 (초성 검색 지원)"""
+        search_text = self.search_input.text().strip()
+        search_field = self.search_field_combo.currentText()
+
+        if not search_text:
+            self.display_schedules(self.all_schedules)
+            return
+
+        filtered = []
+        is_chosung = self.is_chosung_only(search_text)
+
+        for schedule in self.all_schedules:
+            client_name = schedule.get('client_name', '') or ''
+            product_name = schedule.get('product_name', '') or ''
+            status = schedule.get('status', '') or ''
+            status_text = {
+                'pending': '대기', 'scheduled': '입고예정',
+                'received': '입고', 'completed': '종료',
+                'in_progress': '입고', 'cancelled': '종료'
+            }.get(status, status)
+
+            match = False
+
+            if search_field == "전체":
+                if is_chosung:
+                    match = (self.match_chosung(client_name, search_text) or
+                             self.match_chosung(product_name, search_text) or
+                             self.match_chosung(status_text, search_text))
+                else:
+                    search_lower = search_text.lower()
+                    match = (search_lower in client_name.lower() or
+                             search_lower in product_name.lower() or
+                             search_lower in status_text.lower())
+            elif search_field == "업체명":
+                if is_chosung:
+                    match = self.match_chosung(client_name, search_text)
+                else:
+                    match = search_text.lower() in client_name.lower()
+            elif search_field == "샘플명":
+                if is_chosung:
+                    match = self.match_chosung(product_name, search_text)
+                else:
+                    match = search_text.lower() in product_name.lower()
+            elif search_field == "상태":
+                if is_chosung:
+                    match = self.match_chosung(status_text, search_text)
+                else:
+                    match = search_text.lower() in status_text.lower()
+
+            if match:
+                filtered.append(schedule)
+
+        self.display_schedules(filtered)
+
+    def reset_search(self):
+        """검색 초기화"""
+        self.search_input.clear()
+        self.search_field_combo.setCurrentIndex(0)
+        self.display_schedules(self.all_schedules)
 
     def on_double_click(self, index):
         """더블클릭 시 스케줄 관리 탭으로 이동"""
