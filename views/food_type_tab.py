@@ -9,6 +9,7 @@ import os
 
 from models.product_types import ProductType
 from database import get_connection
+from utils.logger import log_message, log_error, log_exception
 
 class FoodTypeTab(QWidget):
     # 한글 초성 매핑
@@ -28,19 +29,6 @@ class FoodTypeTab(QWidget):
         self.initUI()
         self.load_food_types()
         
-    # food_type_tab.py 파일의 FoodTypeTab 클래스에 log_message 함수 추가
-    def log_message(self, category, message):
-        """로그 메시지를 출력하는 함수"""
-        import datetime
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"[{timestamp}] [FoodTypeTab] [{category}] {message}")
-        
-        # 선택적으로 파일에 로그 기록
-        try:
-            with open('app_log.txt', 'a', encoding='utf-8') as log_file:
-                log_file.write(f"[{timestamp}] [FoodTypeTab] [{category}] {message}\n")
-        except Exception as e:
-            print(f"[{timestamp}] [ERROR] 로그 파일 쓰기 실패: {str(e)}")
     
     def initUI(self):
         """UI 초기화"""
@@ -212,21 +200,18 @@ class FoodTypeTab(QWidget):
         except Exception as e:
             print(f"전체 선택 중 오류 발생: {str(e)}")
     
-    # 다음 함수들에 로그 기록 추가
-
-    # load_food_types 함수 수정
     def load_food_types(self):
         """식품유형 목록 로드"""
         try:
-            self.log_message("INFO", "식품유형 목록 로드 시작")
-            self.all_food_types = ProductType.get_all() or []
+            log_message('FoodTypeTab', '식품유형 목록 로드 시작')
+            raw_food_types = ProductType.get_all() or []
+            # sqlite3.Row를 딕셔너리로 변환
+            self.all_food_types = [dict(ft) for ft in raw_food_types]
             self.display_food_types(self.all_food_types)
-            self.log_message("INFO", f"식품유형 {len(self.all_food_types)}개 로드 완료")
+            log_message('FoodTypeTab', f'식품유형 {len(self.all_food_types)}개 로드 완료')
         except Exception as e:
-            import traceback
-            error_msg = f"식품유형 로드 중 오류 발생: {str(e)}"
-            self.log_message("ERROR", f"{error_msg}\n{traceback.format_exc()}")
-            QMessageBox.critical(self, "오류", error_msg)
+            log_exception('FoodTypeTab', f'식품유형 로드 중 오류: {str(e)}')
+            QMessageBox.critical(self, "오류", f"식품유형 로드 중 오류 발생: {str(e)}")
 
     def display_food_types(self, food_types):
         """식품유형 목록을 테이블에 표시"""
@@ -289,53 +274,57 @@ class FoodTypeTab(QWidget):
 
     def filter_food_types(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
-        search_text = self.search_input.text().strip()
-        search_field = self.search_field_combo.currentText()
+        try:
+            search_text = self.search_input.text().strip()
+            search_field = self.search_field_combo.currentText()
 
-        if not search_text:
-            self.display_food_types(self.all_food_types)
-            return
+            if not search_text:
+                self.display_food_types(self.all_food_types)
+                return
 
-        filtered = []
-        is_chosung = self.is_chosung_only(search_text)
+            filtered = []
+            is_chosung = self.is_chosung_only(search_text)
 
-        for food_type in self.all_food_types:
-            type_name = food_type.get('type_name', '') or ''
-            category = food_type.get('category', '') or ''
-            test_items = food_type.get('test_items', '') or ''
+            for food_type in self.all_food_types:
+                # 안전한 값 접근 (딕셔너리로 변환됨)
+                type_name = str(food_type.get('type_name', '') or '')
+                category = str(food_type.get('category', '') or '')
+                test_items = str(food_type.get('test_items', '') or '')
 
-            match = False
+                match = False
 
-            if search_field == "전체":
-                if is_chosung:
-                    match = (self.match_chosung(type_name, search_text) or
-                             self.match_chosung(category, search_text) or
-                             self.match_chosung(test_items, search_text))
-                else:
-                    search_lower = search_text.lower()
-                    match = (search_lower in type_name.lower() or
-                             search_lower in category.lower() or
-                             search_lower in test_items.lower())
-            elif search_field == "식품유형":
-                if is_chosung:
-                    match = self.match_chosung(type_name, search_text)
-                else:
-                    match = search_text.lower() in type_name.lower()
-            elif search_field == "카테고리":
-                if is_chosung:
-                    match = self.match_chosung(category, search_text)
-                else:
-                    match = search_text.lower() in category.lower()
-            elif search_field == "검사항목":
-                if is_chosung:
-                    match = self.match_chosung(test_items, search_text)
-                else:
-                    match = search_text.lower() in test_items.lower()
+                if search_field == "전체":
+                    if is_chosung:
+                        match = (self.match_chosung(type_name, search_text) or
+                                 self.match_chosung(category, search_text) or
+                                 self.match_chosung(test_items, search_text))
+                    else:
+                        search_lower = search_text.lower()
+                        match = (search_lower in type_name.lower() or
+                                 search_lower in category.lower() or
+                                 search_lower in test_items.lower())
+                elif search_field == "식품유형":
+                    if is_chosung:
+                        match = self.match_chosung(type_name, search_text)
+                    else:
+                        match = search_text.lower() in type_name.lower()
+                elif search_field == "카테고리":
+                    if is_chosung:
+                        match = self.match_chosung(category, search_text)
+                    else:
+                        match = search_text.lower() in category.lower()
+                elif search_field == "검사항목":
+                    if is_chosung:
+                        match = self.match_chosung(test_items, search_text)
+                    else:
+                        match = search_text.lower() in test_items.lower()
 
-            if match:
-                filtered.append(food_type)
+                if match:
+                    filtered.append(food_type)
 
-        self.display_food_types(filtered)
+            self.display_food_types(filtered)
+        except Exception as e:
+            log_exception('FoodTypeTab', f'검색 필터링 중 오류: {str(e)}')
 
     def reset_search(self):
         """검색 초기화"""
@@ -362,26 +351,22 @@ class FoodTypeTab(QWidget):
         # 정렬 실행
         self.food_type_table.sortItems(logical_index, self.current_sort_order)
 
-    # create_new_food_type 함수 수정
     def create_new_food_type(self):
         """새 식품유형 등록"""
         try:
-            self.log_message("INFO", "새 식품유형 등록 시작")
+            log_message('FoodTypeTab', '새 식품유형 등록 시작')
             dialog = FoodTypeDialog(self)
             if dialog.exec_():
-                self.log_message("INFO", "새 식품유형 등록 성공")
+                log_message('FoodTypeTab', '새 식품유형 등록 성공')
                 self.load_food_types()
         except Exception as e:
-            import traceback
-            error_msg = f"식품유형 등록 중 오류 발생: {str(e)}"
-            self.log_message("ERROR", f"{error_msg}\n{traceback.format_exc()}")
-            QMessageBox.critical(self, "오류", error_msg)
+            log_exception('FoodTypeTab', f'식품유형 등록 중 오류: {str(e)}')
+            QMessageBox.critical(self, "오류", f"식품유형 등록 중 오류 발생: {str(e)}")
 
-    # edit_food_type 함수 수정
     def edit_food_type(self):
         """식품유형 정보 수정"""
         try:
-            self.log_message("INFO", "식품유형 수정 시작")
+            log_message('FoodTypeTab', '식품유형 수정 시작')
             # 체크박스가 선택된 행 찾기
             selected_row = -1
             for row in range(self.food_type_table.rowCount()):
@@ -391,35 +376,36 @@ class FoodTypeTab(QWidget):
                     if checkbox and checkbox.isChecked():
                         selected_row = row
                         break
-            
+
             if selected_row == -1:
-                self.log_message("WARNING", "수정할 식품유형이 선택되지 않음")
+                log_message('FoodTypeTab', '수정할 식품유형이 선택되지 않음', 'WARNING')
                 QMessageBox.warning(self, "선택 오류", "수정할 식품유형을 선택하세요.")
                 return
-            
+
             # 선택된 행의 데이터 가져오기
             type_name = self.food_type_table.item(selected_row, 1).text()
-            self.log_message("INFO", f"식품유형 '{type_name}' 수정 시도")
-            
+            log_message('FoodTypeTab', f"식품유형 '{type_name}' 수정 시도")
+
             # 해당 식품유형 정보 가져오기
-            food_type = ProductType.get_by_name(type_name)
-            if not food_type:
-                self.log_message("ERROR", f"식품유형 '{type_name}' 정보를 찾을 수 없음")
+            raw_food_type = ProductType.get_by_name(type_name)
+            if not raw_food_type:
+                log_error('FoodTypeTab', f"식품유형 '{type_name}' 정보를 찾을 수 없음")
                 QMessageBox.warning(self, "데이터 오류", "선택한 식품유형 정보를 찾을 수 없습니다.")
                 return
-            
+
+            # sqlite3.Row를 딕셔너리로 변환
+            food_type = dict(raw_food_type)
+
             # 수정 다이얼로그 표시
             dialog = FoodTypeDialog(self, food_type)
             if dialog.exec_():
-                self.log_message("INFO", f"식품유형 '{type_name}' 수정 성공")
+                log_message('FoodTypeTab', f"식품유형 '{type_name}' 수정 성공")
                 self.load_food_types()
             else:
-                self.log_message("INFO", f"식품유형 '{type_name}' 수정 취소")
+                log_message('FoodTypeTab', f"식품유형 '{type_name}' 수정 취소")
         except Exception as e:
-            import traceback
-            error_msg = f"식품유형 수정 중 오류 발생: {str(e)}"
-            self.log_message("ERROR", f"{error_msg}\n{traceback.format_exc()}")
-            QMessageBox.critical(self, "오류", error_msg)
+            log_exception('FoodTypeTab', f'식품유형 수정 중 오류: {str(e)}')
+            QMessageBox.critical(self, "오류", f"식품유형 수정 중 오류 발생: {str(e)}")
     
     def delete_food_type(self):
         """식품유형 삭제"""
@@ -485,41 +471,39 @@ class FoodTypeTab(QWidget):
                 return
                 
             try:
-                self.log_message("INFO", "식품유형 전체 초기화 시작")
-                
+                log_message('FoodTypeTab', '식품유형 전체 초기화 시작')
+
                 # DB 연결 직접 사용하여 삭제 확인
                 conn = get_connection()
                 cursor = conn.cursor()
-                
+
                 # 트랜잭션 시작
                 cursor.execute("BEGIN TRANSACTION")
-                
+
                 # 삭제 전 데이터 백업 (선택사항)
                 cursor.execute("SELECT * FROM food_types")
                 backup_data = cursor.fetchall()
-                
+
                 # 데이터 삭제
                 cursor.execute("DELETE FROM food_types")
-                
+
                 # 자동 증가 ID 초기화
                 cursor.execute("DELETE FROM sqlite_sequence WHERE name='food_types'")
-                
+
                 # 커밋
                 conn.commit()
                 conn.close()
-                
+
                 # 테이블 갱신
                 self.food_type_table.setRowCount(0)
                 self.load_food_types()
-                
-                self.log_message("INFO", f"식품유형 전체 초기화 완료: {len(backup_data)}개 항목 삭제")
+
+                log_message('FoodTypeTab', f'식품유형 전체 초기화 완료: {len(backup_data)}개 항목 삭제')
                 QMessageBox.information(self, "초기화 완료", f"모든 식품 유형 데이터({len(backup_data)}개)가 삭제되었습니다.")
-                
+
             except Exception as e:
-                import traceback
-                error_msg = f"데이터 초기화 중 오류가 발생했습니다: {str(e)}"
-                self.log_message("ERROR", f"{error_msg}\n{traceback.format_exc()}")
-                QMessageBox.critical(self, "초기화 실패", error_msg)
+                log_exception('FoodTypeTab', f'데이터 초기화 중 오류: {str(e)}')
+                QMessageBox.critical(self, "초기화 실패", f"데이터 초기화 중 오류가 발생했습니다: {str(e)}")
     
     def update_from_excel(self):
         """엑셀 파일에서 데이터 업데이트 후 저장"""

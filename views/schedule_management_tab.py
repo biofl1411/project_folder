@@ -20,6 +20,7 @@ from datetime import datetime
 from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
+from utils.logger import log_message, log_error, log_exception, safe_get
 
 
 class DisplaySettingsDialog(QDialog):
@@ -228,23 +229,25 @@ class TestItemSelectDialog(QDialog):
     def load_items(self):
         """수수료 목록에서 검사항목 로드"""
         try:
-            all_fees = Fee.get_all()
+            log_message('ItemSelectDialog', '검사항목 목록 로드 시작')
+            raw_fees = Fee.get_all() or []
             self.all_items = []
 
-            for fee in all_fees:
-                test_item = fee['test_item']
+            for fee in raw_fees:
+                test_item = safe_get(fee, 'test_item', '')
                 # 이미 추가된 항목은 제외
-                if test_item not in self.exclude_items:
+                if test_item and test_item not in self.exclude_items:
                     self.all_items.append({
                         'test_item': test_item,
-                        'food_category': fee['food_category'] or '',
-                        'price': fee['price'] or 0,
-                        'sample_quantity': fee['sample_quantity'] or 0
+                        'food_category': safe_get(fee, 'food_category', ''),
+                        'price': safe_get(fee, 'price', 0) or 0,
+                        'sample_quantity': safe_get(fee, 'sample_quantity', 0) or 0
                     })
 
             self.display_items(self.all_items)
+            log_message('ItemSelectDialog', f'검사항목 {len(self.all_items)}개 로드 완료')
         except Exception as e:
-            print(f"검사항목 로드 오류: {e}")
+            log_exception('ItemSelectDialog', f'검사항목 로드 중 오류: {str(e)}')
 
     def display_items(self, items):
         """테이블에 항목 표시"""
@@ -262,11 +265,16 @@ class TestItemSelectDialog(QDialog):
 
     def filter_items(self, text):
         """검색 필터"""
-        if not text:
-            self.display_items(self.all_items)
-        else:
-            filtered = [item for item in self.all_items if text.lower() in item['test_item'].lower()]
-            self.display_items(filtered)
+        try:
+            if not text:
+                self.display_items(self.all_items)
+            else:
+                filtered = [item for item in self.all_items
+                           if text.lower() in (item.get('test_item', '') or '').lower()]
+                self.display_items(filtered)
+                log_message('ItemSelectDialog', f'검사항목 검색 "{text}": {len(filtered)}개 결과')
+        except Exception as e:
+            log_exception('ItemSelectDialog', f'검사항목 검색 중 오류: {str(e)}')
 
     def accept(self):
         selected = self.item_table.selectedIndexes()

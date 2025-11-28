@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 import pandas as pd
 
 from models.fees import Fee
+from utils.logger import log_message, log_error, log_exception
 
 class FeeTab(QWidget):
     # 한글 초성 매핑
@@ -181,8 +182,15 @@ class FeeTab(QWidget):
     
     def load_fees(self):
         """수수료 목록 로드"""
-        self.all_fees = Fee.get_all() or []
-        self.display_fees(self.all_fees)
+        try:
+            log_message('FeeTab', '수수료 목록 로드 시작')
+            raw_fees = Fee.get_all() or []
+            # sqlite3.Row를 딕셔너리로 변환하여 .get() 메서드 사용 가능하게 함
+            self.all_fees = [dict(f) for f in raw_fees]
+            self.display_fees(self.all_fees)
+            log_message('FeeTab', f'수수료 {len(self.all_fees)}개 로드 완료')
+        except Exception as e:
+            log_exception('FeeTab', f'수수료 로드 중 오류: {str(e)}')
 
     def display_fees(self, fees):
         """수수료 목록을 테이블에 표시"""
@@ -202,32 +210,32 @@ class FeeTab(QWidget):
                     checkbox_layout.setContentsMargins(0, 0, 0, 0)
                     self.fee_table.setCellWidget(row, 0, checkbox_widget)
 
-                    # 나머지 데이터 설정
-                    self.fee_table.setItem(row, 1, QTableWidgetItem(str(fee['test_item'] or '')))
-                    self.fee_table.setItem(row, 2, QTableWidgetItem(fee['food_category'] or ""))
-                    price_item = QTableWidgetItem(f"{int(fee['price']):,}")
+                    # 나머지 데이터 설정 (안전한 .get() 사용)
+                    self.fee_table.setItem(row, 1, QTableWidgetItem(str(fee.get('test_item', '') or '')))
+                    self.fee_table.setItem(row, 2, QTableWidgetItem(fee.get('food_category', '') or ""))
+
+                    price = fee.get('price', 0) or 0
+                    price_item = QTableWidgetItem(f"{int(price):,}")
                     price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     self.fee_table.setItem(row, 3, price_item)
+
                     # 검체 수량 표시
-                    try:
-                        sample_qty = fee['sample_quantity'] or 0
-                    except (KeyError, IndexError):
-                        sample_qty = 0
+                    sample_qty = fee.get('sample_quantity', 0) or 0
                     sample_qty_item = QTableWidgetItem(str(sample_qty))
                     sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     self.fee_table.setItem(row, 4, sample_qty_item)
 
-                    # 정렬순서 설정 - 기존 데이터에 없을 경우 기본값 사용
-                    try:
-                        display_order = fee['display_order']
-                    except (KeyError, IndexError):
-                        display_order = row + 1  # 기본값으로 행 번호+1 사용
-
+                    # 정렬순서 설정
+                    display_order = fee.get('display_order', row + 1) or (row + 1)
                     order_item = QTableWidgetItem(str(display_order))
                     order_item.setTextAlignment(Qt.AlignCenter)
                     self.fee_table.setItem(row, 5, order_item)
 
-                    self.fee_table.setItem(row, 6, QTableWidgetItem(fee['created_at'] or ""))
+                    self.fee_table.setItem(row, 6, QTableWidgetItem(fee.get('created_at', '') or ""))
+
+            log_message('FeeTab', f'수수료 {len(fees) if fees else 0}개 표시 완료')
+        except Exception as e:
+            log_exception('FeeTab', f'수수료 표시 중 오류: {str(e)}')
         finally:
             # UI 업데이트 재개
             self.fee_table.setUpdatesEnabled(True)
@@ -263,45 +271,51 @@ class FeeTab(QWidget):
 
     def filter_fees(self):
         """실시간 검색 필터링 (초성 검색 지원)"""
-        search_text = self.search_input.text().strip()
-        search_field = self.search_field_combo.currentText()
+        try:
+            search_text = self.search_input.text().strip()
+            search_field = self.search_field_combo.currentText()
 
-        if not search_text:
-            self.display_fees(self.all_fees)
-            return
+            if not search_text:
+                self.display_fees(self.all_fees)
+                return
 
-        filtered = []
-        is_chosung = self.is_chosung_only(search_text)
+            log_message('FeeTab', f'수수료 검색 시작: "{search_text}" (필드: {search_field})')
 
-        for fee in self.all_fees:
-            test_item = fee['test_item'] or ''
-            food_category = fee['food_category'] or ''
+            filtered = []
+            is_chosung = self.is_chosung_only(search_text)
 
-            match = False
+            for fee in self.all_fees:
+                test_item = fee.get('test_item', '') or ''
+                food_category = fee.get('food_category', '') or ''
 
-            if search_field == "전체":
-                if is_chosung:
-                    match = (self.match_chosung(test_item, search_text) or
-                             self.match_chosung(food_category, search_text))
-                else:
-                    search_lower = search_text.lower()
-                    match = (search_lower in test_item.lower() or
-                             search_lower in food_category.lower())
-            elif search_field == "검사항목":
-                if is_chosung:
-                    match = self.match_chosung(test_item, search_text)
-                else:
-                    match = search_text.lower() in test_item.lower()
-            elif search_field == "식품 카테고리":
-                if is_chosung:
-                    match = self.match_chosung(food_category, search_text)
-                else:
-                    match = search_text.lower() in food_category.lower()
+                match = False
 
-            if match:
-                filtered.append(fee)
+                if search_field == "전체":
+                    if is_chosung:
+                        match = (self.match_chosung(test_item, search_text) or
+                                 self.match_chosung(food_category, search_text))
+                    else:
+                        search_lower = search_text.lower()
+                        match = (search_lower in test_item.lower() or
+                                 search_lower in food_category.lower())
+                elif search_field == "검사항목":
+                    if is_chosung:
+                        match = self.match_chosung(test_item, search_text)
+                    else:
+                        match = search_text.lower() in test_item.lower()
+                elif search_field == "식품 카테고리":
+                    if is_chosung:
+                        match = self.match_chosung(food_category, search_text)
+                    else:
+                        match = search_text.lower() in food_category.lower()
 
-        self.display_fees(filtered)
+                if match:
+                    filtered.append(fee)
+
+            log_message('FeeTab', f'수수료 검색 완료: {len(filtered)}개 결과')
+            self.display_fees(filtered)
+        except Exception as e:
+            log_exception('FeeTab', f'수수료 검색 중 오류: {str(e)}')
 
     def reset_search(self):
         """검색 초기화"""
