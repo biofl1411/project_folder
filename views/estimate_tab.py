@@ -395,7 +395,14 @@ FAX: (070) 7410-1430""")
         period_str = " ".join(period_parts) if period_parts else "0개월"
 
         # 보관조건
-        storage = schedule.get('storage_condition', '상온')
+        storage_code = schedule.get('storage_condition', 'room_temp')
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage = storage_map.get(storage_code, storage_code)
 
         # 실험방법
         test_method = schedule.get('test_method', 'real')
@@ -403,7 +410,8 @@ FAX: (070) 7410-1430""")
             'real': '실측실험',
             'acceleration': '가속실험',
             'custom_real': '의뢰자요청(실측)',
-            'custom_accel': '의뢰자요청(가속)'
+            'custom_accel': '의뢰자요청(가속)',
+            'custom_acceleration': '의뢰자요청(가속)'
         }
         method_str = method_map.get(test_method, '실측실험')
 
@@ -416,19 +424,34 @@ FAX: (070) 7410-1430""")
         if schedule.get('report_english'):
             report_parts.append("영문")
 
-        # 검사항목 (식품유형에서 가져오기)
-        test_items = schedule.get('test_items', '관능평가, 세균수, 대장균군')
+        # 검사항목 (스케줄에서 동적으로 가져오기)
+        test_items_str = schedule.get('test_items', '')
+        if test_items_str:
+            # 쉼표로 구분된 문자열을 리스트로 변환
+            test_items_list = [item.strip() for item in test_items_str.split(',') if item.strip()]
+        else:
+            # 기본 검사항목
+            test_items_list = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        # 검사항목 목록 텍스트 생성
+        test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
+
+        # 온도 표시
+        custom_temps = schedule.get('custom_temperatures', '')
+        if custom_temps:
+            # 쉼표로 구분된 온도 값에 ℃ 추가
+            temps = [t.strip() for t in custom_temps.split(',')]
+            temp_display = ', '.join([f"{t}℃" if not t.endswith('℃') else t for t in temps])
+        else:
+            temp_display = '-'
 
         # 검사항목 정보 텍스트
         info_text = f"""소비기한: {storage} {period_str}
     ({', '.join(report_parts) if report_parts else '국문'})
 실험방법: {method_str}
-실험온도: {schedule.get('custom_temperatures', '5,10,15 ℃')}
+실험온도: {temp_display}
 
-1)  관능평가
-2)  세균수
-3)  대장균군
-4)  pH"""
+{test_items_text}"""
 
         # 테이블에 데이터 추가
         self.items_table.setItem(0, 0, QTableWidgetItem("1."))
@@ -436,7 +459,12 @@ FAX: (070) 7410-1430""")
 
         info_item = QTableWidgetItem(info_text)
         self.items_table.setItem(0, 2, info_item)
-        self.items_table.setRowHeight(0, 150)
+
+        # 검사항목 개수에 따라 행 높이 동적 조정
+        base_height = 120
+        item_height = 18
+        row_height = base_height + (len(test_items_list) * item_height)
+        self.items_table.setRowHeight(0, row_height)
 
         # 금액 계산
         total_price = self.calculate_total_price(schedule)
