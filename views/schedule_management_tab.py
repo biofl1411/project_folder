@@ -534,7 +534,7 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(frame)
 
     def create_info_summary_panel(self, parent_layout):
-        """소비기한 설정 실험 계획 (안)"""
+        """소비기한 설정 실험 계획 (안) - 4열 레이아웃"""
         group = QGroupBox("1. 소비기한 설정 실험 계획 (안)")
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #3498db; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
@@ -544,146 +544,103 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(2)
 
-        # 열 균등 배분
-        for col in range(6):
+        # 8열 균등 배분 (라벨+값 4쌍)
+        for col in range(8):
             grid.setColumnStretch(col, 1)
 
-        # 8행으로 설정하여 여유 공간 확보
-        for row in range(8):
-            grid.setRowStretch(row, 1)
+        label_style = "font-weight: bold; background-color: #ecf0f1; padding: 3px; border: 1px solid #bdc3c7; font-size: 11px;"
+        value_style = "background-color: white; padding: 3px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 11px;"
+        temp_label_style = "font-weight: bold; background-color: #d5f5e3; padding: 3px; border: 1px solid #27ae60; font-size: 11px;"
+        temp_value_style = "background-color: white; padding: 3px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 11px;"
 
-        label_style = "font-weight: bold; background-color: #ecf0f1; padding: 4px; border: 1px solid #bdc3c7; font-size: 13px;"
-        value_style = "background-color: white; padding: 4px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 13px;"
-
-        # 행 1 (공백으로 글자 간격 균일하게)
-        self.company_label = self._create_label("회  사  명", label_style)
-        grid.addWidget(self.company_label, 0, 0)
+        # 행 1: 회사명, 제품명, 식품유형, 보관조건
+        grid.addWidget(self._create_label("회 사 명", label_style), 0, 0)
         self.company_value = self._create_value_label("-", value_style)
         grid.addWidget(self.company_value, 0, 1)
-        self.test_method_label = self._create_label("실 험 방 법", label_style)
-        grid.addWidget(self.test_method_label, 0, 2)
-        self.test_method_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.test_method_value, 0, 3)
-        self.product_label = self._create_label("제  품  명", label_style)
-        grid.addWidget(self.product_label, 0, 4)
+        grid.addWidget(self._create_label("제 품 명", label_style), 0, 2)
         self.product_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.product_value, 0, 5)
-
-        # 행 2
-        self.expiry_label = self._create_label("소 비 기 한", label_style)
-        grid.addWidget(self.expiry_label, 1, 0)
-        self.expiry_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.expiry_value, 1, 1)
-        self.storage_label = self._create_label("보 관 조 건", label_style)
-        grid.addWidget(self.storage_label, 1, 2)
-        self.storage_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.storage_value, 1, 3)
-        self.food_type_label = self._create_label("식 품 유 형", label_style)
-        grid.addWidget(self.food_type_label, 1, 4)
+        grid.addWidget(self.product_value, 0, 3)
+        grid.addWidget(self._create_label("식품유형", label_style), 0, 4)
         self.food_type_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.food_type_value, 1, 5)
+        grid.addWidget(self.food_type_value, 0, 5)
+        grid.addWidget(self._create_label("보관조건", label_style), 0, 6)
+        self.storage_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.storage_value, 0, 7)
 
-        # 행 3
-        self.period_label = self._create_label("실 험 기 간", label_style)
-        grid.addWidget(self.period_label, 2, 0)
-        self.period_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.period_value, 2, 1)
-        self.interim_report_label = self._create_label("중간보고서", label_style)
-        grid.addWidget(self.interim_report_label, 2, 2)
+        # 행 2: 실험방법, 중간보고서, 연장실험, 시작일
+        grid.addWidget(self._create_label("실험방법", label_style), 1, 0)
+        self.test_method_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.test_method_value, 1, 1)
+        grid.addWidget(self._create_label("중간보고서", label_style), 1, 2)
         self.interim_report_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.interim_report_value, 2, 3)
-        self.extension_label = self._create_label("연 장 실 험", label_style)
-        grid.addWidget(self.extension_label, 2, 4)
+        grid.addWidget(self.interim_report_value, 1, 3)
+        grid.addWidget(self._create_label("연장실험", label_style), 1, 4)
         self.extension_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.extension_value, 2, 5)
-
-        # 행 4
-        self.sampling_count_label = self._create_label("샘플링횟수", label_style)
-        grid.addWidget(self.sampling_count_label, 3, 0)
-        self.sampling_count_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.sampling_count_value, 3, 1)
-        self.sampling_interval_label = self._create_label("샘플링간격", label_style)
-        grid.addWidget(self.sampling_interval_label, 3, 2)
-        self.sampling_interval_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.sampling_interval_value, 3, 3)
-        self.start_date_label = self._create_label("시  작  일", label_style)
-        grid.addWidget(self.start_date_label, 3, 4)
+        grid.addWidget(self.extension_value, 1, 5)
+        grid.addWidget(self._create_label("시 작 일", label_style), 1, 6)
         self.start_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.start_date_value, 3, 5)
+        grid.addWidget(self.start_date_value, 1, 7)
 
-        # 행 5
-        self.interim_date_label = self._create_label("중간보고일", label_style)
-        grid.addWidget(self.interim_date_label, 4, 0)
+        # 행 3: 소비기한, 실험기간, 샘플링간격, 중간보고일
+        grid.addWidget(self._create_label("소비기한", label_style), 2, 0)
+        self.expiry_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.expiry_value, 2, 1)
+        grid.addWidget(self._create_label("실험기간", label_style), 2, 2)
+        self.period_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.period_value, 2, 3)
+        grid.addWidget(self._create_label("샘플링간격", label_style), 2, 4)
+        self.sampling_interval_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.sampling_interval_value, 2, 5)
+        grid.addWidget(self._create_label("중간보고일", label_style), 2, 6)
         self.interim_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.interim_date_value, 4, 1)
-        self.last_test_date_label = self._create_label("마지막실험일", label_style)
-        grid.addWidget(self.last_test_date_label, 4, 2)
-        self.last_test_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.last_test_date_value, 4, 3)
-        self.status_label = self._create_label("상      태", label_style)
-        grid.addWidget(self.status_label, 4, 4)
-        self.status_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.status_value, 4, 5)
+        grid.addWidget(self.interim_date_value, 2, 7)
 
-        # 행 6 - 검체량 관련
-        self.sample_per_test_label = self._create_label("1회실험검체량", label_style)
-        grid.addWidget(self.sample_per_test_label, 5, 0)
+        # 행 4: 1회실험검체량, 포장단위, 필요검체량, 마지막실험일
+        grid.addWidget(self._create_label("1회검체량", label_style), 3, 0)
         self.sample_per_test_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.sample_per_test_value, 5, 1)
-        self.packaging_label = self._create_label("포 장 단 위", label_style)
-        grid.addWidget(self.packaging_label, 5, 2)
+        grid.addWidget(self.sample_per_test_value, 3, 1)
+        grid.addWidget(self._create_label("포장단위", label_style), 3, 2)
         self.packaging_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.packaging_value, 5, 3)
-        self.required_sample_label = self._create_label("필요검체량", label_style)
-        grid.addWidget(self.required_sample_label, 5, 4)
-        # 필요 검체량 - 수정 가능한 입력 필드
+        grid.addWidget(self.packaging_value, 3, 3)
+        grid.addWidget(self._create_label("필요검체량", label_style), 3, 4)
         self.required_sample_value = QLineEdit("-")
         self.required_sample_value.setStyleSheet(value_style + " color: #e67e22; font-weight: bold;")
         self.required_sample_value.setAlignment(Qt.AlignCenter)
-        self.required_sample_value.setMinimumWidth(60)
-        self.required_sample_value.setPlaceholderText("개수 입력")
-        grid.addWidget(self.required_sample_value, 5, 5)
-        self.current_required_sample = 0  # 계산된 필요 검체량 저장
+        self.required_sample_value.setPlaceholderText("개수")
+        grid.addWidget(self.required_sample_value, 3, 5)
+        self.current_required_sample = 0
+        grid.addWidget(self._create_label("마지막실험일", label_style), 3, 6)
+        self.last_test_date_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.last_test_date_value, 3, 7)
 
-        # 행 7, 8 - 여유 공간 (빈 행)
+        # 행 5: 상태, 보관온도 (1구간, 2구간, 3구간)
+        grid.addWidget(self._create_label("상    태", label_style), 4, 0)
+        self.status_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.status_value, 4, 1)
+        grid.addWidget(self._create_label("1 구 간", temp_label_style), 4, 2)
+        self.temp_zone1_value = self._create_value_label("-", temp_value_style)
+        grid.addWidget(self.temp_zone1_value, 4, 3)
+        grid.addWidget(self._create_label("2 구 간", temp_label_style), 4, 4)
+        self.temp_zone2_value = self._create_value_label("-", temp_value_style)
+        grid.addWidget(self.temp_zone2_value, 4, 5)
+        grid.addWidget(self._create_label("3 구 간", temp_label_style), 4, 6)
+        self.temp_zone3_value = self._create_value_label("-", temp_value_style)
+        grid.addWidget(self.temp_zone3_value, 4, 7)
+
+        # 샘플링횟수는 다른 곳에서 사용하므로 숨겨진 라벨로 유지
+        self.sampling_count_value = QLabel("-")
+        self.sampling_count_value.hide()
 
         parent_layout.addWidget(group)
 
     def create_temperature_panel(self, parent_layout):
-        """보관 온도 구간 패널"""
-        group = QGroupBox("2. 보관 온도")
-        group.setStyleSheet("""
-            QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #27ae60; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #27ae60; }
-        """)
-
-        grid = QGridLayout(group)
-        grid.setSpacing(2)
-
-        label_style = "font-weight: bold; background-color: #d5f5e3; padding: 4px; border: 1px solid #27ae60; font-size: 13px;"
-        value_style = "background-color: white; padding: 4px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 13px;"
-
-        grid.addWidget(self._create_label("구분", label_style), 0, 0)
-        self.temp_zone1_label = self._create_label("1구간", label_style)
-        grid.addWidget(self.temp_zone1_label, 0, 1)
-        self.temp_zone2_label = self._create_label("2구간", label_style)
-        grid.addWidget(self.temp_zone2_label, 0, 2)
-        self.temp_zone3_label = self._create_label("3구간", label_style)
-        grid.addWidget(self.temp_zone3_label, 0, 3)
-
-        grid.addWidget(self._create_label("온도", label_style), 1, 0)
-        self.temp_zone1_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.temp_zone1_value, 1, 1)
-        self.temp_zone2_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.temp_zone2_value, 1, 2)
-        self.temp_zone3_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.temp_zone3_value, 1, 3)
-
-        parent_layout.addWidget(group)
+        """보관 온도 구간 패널 - 이제 create_info_summary_panel에 통합됨"""
+        # 기존 호환성을 위해 빈 메서드로 유지
+        pass
 
     def create_memo_panel(self, parent_layout):
         """메모 입력 (1/3) + 메모 이력 (2/3)"""
-        group = QGroupBox("3. 메모")
+        group = QGroupBox("2. 메모")
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #9b59b6; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #9b59b6; }
@@ -730,7 +687,7 @@ class ScheduleManagementTab(QWidget):
 
     def create_experiment_schedule_panel(self, parent_layout):
         """온도조건별 실험 스케줄"""
-        group = QGroupBox("4. 온도조건별 실험 스케줄")
+        group = QGroupBox("3. 온도조건별 실험 스케줄")
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #e67e22; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #e67e22; }
@@ -774,77 +731,82 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약"""
+        """비용 요약 (2줄 컴팩트 레이아웃)"""
         cost_frame = QFrame()
-        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 5px;")
-        cost_layout = QGridLayout(cost_frame)
+        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
+        cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(3)
-        cost_layout.setContentsMargins(8, 5, 8, 5)
+        cost_layout.setContentsMargins(5, 2, 5, 2)
 
-        # 0행: 검사항목별 비용 내역 (O 체크 수 × 단가)
-        item_detail_label = QLabel("※ 항목별 비용:")
-        item_detail_label.setStyleSheet("font-size: 11px; color: #666;")
-        cost_layout.addWidget(item_detail_label, 0, 0)
+        # 좌측: 항목별 비용 + 1회/회차/보고서/중간
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(1)
 
+        # 1행: 항목별 비용 내역
+        row1 = QHBoxLayout()
+        row1.setSpacing(5)
         self.item_cost_detail = QLabel("-")
-        self.item_cost_detail.setStyleSheet("font-size: 11px; color: #333;")
-        self.item_cost_detail.setWordWrap(True)
-        cost_layout.addWidget(self.item_cost_detail, 0, 1, 1, 3)
+        self.item_cost_detail.setStyleSheet("font-size: 10px; color: #333;")
+        row1.addWidget(self.item_cost_detail)
 
-        # 1행: 1회 기준 + 회차별 총계
-        cost_layout.addWidget(QLabel("1회 검사비"), 1, 0)
+        row1.addWidget(QLabel("|"))
+
+        lbl1 = QLabel("1회")
+        lbl1.setStyleSheet("font-size: 10px;")
+        row1.addWidget(lbl1)
         self.cost_per_test = QLabel("-")
-        self.cost_per_test.setAlignment(Qt.AlignRight)
-        self.cost_per_test.setFixedWidth(90)
-        cost_layout.addWidget(self.cost_per_test, 1, 1)
+        self.cost_per_test.setStyleSheet("font-size: 10px; font-weight: bold;")
+        row1.addWidget(self.cost_per_test)
 
-        cost_layout.addWidget(QLabel("회차별 소계"), 1, 2)
+        lbl2 = QLabel("회차")
+        lbl2.setStyleSheet("font-size: 10px;")
+        row1.addWidget(lbl2)
         self.total_rounds_cost = QLabel("-")
-        self.total_rounds_cost.setAlignment(Qt.AlignRight)
-        self.total_rounds_cost.setFixedWidth(100)
-        cost_layout.addWidget(self.total_rounds_cost, 1, 3)
+        self.total_rounds_cost.setStyleSheet("font-size: 10px; font-weight: bold;")
+        row1.addWidget(self.total_rounds_cost)
 
-        # 2행: 보고서 비용 + 중간 보고서 비용
-        cost_layout.addWidget(QLabel("보고서 비용"), 2, 0)
+        lbl3 = QLabel("보고서")
+        lbl3.setStyleSheet("font-size: 10px;")
+        row1.addWidget(lbl3)
         self.report_cost_input = QLineEdit("300,000")
         self.report_cost_input.setAlignment(Qt.AlignRight)
-        self.report_cost_input.setStyleSheet("background-color: white; border: 1px solid #ccc; padding: 2px;")
-        self.report_cost_input.setFixedWidth(90)
+        self.report_cost_input.setStyleSheet("font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 1px;")
+        self.report_cost_input.setFixedWidth(55)
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
-        cost_layout.addWidget(self.report_cost_input, 2, 1)
+        row1.addWidget(self.report_cost_input)
 
-        self.interim_report_label = QLabel("중간보고서")
-        cost_layout.addWidget(self.interim_report_label, 2, 2)
+        self.interim_report_label = QLabel("중간")
+        self.interim_report_label.setStyleSheet("font-size: 10px;")
+        row1.addWidget(self.interim_report_label)
         self.interim_report_cost_input = QLineEdit("200,000")
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
-        self.interim_report_cost_input.setStyleSheet("background-color: white; border: 1px solid #ccc; padding: 2px;")
-        self.interim_report_cost_input.setFixedWidth(100)
+        self.interim_report_cost_input.setStyleSheet("font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 1px;")
+        self.interim_report_cost_input.setFixedWidth(55)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
-        cost_layout.addWidget(self.interim_report_cost_input, 2, 3)
-        # 초기에는 숨김
+        row1.addWidget(self.interim_report_cost_input)
         self.interim_report_label.hide()
         self.interim_report_cost_input.hide()
 
-        # 3행: 최종비용 (부가세별도) - 계산식 포함
-        final_label = QLabel("합계(税별)")
-        final_label.setStyleSheet("font-weight: bold; color: #e67e22;")
-        cost_layout.addWidget(final_label, 3, 0)
+        row1.addStretch()
+        left_layout.addLayout(row1)
 
+        # 2행: 계산식
+        row2 = QHBoxLayout()
+        row2.setSpacing(5)
         self.final_cost_formula = QLabel("-")
-        self.final_cost_formula.setStyleSheet("font-weight: bold; color: #e67e22; font-size: 11px;")
-        self.final_cost_formula.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.final_cost_formula, 3, 1, 1, 2)
+        self.final_cost_formula.setStyleSheet("font-size: 10px; color: #e67e22;")
+        row2.addWidget(self.final_cost_formula)
+        row2.addStretch()
+        left_layout.addLayout(row2)
 
-        # 최종비용 (부가세 포함)
-        final_vat_label = QLabel("총액(VAT포함)")
-        final_vat_label.setStyleSheet("font-weight: bold; color: #c0392b;")
-        cost_layout.addWidget(final_vat_label, 3, 3)
+        cost_layout.addLayout(left_layout)
 
+        # 우측: 공급가 + 세액 = 총계
         self.final_cost_with_vat = QLabel("-")
-        self.final_cost_with_vat.setStyleSheet("font-weight: bold; font-size: 13px; color: white; background-color: #e67e22; padding: 5px; border-radius: 3px;")
+        self.final_cost_with_vat.setStyleSheet("font-size: 11px; font-weight: bold; color: white; background-color: #e67e22; padding: 3px 8px; border-radius: 3px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
-        self.final_cost_with_vat.setFixedWidth(120)
-        cost_layout.addWidget(self.final_cost_with_vat, 4, 3)
+        self.final_cost_with_vat.setMinimumWidth(200)
+        cost_layout.addWidget(self.final_cost_with_vat)
 
         parent_layout.addWidget(cost_frame)
 
@@ -1412,8 +1374,9 @@ class ScheduleManagementTab(QWidget):
         self.final_cost_formula.setText(formula_text)
 
         # 5. 최종비용 (부가세 포함) - 10% 부가세
-        final_cost_with_vat = int(final_cost_no_vat * 1.1)
-        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
+        vat = int(final_cost_no_vat * 0.1)
+        final_cost_with_vat = final_cost_no_vat + vat
+        self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
 
     def show_estimate(self):
         """견적서 보기 버튼 클릭 시 처리"""
@@ -1779,8 +1742,9 @@ class ScheduleManagementTab(QWidget):
         self.final_cost_formula.setText(formula_text)
 
         # 5. 최종비용 (부가세 포함) - 10% 부가세
-        final_cost_with_vat = int(final_cost_no_vat * 1.1)
-        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
+        vat = int(final_cost_no_vat * 0.1)
+        final_cost_with_vat = final_cost_no_vat + vat
+        self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
 
     def on_cost_input_changed(self):
         """보고서 비용 입력 변경 시 총비용 재계산"""
@@ -1824,5 +1788,6 @@ class ScheduleManagementTab(QWidget):
         self.final_cost_formula.setText(formula_text)
 
         # 부가세 포함 금액
-        final_cost_with_vat = int(final_cost_no_vat * 1.1)
-        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
+        vat = int(final_cost_no_vat * 0.1)
+        final_cost_with_vat = final_cost_no_vat + vat
+        self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")

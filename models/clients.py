@@ -102,6 +102,95 @@ class Client:
             return []
 
     @staticmethod
+    def get_total_count():
+        """전체 업체 수 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM clients")
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            print(f"업체 수 조회 중 오류: {str(e)}")
+            return 0
+
+    @staticmethod
+    def get_paginated(page=1, per_page=100, search_keyword=None, search_field=None):
+        """페이지네이션 업체 조회"""
+        try:
+            Client._ensure_detail_address_column()
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            offset = (page - 1) * per_page
+
+            # 검색 조건이 있는 경우
+            if search_keyword:
+                if search_field == "고객/회사명":
+                    where_clause = "WHERE name LIKE ?"
+                    params = (f"%{search_keyword}%",)
+                elif search_field == "대표자":
+                    where_clause = "WHERE ceo LIKE ?"
+                    params = (f"%{search_keyword}%",)
+                elif search_field == "담당자":
+                    where_clause = "WHERE contact_person LIKE ?"
+                    params = (f"%{search_keyword}%",)
+                elif search_field == "사업자번호":
+                    where_clause = "WHERE business_no LIKE ?"
+                    params = (f"%{search_keyword}%",)
+                else:  # 전체
+                    where_clause = "WHERE name LIKE ? OR ceo LIKE ? OR contact_person LIKE ? OR business_no LIKE ?"
+                    params = (f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%")
+
+                # 총 개수 조회
+                cursor.execute(f"SELECT COUNT(*) FROM clients {where_clause}", params)
+                total_count = cursor.fetchone()[0]
+
+                # 데이터 조회
+                cursor.execute(f"""
+                    SELECT id, name, ceo, business_no, category, phone, fax,
+                        contact_person, email, sales_rep, toll_free, zip_code,
+                        address, detail_address, notes, sales_business, sales_phone, sales_mobile,
+                        sales_address, mobile, created_at
+                    FROM clients
+                    {where_clause}
+                    ORDER BY name
+                    LIMIT ? OFFSET ?
+                """, params + (per_page, offset))
+            else:
+                # 총 개수 조회
+                cursor.execute("SELECT COUNT(*) FROM clients")
+                total_count = cursor.fetchone()[0]
+
+                # 데이터 조회
+                cursor.execute("""
+                    SELECT id, name, ceo, business_no, category, phone, fax,
+                        contact_person, email, sales_rep, toll_free, zip_code,
+                        address, detail_address, notes, sales_business, sales_phone, sales_mobile,
+                        sales_address, mobile, created_at
+                    FROM clients
+                    ORDER BY name
+                    LIMIT ? OFFSET ?
+                """, (per_page, offset))
+
+            clients = cursor.fetchall()
+            conn.close()
+
+            total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+
+            return {
+                'clients': [dict(client) for client in clients],
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'current_page': page,
+                'per_page': per_page
+            }
+        except Exception as e:
+            print(f"페이지네이션 업체 조회 중 오류: {str(e)}")
+            return {'clients': [], 'total_count': 0, 'total_pages': 1, 'current_page': 1, 'per_page': per_page}
+
+    @staticmethod
     def update(client_id, name, ceo=None, business_no=None, category=None, phone=None,
                fax=None, contact_person=None, email=None, sales_rep=None, toll_free=None,
                zip_code=None, address=None, notes=None, sales_business=None,
