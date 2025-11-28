@@ -475,19 +475,19 @@ FAX: (070) 7410-1430""")
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
 
-        # 테이블에 데이터 추가
+        # 테이블에 데이터 추가 (수직 가운데 정렬)
         no_item = QTableWidgetItem("1.")
-        no_item.setTextAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        no_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.items_table.setItem(0, 0, no_item)
 
         # 식품유형 열에 상세 정보 포함
         food_type_item = QTableWidgetItem(food_type_text)
-        food_type_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
+        food_type_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.items_table.setItem(0, 1, food_type_item)
 
-        # 검사 항목 열에 검사항목만 표시 (위에 배치)
+        # 검사 항목 열에 검사항목만 표시
         test_items_item = QTableWidgetItem(test_items_text)
-        test_items_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
+        test_items_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.items_table.setItem(0, 2, test_items_item)
 
         # 행 높이 동적 조정
@@ -497,14 +497,14 @@ FAX: (070) 7410-1430""")
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 금액 계산
+        # 금액 계산 (수직 가운데 정렬)
         total_price = self.calculate_total_price(schedule)
         price_item = QTableWidgetItem(f"{total_price:,}")
-        price_item.setTextAlignment(Qt.AlignTop | Qt.AlignRight)
+        price_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.items_table.setItem(0, 3, price_item)
 
         subtotal_item = QTableWidgetItem(f"{total_price:,} 원")
-        subtotal_item.setTextAlignment(Qt.AlignTop | Qt.AlignRight)
+        subtotal_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.items_table.setItem(0, 4, subtotal_item)
 
     def calculate_total_price(self, schedule):
