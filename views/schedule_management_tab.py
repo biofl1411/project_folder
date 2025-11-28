@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QFileDialog, QGridLayout, QSpinBox, QSplitter,
                              QScrollArea, QTabWidget, QListWidget, QListWidgetItem,
                              QDialogButtonBox, QCalendarWidget)
-from PyQt5.QtCore import Qt, QDate, QDateTime
+from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QBrush
 import pandas as pd
 from datetime import datetime
@@ -445,6 +445,9 @@ class ScheduleSelectDialog(QDialog):
 class ScheduleManagementTab(QWidget):
     """스케줄 관리 탭"""
 
+    # 견적서 보기 요청 시그널
+    show_estimate_requested = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_schedule = None
@@ -501,6 +504,12 @@ class ScheduleManagementTab(QWidget):
         layout.addWidget(self.selected_schedule_label)
 
         layout.addStretch()
+
+        # 견적서 보기 버튼
+        estimate_btn = QPushButton("견적서 보기")
+        estimate_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 8px 15px; font-weight: bold;")
+        estimate_btn.clicked.connect(self.show_estimate)
+        layout.addWidget(estimate_btn)
 
         # 표시 설정 버튼
         settings_btn = QPushButton("표시 설정")
@@ -1325,6 +1334,32 @@ class ScheduleManagementTab(QWidget):
         # 5. 최종비용 (부가세 포함) - 10% 부가세
         final_cost_with_vat = int(final_cost_no_vat * 1.1)
         self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
+
+    def show_estimate(self):
+        """견적서 보기 버튼 클릭 시 처리"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "먼저 스케줄을 선택해주세요.")
+            return
+
+        # 스케줄 데이터에 추가 정보 포함
+        schedule_data = dict(self.current_schedule)
+
+        # 식품유형 이름 추가
+        if self.current_schedule.get('food_type_id'):
+            food_type = ProductType.get_by_id(self.current_schedule['food_type_id'])
+            if food_type:
+                schedule_data['food_type_name'] = food_type['type_name']
+                schedule_data['test_items'] = food_type.get('test_items', '')
+
+        # 업체명 추가
+        if self.current_schedule.get('client_id'):
+            from models.clients import Client
+            client = Client.get_by_id(self.current_schedule['client_id'])
+            if client:
+                schedule_data['client_name'] = client['name']
+
+        # 시그널 발생
+        self.show_estimate_requested.emit(schedule_data)
 
     def open_display_settings(self):
         """표시 설정 다이얼로그 열기"""
