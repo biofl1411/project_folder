@@ -6,28 +6,28 @@ class Client:
     # 모든 필드 정의
     FIELDS = [
         'id', 'name', 'ceo', 'business_no', 'category', 'phone', 'fax',
-        'contact_person', 'email', 'sales_rep', 'toll_free', 'zip_code',
-        'address', 'notes', 'sales_business', 'sales_phone', 'sales_mobile',
-        'sales_address', 'mobile', 'created_at'
+        'contact_person', 'email', 'sales_rep', 'zip_code',
+        'address', 'notes', 'eng_company_name', 'eng_ceo', 'eng_zip_code',
+        'eng_address', 'mobile', 'created_at'
     ]
 
     @staticmethod
     def create(name, ceo=None, business_no=None, category=None, phone=None, fax=None,
-               contact_person=None, email=None, sales_rep=None, toll_free=None,
-               zip_code=None, address=None, notes=None, sales_business=None,
-               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None):
+               contact_person=None, email=None, sales_rep=None,
+               zip_code=None, address=None, notes=None, eng_company_name=None,
+               eng_ceo=None, eng_zip_code=None, eng_address=None, mobile=None):
         """새 업체 생성"""
         try:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO clients (name, ceo, business_no, category, phone, fax,
-                    contact_person, email, sales_rep, toll_free, zip_code, address,
-                    notes, sales_business, sales_phone, sales_mobile, sales_address, mobile)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    contact_person, email, sales_rep, zip_code, address,
+                    notes, eng_company_name, eng_ceo, eng_zip_code, eng_address, mobile)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
-                  sales_rep, toll_free, zip_code, address, notes, sales_business,
-                  sales_phone, sales_mobile, sales_address, mobile))
+                  sales_rep, zip_code, address, notes, eng_company_name,
+                  eng_ceo, eng_zip_code, eng_address, mobile))
             client_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -44,9 +44,9 @@ class Client:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
-                    contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
-                    sales_address, mobile, created_at
+                    contact_person, email, sales_rep, zip_code,
+                    address, notes, eng_company_name, eng_ceo, eng_zip_code,
+                    eng_address, mobile, created_at
                 FROM clients
                 WHERE id = ?
             """, (client_id,))
@@ -68,9 +68,9 @@ class Client:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
-                    contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
-                    sales_address, mobile, created_at
+                    contact_person, email, sales_rep, zip_code,
+                    address, notes, eng_company_name, eng_ceo, eng_zip_code,
+                    eng_address, mobile, created_at
                 FROM clients
                 ORDER BY name
             """)
@@ -84,9 +84,9 @@ class Client:
 
     @staticmethod
     def update(client_id, name, ceo=None, business_no=None, category=None, phone=None,
-               fax=None, contact_person=None, email=None, sales_rep=None, toll_free=None,
-               zip_code=None, address=None, notes=None, sales_business=None,
-               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None):
+               fax=None, contact_person=None, email=None, sales_rep=None,
+               zip_code=None, address=None, notes=None, eng_company_name=None,
+               eng_ceo=None, eng_zip_code=None, eng_address=None, mobile=None):
         """업체 정보 업데이트"""
         try:
             conn = get_connection()
@@ -94,13 +94,13 @@ class Client:
             cursor.execute("""
                 UPDATE clients
                 SET name = ?, ceo = ?, business_no = ?, category = ?, phone = ?,
-                    fax = ?, contact_person = ?, email = ?, sales_rep = ?, toll_free = ?,
-                    zip_code = ?, address = ?, notes = ?, sales_business = ?,
-                    sales_phone = ?, sales_mobile = ?, sales_address = ?, mobile = ?
+                    fax = ?, contact_person = ?, email = ?, sales_rep = ?,
+                    zip_code = ?, address = ?, notes = ?, eng_company_name = ?,
+                    eng_ceo = ?, eng_zip_code = ?, eng_address = ?, mobile = ?
                 WHERE id = ?
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
-                  sales_rep, toll_free, zip_code, address, notes, sales_business,
-                  sales_phone, sales_mobile, sales_address, mobile, client_id))
+                  sales_rep, zip_code, address, notes, eng_company_name,
+                  eng_ceo, eng_zip_code, eng_address, mobile, client_id))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
@@ -132,9 +132,9 @@ class Client:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
-                    contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
-                    sales_address, mobile, created_at
+                    contact_person, email, sales_rep, zip_code,
+                    address, notes, eng_company_name, eng_ceo, eng_zip_code,
+                    eng_address, mobile, created_at
                 FROM clients
                 WHERE name LIKE ? OR contact_person LIKE ? OR ceo LIKE ? OR business_no LIKE ?
                 ORDER BY name

@@ -228,18 +228,14 @@ class ClientDialog(QDialog):
         self.sales_rep_input = QLineEdit()
         basic_layout.addWidget(self.sales_rep_input, 4, 1)
 
-        basic_layout.addWidget(QLabel("무료번호:"), 4, 2)
-        self.toll_free_input = QLineEdit()
-        basic_layout.addWidget(self.toll_free_input, 4, 3)
+        basic_layout.addWidget(QLabel("담당자 핸드폰:"), 4, 2)
+        self.mobile_input = QLineEdit()
+        basic_layout.addWidget(self.mobile_input, 4, 3)
 
         # Row 5
         basic_layout.addWidget(QLabel("우편번호:"), 5, 0)
         self.zip_code_input = QLineEdit()
         basic_layout.addWidget(self.zip_code_input, 5, 1)
-
-        basic_layout.addWidget(QLabel("담당자 핸드폰:"), 5, 2)
-        self.mobile_input = QLineEdit()
-        basic_layout.addWidget(self.mobile_input, 5, 3)
 
         # Row 6
         basic_layout.addWidget(QLabel("소재지:"), 6, 0)
@@ -253,27 +249,27 @@ class ClientDialog(QDialog):
 
         scroll_layout.addWidget(basic_group)
 
-        # 영업 정보 그룹
-        sales_group = QGroupBox("영업 정보")
-        sales_layout = QGridLayout(sales_group)
+        # 영문 정보 그룹 (영업→영문으로 변경)
+        eng_group = QGroupBox("영문 정보")
+        eng_layout = QGridLayout(eng_group)
 
-        sales_layout.addWidget(QLabel("(영업)업무:"), 0, 0)
-        self.sales_business_input = QLineEdit()
-        sales_layout.addWidget(self.sales_business_input, 0, 1)
+        eng_layout.addWidget(QLabel("영문(업체명):"), 0, 0)
+        self.eng_company_name_input = QLineEdit()
+        eng_layout.addWidget(self.eng_company_name_input, 0, 1)
 
-        sales_layout.addWidget(QLabel("(영업)대표번호:"), 0, 2)
-        self.sales_phone_input = QLineEdit()
-        sales_layout.addWidget(self.sales_phone_input, 0, 3)
+        eng_layout.addWidget(QLabel("영문(대표자):"), 0, 2)
+        self.eng_ceo_input = QLineEdit()
+        eng_layout.addWidget(self.eng_ceo_input, 0, 3)
 
-        sales_layout.addWidget(QLabel("(영업)핸드폰:"), 1, 0)
-        self.sales_mobile_input = QLineEdit()
-        sales_layout.addWidget(self.sales_mobile_input, 1, 1)
+        eng_layout.addWidget(QLabel("영문(우편번호):"), 1, 0)
+        self.eng_zip_code_input = QLineEdit()
+        eng_layout.addWidget(self.eng_zip_code_input, 1, 1)
 
-        sales_layout.addWidget(QLabel("(영업)업체주소:"), 1, 2)
-        self.sales_address_input = QLineEdit()
-        sales_layout.addWidget(self.sales_address_input, 1, 3)
+        eng_layout.addWidget(QLabel("영문(업체주소):"), 1, 2)
+        self.eng_address_input = QLineEdit()
+        eng_layout.addWidget(self.eng_address_input, 1, 3)
 
-        scroll_layout.addWidget(sales_group)
+        scroll_layout.addWidget(eng_group)
         scroll_layout.addStretch()
 
         scroll.setWidget(scroll_widget)
@@ -324,15 +320,14 @@ class ClientDialog(QDialog):
         self.contact_person_input.setText(self.client_data.get('contact_person', '') or '')
         self.email_input.setText(self.client_data.get('email', '') or '')
         self.sales_rep_input.setText(self.client_data.get('sales_rep', '') or '')
-        self.toll_free_input.setText(self.client_data.get('toll_free', '') or '')
         self.zip_code_input.setText(self.client_data.get('zip_code', '') or '')
         self.mobile_input.setText(self.client_data.get('mobile', '') or '')
         self.address_input.setText(self.client_data.get('address', '') or '')
         self.notes_input.setText(self.client_data.get('notes', '') or '')
-        self.sales_business_input.setText(self.client_data.get('sales_business', '') or '')
-        self.sales_phone_input.setText(self.client_data.get('sales_phone', '') or '')
-        self.sales_mobile_input.setText(self.client_data.get('sales_mobile', '') or '')
-        self.sales_address_input.setText(self.client_data.get('sales_address', '') or '')
+        self.eng_company_name_input.setText(self.client_data.get('eng_company_name', '') or '')
+        self.eng_ceo_input.setText(self.client_data.get('eng_ceo', '') or '')
+        self.eng_zip_code_input.setText(self.client_data.get('eng_zip_code', '') or '')
+        self.eng_address_input.setText(self.client_data.get('eng_address', '') or '')
 
     def saveClient(self):
         """업체 정보 저장"""
@@ -352,14 +347,13 @@ class ClientDialog(QDialog):
             'contact_person': self.contact_person_input.text().strip(),
             'email': self.email_input.text().strip(),
             'sales_rep': self.sales_rep_input.text().strip(),
-            'toll_free': self.toll_free_input.text().strip(),
             'zip_code': self.zip_code_input.text().strip(),
             'address': self.address_input.text().strip(),
             'notes': self.notes_input.text().strip(),
-            'sales_business': self.sales_business_input.text().strip(),
-            'sales_phone': self.sales_phone_input.text().strip(),
-            'sales_mobile': self.sales_mobile_input.text().strip(),
-            'sales_address': self.sales_address_input.text().strip(),
+            'eng_company_name': self.eng_company_name_input.text().strip(),
+            'eng_ceo': self.eng_ceo_input.text().strip(),
+            'eng_zip_code': self.eng_zip_code_input.text().strip(),
+            'eng_address': self.eng_address_input.text().strip(),
             'mobile': self.mobile_input.text().strip()
         }
 
@@ -376,14 +370,13 @@ class ClientDialog(QDialog):
                     client_data['contact_person'],
                     client_data['email'],
                     client_data['sales_rep'],
-                    client_data['toll_free'],
                     client_data['zip_code'],
                     client_data['address'],
                     client_data['notes'],
-                    client_data['sales_business'],
-                    client_data['sales_phone'],
-                    client_data['sales_mobile'],
-                    client_data['sales_address'],
+                    client_data['eng_company_name'],
+                    client_data['eng_ceo'],
+                    client_data['eng_zip_code'],
+                    client_data['eng_address'],
                     client_data['mobile']
                 )
                 if success:
@@ -402,14 +395,13 @@ class ClientDialog(QDialog):
                     client_data['contact_person'],
                     client_data['email'],
                     client_data['sales_rep'],
-                    client_data['toll_free'],
                     client_data['zip_code'],
                     client_data['address'],
                     client_data['notes'],
-                    client_data['sales_business'],
-                    client_data['sales_phone'],
-                    client_data['sales_mobile'],
-                    client_data['sales_address'],
+                    client_data['eng_company_name'],
+                    client_data['eng_ceo'],
+                    client_data['eng_zip_code'],
+                    client_data['eng_address'],
                     client_data['mobile']
                 )
                 if self.client_id:

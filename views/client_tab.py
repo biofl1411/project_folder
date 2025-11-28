@@ -9,17 +9,85 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                           QFrame, QMessageBox, QDialog, QFormLayout, QLineEdit,
                           QFileDialog, QProgressDialog, QGridLayout, QScrollArea,
-                          QGroupBox, QComboBox)
-from PyQt5.QtCore import Qt, QCoreApplication
+                          QGroupBox, QComboBox, QCheckBox)
+from PyQt5.QtCore import Qt, QCoreApplication, QSettings
 import pandas as pd
 import os
 
 from models.clients import Client
 
+class DisplaySettingsDialog(QDialog):
+    """표시 설정 다이얼로그"""
+    def __init__(self, parent=None, columns=None, visible_columns=None):
+        super().__init__(parent)
+        self.setWindowTitle("표시 설정")
+        self.setMinimumWidth(300)
+        self.columns = columns or []
+        self.visible_columns = visible_columns or []
+        self.checkboxes = {}
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        # 설명 라벨
+        layout.addWidget(QLabel("표시할 필드를 선택하세요:"))
+
+        # 전체 선택/해제 버튼
+        all_btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(self.select_all)
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(self.deselect_all)
+        all_btn_layout.addWidget(select_all_btn)
+        all_btn_layout.addWidget(deselect_all_btn)
+        layout.addLayout(all_btn_layout)
+
+        # 컬럼 체크박스들
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        for col_name, field in self.columns:
+            checkbox = QCheckBox(col_name)
+            checkbox.setChecked(field in self.visible_columns)
+            self.checkboxes[field] = checkbox
+            scroll_layout.addWidget(checkbox)
+
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        # 버튼 영역
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("확인")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("취소")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def select_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(True)
+
+    def deselect_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(False)
+
+    def get_visible_columns(self):
+        return [field for field, checkbox in self.checkboxes.items() if checkbox.isChecked()]
+
+
 class ClientTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.settings = QSettings("MyApp", "ClientTab")
         self.initUI()
+        self.load_visible_columns()
         self.load_clients()
 
     def initUI(self):
@@ -33,6 +101,10 @@ class ClientTab(QWidget):
 
         button_layout = QHBoxLayout(button_frame)
 
+        # 전체 선택 체크박스
+        self.select_all_checkbox = QCheckBox("전체 선택")
+        self.select_all_checkbox.clicked.connect(self.select_all_rows)
+
         new_client_btn = QPushButton("신규 업체 등록")
         new_client_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
         new_client_btn.clicked.connect(self.create_new_client)
@@ -41,9 +113,13 @@ class ClientTab(QWidget):
         edit_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
         edit_btn.clicked.connect(self.edit_client)
 
-        delete_btn = QPushButton("삭제")
+        delete_btn = QPushButton("선택 삭제")
         delete_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
         delete_btn.clicked.connect(self.delete_client)
+
+        display_settings_btn = QPushButton("표시설정")
+        display_settings_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogListView))
+        display_settings_btn.clicked.connect(self.show_display_settings)
 
         import_btn = QPushButton("엑셀 가져오기")
         import_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogStart))
@@ -53,9 +129,11 @@ class ClientTab(QWidget):
         export_btn.setIcon(self.style().standardIcon(self.style().SP_DialogSaveButton))
         export_btn.clicked.connect(self.export_to_excel)
 
+        button_layout.addWidget(self.select_all_checkbox)
         button_layout.addWidget(new_client_btn)
         button_layout.addWidget(edit_btn)
         button_layout.addWidget(delete_btn)
+        button_layout.addWidget(display_settings_btn)
         button_layout.addWidget(import_btn)
         button_layout.addWidget(export_btn)
         button_layout.addStretch()
@@ -65,8 +143,9 @@ class ClientTab(QWidget):
         # 2. 업체 목록 테이블
         self.client_table = QTableWidget()
 
-        # 컬럼 정의 (요청하신 순서대로)
-        self.columns = [
+        # 컬럼 정의 (무료번호 삭제, 영업→영문 변경)
+        self.all_columns = [
+            ("선택", "select"),  # 체크박스 컬럼
             ("고객/회사명", "name"),
             ("대표자", "ceo"),
             ("사업자번호", "business_no"),
@@ -76,15 +155,37 @@ class ClientTab(QWidget):
             ("담당자", "contact_person"),
             ("EMAIL", "email"),
             ("영업담당", "sales_rep"),
-            ("무료번호", "toll_free"),
             ("우편번호", "zip_code"),
             ("소재지", "address"),
             ("메모", "notes"),
-            ("(영업)업무", "sales_business"),
-            ("(영업)대표번호", "sales_phone"),
-            ("(영업)핸드폰", "sales_mobile"),
-            ("(영업)업체주소", "sales_address"),
+            ("영문(업체명)", "eng_company_name"),
+            ("영문(대표자)", "eng_ceo"),
+            ("영문(우편번호)", "eng_zip_code"),
+            ("영문(업체주소)", "eng_address"),
+            ("핸드폰", "mobile"),
         ]
+
+        # 기본 표시 컬럼 (처음에는 모두 표시)
+        self.visible_columns = [col[1] for col in self.all_columns]
+
+        self.setup_table()
+
+    def load_visible_columns(self):
+        """저장된 표시 설정 불러오기"""
+        saved = self.settings.value("visible_columns", None)
+        if saved:
+            self.visible_columns = saved
+        else:
+            self.visible_columns = [col[1] for col in self.all_columns]
+
+    def save_visible_columns(self):
+        """표시 설정 저장"""
+        self.settings.setValue("visible_columns", self.visible_columns)
+
+    def setup_table(self):
+        """테이블 설정"""
+        # 표시할 컬럼만 필터링
+        self.columns = [(name, field) for name, field in self.all_columns if field in self.visible_columns]
 
         self.client_table.setColumnCount(len(self.columns))
         self.client_table.setHorizontalHeaderLabels([col[0] for col in self.columns])
@@ -94,26 +195,71 @@ class ClientTab(QWidget):
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
 
-        # 기본 열 너비 설정
-        self.client_table.setColumnWidth(0, 150)  # 고객/회사명
-        self.client_table.setColumnWidth(1, 80)   # 대표자
-        self.client_table.setColumnWidth(2, 120)  # 사업자번호
-        self.client_table.setColumnWidth(3, 80)   # 분류
-        self.client_table.setColumnWidth(4, 120)  # 전화번호
-        self.client_table.setColumnWidth(5, 120)  # 팩스번호
-        self.client_table.setColumnWidth(6, 80)   # 담당자
-        self.client_table.setColumnWidth(7, 150)  # EMAIL
-        self.client_table.setColumnWidth(8, 80)   # 영업담당
-        self.client_table.setColumnWidth(9, 100)  # 무료번호
-        self.client_table.setColumnWidth(10, 80)  # 우편번호
-        self.client_table.setColumnWidth(11, 200) # 소재지
-        self.client_table.setColumnWidth(12, 150) # 메모
+        # 선택 컬럼이 있으면 고정 너비
+        for i, (name, field) in enumerate(self.columns):
+            if field == "select":
+                header.setSectionResizeMode(i, QHeaderView.Fixed)
+                self.client_table.setColumnWidth(i, 50)
+            elif field == "name":
+                self.client_table.setColumnWidth(i, 150)
+            elif field in ["ceo", "contact_person", "sales_rep", "category"]:
+                self.client_table.setColumnWidth(i, 80)
+            elif field in ["business_no", "phone", "fax"]:
+                self.client_table.setColumnWidth(i, 120)
+            elif field == "email":
+                self.client_table.setColumnWidth(i, 150)
+            elif field in ["address", "eng_address"]:
+                self.client_table.setColumnWidth(i, 200)
+            elif field in ["zip_code", "eng_zip_code"]:
+                self.client_table.setColumnWidth(i, 80)
 
         self.client_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.client_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.client_table.doubleClicked.connect(self.edit_client)
 
-        layout.addWidget(self.client_table)
+        # 기존 레이아웃에 테이블이 없으면 추가
+        if self.client_table.parent() is None:
+            self.layout().addWidget(self.client_table)
+
+    def select_all_rows(self, checked):
+        """모든 행 선택/해제"""
+        try:
+            if self.client_table.rowCount() == 0:
+                return
+
+            # 선택 컬럼 인덱스 찾기
+            select_col = -1
+            for i, (name, field) in enumerate(self.columns):
+                if field == "select":
+                    select_col = i
+                    break
+
+            if select_col == -1:
+                return
+
+            for row in range(self.client_table.rowCount()):
+                checkbox_widget = self.client_table.cellWidget(row, select_col)
+                if checkbox_widget:
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox:
+                        checkbox.setChecked(checked)
+        except Exception as e:
+            print(f"전체 선택 중 오류 발생: {str(e)}")
+
+    def show_display_settings(self):
+        """표시 설정 다이얼로그 표시"""
+        # 선택 컬럼 제외한 컬럼 목록
+        display_columns = [(name, field) for name, field in self.all_columns if field != "select"]
+        visible_without_select = [f for f in self.visible_columns if f != "select"]
+
+        dialog = DisplaySettingsDialog(self, display_columns, visible_without_select)
+        if dialog.exec_():
+            new_visible = dialog.get_visible_columns()
+            # 선택 컬럼은 항상 포함
+            self.visible_columns = ["select"] + new_visible
+            self.save_visible_columns()
+            self.setup_table()
+            self.load_clients()
 
     def load_clients(self):
         """업체 목록 로드"""
@@ -121,11 +267,28 @@ class ClientTab(QWidget):
 
         self.client_table.setRowCount(len(clients) if clients else 0)
 
+        # 선택 컬럼 인덱스 찾기
+        select_col = -1
+        for i, (name, field) in enumerate(self.columns):
+            if field == "select":
+                select_col = i
+                break
+
         if clients:
             for row, client in enumerate(clients):
                 for col, (header, field) in enumerate(self.columns):
-                    value = client.get(field, '') or ''
-                    self.client_table.setItem(row, col, QTableWidgetItem(str(value)))
+                    if field == "select":
+                        # 체크박스 추가
+                        checkbox = QCheckBox()
+                        checkbox_widget = QWidget()
+                        checkbox_layout = QHBoxLayout(checkbox_widget)
+                        checkbox_layout.addWidget(checkbox)
+                        checkbox_layout.setAlignment(Qt.AlignCenter)
+                        checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                        self.client_table.setCellWidget(row, col, checkbox_widget)
+                    else:
+                        value = client.get(field, '') or ''
+                        self.client_table.setItem(row, col, QTableWidgetItem(str(value)))
 
     def create_new_client(self):
         """신규 업체 등록"""
@@ -135,13 +298,46 @@ class ClientTab(QWidget):
 
     def edit_client(self):
         """업체 정보 수정"""
-        selected_rows = self.client_table.selectedItems()
-        if not selected_rows:
+        # 체크박스가 선택된 행 찾기
+        selected_row = -1
+        select_col = -1
+
+        for i, (name, field) in enumerate(self.columns):
+            if field == "select":
+                select_col = i
+                break
+
+        if select_col != -1:
+            for row in range(self.client_table.rowCount()):
+                checkbox_widget = self.client_table.cellWidget(row, select_col)
+                if checkbox_widget:
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox and checkbox.isChecked():
+                        selected_row = row
+                        break
+
+        # 체크박스로 선택된 행이 없으면 테이블 선택 확인
+        if selected_row == -1:
+            selected_items = self.client_table.selectedItems()
+            if selected_items:
+                selected_row = selected_items[0].row()
+
+        if selected_row == -1:
             QMessageBox.warning(self, "선택 오류", "수정할 업체를 선택하세요.")
             return
 
-        row = selected_rows[0].row()
-        client_name = self.client_table.item(row, 0).text()
+        # 이름 컬럼 인덱스 찾기
+        name_col = -1
+        for i, (name, field) in enumerate(self.columns):
+            if field == "name":
+                name_col = i
+                break
+
+        if name_col == -1:
+            QMessageBox.warning(self, "오류", "업체명 컬럼을 찾을 수 없습니다.")
+            return
+
+        client_name = self.client_table.item(selected_row, name_col).text()
 
         clients = Client.search(client_name)
         if not clients:
@@ -155,35 +351,61 @@ class ClientTab(QWidget):
             self.load_clients()
 
     def delete_client(self):
-        """업체 삭제"""
-        selected_rows = self.client_table.selectedItems()
+        """선택된 업체들 삭제"""
+        # 선택 컬럼 인덱스 찾기
+        select_col = -1
+        name_col = -1
+        for i, (name, field) in enumerate(self.columns):
+            if field == "select":
+                select_col = i
+            if field == "name":
+                name_col = i
+
+        if select_col == -1 or name_col == -1:
+            QMessageBox.warning(self, "오류", "테이블 구성 오류입니다.")
+            return
+
+        # 체크박스가 선택된 모든 행 찾기
+        selected_rows = []
+        for row in range(self.client_table.rowCount()):
+            checkbox_widget = self.client_table.cellWidget(row, select_col)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    selected_rows.append(row)
+
         if not selected_rows:
             QMessageBox.warning(self, "선택 오류", "삭제할 업체를 선택하세요.")
             return
 
-        row = selected_rows[0].row()
-        client_name = self.client_table.item(row, 0).text()
-
+        # 확인 메시지 표시
+        count = len(selected_rows)
         reply = QMessageBox.question(
             self, "업체 삭제",
-            f"'{client_name}' 업체를 정말 삭제하시겠습니까?",
+            f"선택한 {count}개의 업체를 정말 삭제하시겠습니까?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
 
         if reply == QMessageBox.Yes:
-            clients = Client.search(client_name)
-            if not clients:
-                QMessageBox.warning(self, "데이터 오류", "선택한 업체 정보를 찾을 수 없습니다.")
-                return
+            deleted_count = 0
+            # 선택된 행의 역순으로 삭제 (인덱스 변화 방지)
+            for row in sorted(selected_rows, reverse=True):
+                client_name = self.client_table.item(row, name_col).text()
 
-            client = clients[0]
+                clients = Client.search(client_name)
+                if clients and Client.delete(clients[0]['id']):
+                    deleted_count += 1
 
-            if Client.delete(client['id']):
-                self.load_clients()
-                QMessageBox.information(self, "삭제 완료", f"'{client_name}' 업체가 삭제되었습니다.")
+            self.load_clients()
+
+            if deleted_count > 0:
+                QMessageBox.information(self, "삭제 완료", f"{deleted_count}개의 업체가 삭제되었습니다.")
             else:
                 QMessageBox.warning(self, "삭제 실패", "업체 삭제 중 오류가 발생했습니다.")
+
+        # 전체 선택 체크박스 해제
+        self.select_all_checkbox.setChecked(False)
 
     def import_from_excel(self):
         """엑셀 파일에서 업체 정보 가져오기"""
@@ -208,14 +430,14 @@ class ClientTab(QWidget):
                 "담당자": "contact_person",
                 "EMAIL": "email", "이메일": "email",
                 "영업담당": "sales_rep", "영업담당자": "sales_rep",
-                "무료번호": "toll_free",
                 "우편번호": "zip_code",
                 "소재지": "address", "업체주소": "address", "주소": "address",
                 "메모": "notes",
-                "(영업)업무": "sales_business", "영업업무": "sales_business",
-                "(영업)대표번호": "sales_phone", "영업대표번호": "sales_phone",
-                "(영업)핸드폰": "sales_mobile", "영업핸드폰": "sales_mobile", "핸드폰": "mobile",
-                "(영업)업체주소": "sales_address", "영업업체주소": "sales_address",
+                "영문(업체명)": "eng_company_name", "영문업체명": "eng_company_name",
+                "영문(대표자)": "eng_ceo", "영문대표자": "eng_ceo",
+                "영문(우편번호)": "eng_zip_code", "영문우편번호": "eng_zip_code",
+                "영문(업체주소)": "eng_address", "영문업체주소": "eng_address",
+                "핸드폰": "mobile",
             }
 
             # 필수 열 확인
@@ -272,14 +494,13 @@ class ClientTab(QWidget):
                         client_data.get("contact_person"),
                         client_data.get("email"),
                         client_data.get("sales_rep"),
-                        client_data.get("toll_free"),
                         client_data.get("zip_code"),
                         client_data.get("address"),
                         client_data.get("notes"),
-                        client_data.get("sales_business"),
-                        client_data.get("sales_phone"),
-                        client_data.get("sales_mobile"),
-                        client_data.get("sales_address"),
+                        client_data.get("eng_company_name"),
+                        client_data.get("eng_ceo"),
+                        client_data.get("eng_zip_code"),
+                        client_data.get("eng_address"),
                         client_data.get("mobile")
                     ):
                         updated_count += 1
@@ -294,14 +515,13 @@ class ClientTab(QWidget):
                         client_data.get("contact_person"),
                         client_data.get("email"),
                         client_data.get("sales_rep"),
-                        client_data.get("toll_free"),
                         client_data.get("zip_code"),
                         client_data.get("address"),
                         client_data.get("notes"),
-                        client_data.get("sales_business"),
-                        client_data.get("sales_phone"),
-                        client_data.get("sales_mobile"),
-                        client_data.get("sales_address"),
+                        client_data.get("eng_company_name"),
+                        client_data.get("eng_ceo"),
+                        client_data.get("eng_zip_code"),
+                        client_data.get("eng_address"),
                         client_data.get("mobile")
                     ):
                         imported_count += 1
@@ -339,10 +559,13 @@ class ClientTab(QWidget):
                 QMessageBox.warning(self, "데이터 없음", "내보낼 업체 정보가 없습니다.")
                 return
 
+            # 선택 컬럼 제외하고 내보내기
+            export_columns = [(name, field) for name, field in self.columns if field != "select"]
+
             data = []
             for client in clients:
                 row_data = {}
-                for header, field in self.columns:
+                for header, field in export_columns:
                     row_data[header] = client.get(field, '') or ''
                 data.append(row_data)
 
@@ -436,9 +659,9 @@ class ClientDialog(QDialog):
         self.sales_rep_input = QLineEdit()
         basic_layout.addWidget(self.sales_rep_input, 4, 1)
 
-        basic_layout.addWidget(QLabel("무료번호:"), 4, 2)
-        self.toll_free_input = QLineEdit()
-        basic_layout.addWidget(self.toll_free_input, 4, 3)
+        basic_layout.addWidget(QLabel("핸드폰:"), 4, 2)
+        self.mobile_input = QLineEdit()
+        basic_layout.addWidget(self.mobile_input, 4, 3)
 
         # Row 5
         basic_layout.addWidget(QLabel("우편번호:"), 5, 0)
@@ -457,27 +680,27 @@ class ClientDialog(QDialog):
 
         scroll_layout.addWidget(basic_group)
 
-        # 영업 정보 그룹
-        sales_group = QGroupBox("영업 정보")
-        sales_layout = QGridLayout(sales_group)
+        # 영문 정보 그룹 (영업→영문으로 변경)
+        eng_group = QGroupBox("영문 정보")
+        eng_layout = QGridLayout(eng_group)
 
-        sales_layout.addWidget(QLabel("(영업)업무:"), 0, 0)
-        self.sales_business_input = QLineEdit()
-        sales_layout.addWidget(self.sales_business_input, 0, 1)
+        eng_layout.addWidget(QLabel("영문(업체명):"), 0, 0)
+        self.eng_company_name_input = QLineEdit()
+        eng_layout.addWidget(self.eng_company_name_input, 0, 1)
 
-        sales_layout.addWidget(QLabel("(영업)대표번호:"), 0, 2)
-        self.sales_phone_input = QLineEdit()
-        sales_layout.addWidget(self.sales_phone_input, 0, 3)
+        eng_layout.addWidget(QLabel("영문(대표자):"), 0, 2)
+        self.eng_ceo_input = QLineEdit()
+        eng_layout.addWidget(self.eng_ceo_input, 0, 3)
 
-        sales_layout.addWidget(QLabel("(영업)핸드폰:"), 1, 0)
-        self.sales_mobile_input = QLineEdit()
-        sales_layout.addWidget(self.sales_mobile_input, 1, 1)
+        eng_layout.addWidget(QLabel("영문(우편번호):"), 1, 0)
+        self.eng_zip_code_input = QLineEdit()
+        eng_layout.addWidget(self.eng_zip_code_input, 1, 1)
 
-        sales_layout.addWidget(QLabel("(영업)업체주소:"), 1, 2)
-        self.sales_address_input = QLineEdit()
-        sales_layout.addWidget(self.sales_address_input, 1, 3)
+        eng_layout.addWidget(QLabel("영문(업체주소):"), 1, 2)
+        self.eng_address_input = QLineEdit()
+        eng_layout.addWidget(self.eng_address_input, 1, 3)
 
-        scroll_layout.addWidget(sales_group)
+        scroll_layout.addWidget(eng_group)
         scroll_layout.addStretch()
 
         scroll.setWidget(scroll_widget)
@@ -513,14 +736,14 @@ class ClientDialog(QDialog):
         self.contact_input.setText(client.get('contact_person', '') or '')
         self.email_input.setText(client.get('email', '') or '')
         self.sales_rep_input.setText(client.get('sales_rep', '') or '')
-        self.toll_free_input.setText(client.get('toll_free', '') or '')
+        self.mobile_input.setText(client.get('mobile', '') or '')
         self.zip_code_input.setText(client.get('zip_code', '') or '')
         self.address_input.setText(client.get('address', '') or '')
         self.notes_input.setText(client.get('notes', '') or '')
-        self.sales_business_input.setText(client.get('sales_business', '') or '')
-        self.sales_phone_input.setText(client.get('sales_phone', '') or '')
-        self.sales_mobile_input.setText(client.get('sales_mobile', '') or '')
-        self.sales_address_input.setText(client.get('sales_address', '') or '')
+        self.eng_company_name_input.setText(client.get('eng_company_name', '') or '')
+        self.eng_ceo_input.setText(client.get('eng_ceo', '') or '')
+        self.eng_zip_code_input.setText(client.get('eng_zip_code', '') or '')
+        self.eng_address_input.setText(client.get('eng_address', '') or '')
 
     def save_client(self):
         """업체 정보 저장"""
@@ -538,20 +761,20 @@ class ClientDialog(QDialog):
         contact_person = self.contact_input.text().strip()
         email = self.email_input.text().strip()
         sales_rep = self.sales_rep_input.text().strip()
-        toll_free = self.toll_free_input.text().strip()
+        mobile = self.mobile_input.text().strip()
         zip_code = self.zip_code_input.text().strip()
         address = self.address_input.text().strip()
         notes = self.notes_input.text().strip()
-        sales_business = self.sales_business_input.text().strip()
-        sales_phone = self.sales_phone_input.text().strip()
-        sales_mobile = self.sales_mobile_input.text().strip()
-        sales_address = self.sales_address_input.text().strip()
+        eng_company_name = self.eng_company_name_input.text().strip()
+        eng_ceo = self.eng_ceo_input.text().strip()
+        eng_zip_code = self.eng_zip_code_input.text().strip()
+        eng_address = self.eng_address_input.text().strip()
 
         if self.client:  # 기존 업체 수정
             if Client.update(
                 self.client['id'], name, ceo, business_no, category, phone, fax,
-                contact_person, email, sales_rep, toll_free, zip_code, address,
-                notes, sales_business, sales_phone, sales_mobile, sales_address
+                contact_person, email, sales_rep, zip_code, address,
+                notes, eng_company_name, eng_ceo, eng_zip_code, eng_address, mobile
             ):
                 QMessageBox.information(self, "저장 완료", "업체 정보가 수정되었습니다.")
                 self.accept()
@@ -560,8 +783,8 @@ class ClientDialog(QDialog):
         else:  # 신규 업체 등록
             client_id = Client.create(
                 name, ceo, business_no, category, phone, fax,
-                contact_person, email, sales_rep, toll_free, zip_code, address,
-                notes, sales_business, sales_phone, sales_mobile, sales_address
+                contact_person, email, sales_rep, zip_code, address,
+                notes, eng_company_name, eng_ceo, eng_zip_code, eng_address, mobile
             )
             if client_id:
                 QMessageBox.information(self, "등록 완료", "새 업체가 등록되었습니다.")

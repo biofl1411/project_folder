@@ -68,14 +68,13 @@ def init_database():
         contact_person TEXT,
         email TEXT,
         sales_rep TEXT,
-        toll_free TEXT,
         zip_code TEXT,
         address TEXT,
         notes TEXT,
-        sales_business TEXT,
-        sales_phone TEXT,
-        sales_mobile TEXT,
-        sales_address TEXT,
+        eng_company_name TEXT,
+        eng_ceo TEXT,
+        eng_zip_code TEXT,
+        eng_address TEXT,
         mobile TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -87,12 +86,11 @@ def init_database():
         ('category', 'TEXT'),
         ('fax', 'TEXT'),
         ('email', 'TEXT'),
-        ('toll_free', 'TEXT'),
         ('zip_code', 'TEXT'),
-        ('sales_business', 'TEXT'),
-        ('sales_phone', 'TEXT'),
-        ('sales_mobile', 'TEXT'),
-        ('sales_address', 'TEXT')
+        ('eng_company_name', 'TEXT'),
+        ('eng_ceo', 'TEXT'),
+        ('eng_zip_code', 'TEXT'),
+        ('eng_address', 'TEXT')
     ]
     for col_name, col_type in new_columns:
         try:
