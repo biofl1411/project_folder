@@ -90,6 +90,7 @@ class ClientTab(QWidget):
             ("영업담당", "sales_rep"),
             ("우편번호", "zip_code"),
             ("소재지", "address"),
+            ("상세주소", "detail_address"),
             ("메모", "notes"),
             ("영문(업체명)", "sales_business"),
             ("영문(대표자)", "sales_phone"),
@@ -139,7 +140,7 @@ class ClientTab(QWidget):
         column_widths = {
             "고객/회사명": 150, "대표자": 80, "사업자번호": 120, "분류": 80,
             "전화번호": 120, "팩스번호": 120, "담당자": 80, "EMAIL": 150,
-            "영업담당": 80, "우편번호": 80, "소재지": 200, "메모": 150,
+            "영업담당": 80, "우편번호": 80, "소재지": 200, "상세주소": 200, "메모": 150,
             "영문(업체명)": 120, "영문(대표자)": 100, "영문(우편번호)": 100, "영문(업체주소)": 200,
         }
 
@@ -343,6 +344,7 @@ class ClientTab(QWidget):
                 "영업담당": "sales_rep", "영업담당자": "sales_rep",
                 "우편번호": "zip_code",
                 "소재지": "address", "업체주소": "address", "주소": "address",
+                "상세주소": "detail_address",
                 "메모": "notes",
                 "영문(업체명)": "sales_business", "(영업)업무": "sales_business", "영업업무": "sales_business",
                 "영문(대표자)": "sales_phone", "(영업)대표번호": "sales_phone", "영업대표번호": "sales_phone",
@@ -412,7 +414,8 @@ class ClientTab(QWidget):
                         client_data.get("sales_phone"),
                         client_data.get("sales_mobile"),
                         client_data.get("sales_address"),
-                        client_data.get("mobile")
+                        client_data.get("mobile"),
+                        client_data.get("detail_address")
                     ):
                         updated_count += 1
                 else:
@@ -434,7 +437,8 @@ class ClientTab(QWidget):
                         client_data.get("sales_phone"),
                         client_data.get("sales_mobile"),
                         client_data.get("sales_address"),
-                        client_data.get("mobile")
+                        client_data.get("mobile"),
+                        client_data.get("detail_address")
                     ):
                         imported_count += 1
 
@@ -581,9 +585,14 @@ class ClientDialog(QDialog):
         basic_layout.addWidget(self.address_input, 5, 1, 1, 3)
 
         # Row 6
-        basic_layout.addWidget(QLabel("메모:"), 6, 0)
+        basic_layout.addWidget(QLabel("상세주소:"), 6, 0)
+        self.detail_address_input = QLineEdit()
+        basic_layout.addWidget(self.detail_address_input, 6, 1, 1, 3)
+
+        # Row 7
+        basic_layout.addWidget(QLabel("메모:"), 7, 0)
         self.notes_input = QLineEdit()
-        basic_layout.addWidget(self.notes_input, 6, 1, 1, 3)
+        basic_layout.addWidget(self.notes_input, 7, 1, 1, 3)
 
         scroll_layout.addWidget(basic_group)
 
@@ -645,6 +654,7 @@ class ClientDialog(QDialog):
         self.sales_rep_input.setText(client.get('sales_rep', '') or '')
         self.zip_code_input.setText(client.get('zip_code', '') or '')
         self.address_input.setText(client.get('address', '') or '')
+        self.detail_address_input.setText(client.get('detail_address', '') or '')
         self.notes_input.setText(client.get('notes', '') or '')
         self.sales_business_input.setText(client.get('sales_business', '') or '')
         self.sales_phone_input.setText(client.get('sales_phone', '') or '')
@@ -669,6 +679,7 @@ class ClientDialog(QDialog):
         sales_rep = self.sales_rep_input.text().strip()
         zip_code = self.zip_code_input.text().strip()
         address = self.address_input.text().strip()
+        detail_address = self.detail_address_input.text().strip()
         notes = self.notes_input.text().strip()
         sales_business = self.sales_business_input.text().strip()
         sales_phone = self.sales_phone_input.text().strip()
@@ -679,7 +690,8 @@ class ClientDialog(QDialog):
             if Client.update(
                 self.client['id'], name, ceo, business_no, category, phone, fax,
                 contact_person, email, sales_rep, None, zip_code, address,
-                notes, sales_business, sales_phone, sales_mobile, sales_address
+                notes, sales_business, sales_phone, sales_mobile, sales_address, None,
+                detail_address
             ):
                 QMessageBox.information(self, "저장 완료", "업체 정보가 수정되었습니다.")
                 self.accept()
@@ -689,7 +701,8 @@ class ClientDialog(QDialog):
             client_id = Client.create(
                 name, ceo, business_no, category, phone, fax,
                 contact_person, email, sales_rep, None, zip_code, address,
-                notes, sales_business, sales_phone, sales_mobile, sales_address
+                notes, sales_business, sales_phone, sales_mobile, sales_address, None,
+                detail_address
             )
             if client_id:
                 QMessageBox.information(self, "등록 완료", "새 업체가 등록되었습니다.")

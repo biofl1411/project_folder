@@ -7,26 +7,43 @@ class Client:
     FIELDS = [
         'id', 'name', 'ceo', 'business_no', 'category', 'phone', 'fax',
         'contact_person', 'email', 'sales_rep', 'toll_free', 'zip_code',
-        'address', 'notes', 'sales_business', 'sales_phone', 'sales_mobile',
+        'address', 'detail_address', 'notes', 'sales_business', 'sales_phone', 'sales_mobile',
         'sales_address', 'mobile', 'created_at'
     ]
+
+    @staticmethod
+    def _ensure_detail_address_column():
+        """detail_address 컬럼이 없으면 추가"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(clients)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'detail_address' not in columns:
+                cursor.execute("ALTER TABLE clients ADD COLUMN detail_address TEXT")
+                conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"컬럼 추가 중 오류: {str(e)}")
 
     @staticmethod
     def create(name, ceo=None, business_no=None, category=None, phone=None, fax=None,
                contact_person=None, email=None, sales_rep=None, toll_free=None,
                zip_code=None, address=None, notes=None, sales_business=None,
-               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None):
+               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None,
+               detail_address=None):
         """새 업체 생성"""
         try:
+            Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO clients (name, ceo, business_no, category, phone, fax,
                     contact_person, email, sales_rep, toll_free, zip_code, address,
-                    notes, sales_business, sales_phone, sales_mobile, sales_address, mobile)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    detail_address, notes, sales_business, sales_phone, sales_mobile, sales_address, mobile)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
-                  sales_rep, toll_free, zip_code, address, notes, sales_business,
+                  sales_rep, toll_free, zip_code, address, detail_address, notes, sales_business,
                   sales_phone, sales_mobile, sales_address, mobile))
             client_id = cursor.lastrowid
             conn.commit()
@@ -40,12 +57,13 @@ class Client:
     def get_by_id(client_id):
         """ID로 업체 조회"""
         try:
+            Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
                     contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
+                    address, detail_address, notes, sales_business, sales_phone, sales_mobile,
                     sales_address, mobile, created_at
                 FROM clients
                 WHERE id = ?
@@ -64,12 +82,13 @@ class Client:
     def get_all():
         """모든 업체 조회"""
         try:
+            Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
                     contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
+                    address, detail_address, notes, sales_business, sales_phone, sales_mobile,
                     sales_address, mobile, created_at
                 FROM clients
                 ORDER BY name
@@ -86,20 +105,22 @@ class Client:
     def update(client_id, name, ceo=None, business_no=None, category=None, phone=None,
                fax=None, contact_person=None, email=None, sales_rep=None, toll_free=None,
                zip_code=None, address=None, notes=None, sales_business=None,
-               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None):
+               sales_phone=None, sales_mobile=None, sales_address=None, mobile=None,
+               detail_address=None):
         """업체 정보 업데이트"""
         try:
+            Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE clients
                 SET name = ?, ceo = ?, business_no = ?, category = ?, phone = ?,
                     fax = ?, contact_person = ?, email = ?, sales_rep = ?, toll_free = ?,
-                    zip_code = ?, address = ?, notes = ?, sales_business = ?,
+                    zip_code = ?, address = ?, detail_address = ?, notes = ?, sales_business = ?,
                     sales_phone = ?, sales_mobile = ?, sales_address = ?, mobile = ?
                 WHERE id = ?
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
-                  sales_rep, toll_free, zip_code, address, notes, sales_business,
+                  sales_rep, toll_free, zip_code, address, detail_address, notes, sales_business,
                   sales_phone, sales_mobile, sales_address, mobile, client_id))
             success = cursor.rowcount > 0
             conn.commit()
@@ -128,12 +149,13 @@ class Client:
     def search(keyword):
         """업체명, 담당자, CEO, 사업자번호로 검색"""
         try:
+            Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, name, ceo, business_no, category, phone, fax,
                     contact_person, email, sales_rep, toll_free, zip_code,
-                    address, notes, sales_business, sales_phone, sales_mobile,
+                    address, detail_address, notes, sales_business, sales_phone, sales_mobile,
                     sales_address, mobile, created_at
                 FROM clients
                 WHERE name LIKE ? OR contact_person LIKE ? OR ceo LIKE ? OR business_no LIKE ?
