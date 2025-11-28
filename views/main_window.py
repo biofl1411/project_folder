@@ -110,11 +110,12 @@ class MainWindow(QMainWindow):
         from .fee_tab import FeeTab
         fee_tab = FeeTab()
         self.tab_widget.addTab(fee_tab, "수수료 관리")
-        
+
         # 견적서 관리 탭
-        estimates_tab = QWidget()
-        self.tab_widget.addTab(estimates_tab, "견적서 관리")
-        
+        from .estimate_tab import EstimateTab
+        self.estimate_tab = EstimateTab()
+        self.tab_widget.addTab(self.estimate_tab, "견적서 관리")
+
         # 스케줄 관리 탭
         from .schedule_management_tab import ScheduleManagementTab
         self.schedule_management_tab = ScheduleManagementTab()
@@ -122,6 +123,9 @@ class MainWindow(QMainWindow):
 
         # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
         self.schedule_create_tab.schedule_double_clicked.connect(self.show_schedule_detail)
+
+        # 스케줄 관리 탭에서 견적서 보기 버튼 연결
+        self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
         
         # 사용자 관리 탭 (관리자만 접근 가능)
         users_tab = QWidget()
@@ -272,7 +276,14 @@ class MainWindow(QMainWindow):
 
     def show_schedule_detail(self, schedule_id):
         """스케줄 관리 탭으로 이동하고 해당 스케줄 선택"""
-        # 스케줄 관리 탭으로 전환 (탭 인덱스 6)
-        self.tab_widget.setCurrentIndex(6)
+        # 스케줄 관리 탭으로 전환 (탭 인덱스 7)
+        self.tab_widget.setCurrentIndex(7)
         # 스케줄 관리 탭에서 해당 스케줄 선택
         self.schedule_management_tab.select_schedule_by_id(schedule_id)
+
+    def show_estimate(self, schedule_data):
+        """견적서 관리 탭으로 이동하고 해당 스케줄의 견적서 표시"""
+        # 견적서 관리 탭으로 전환 (탭 인덱스 5)
+        self.tab_widget.setCurrentIndex(5)
+        # 견적서 탭에 스케줄 데이터 로드
+        self.estimate_tab.load_schedule_data(schedule_data)
