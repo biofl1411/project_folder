@@ -57,7 +57,7 @@ class EstimateTab(QWidget):
         self.estimate_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.estimate_layout = QVBoxLayout(self.estimate_container)
-        self.estimate_layout.setContentsMargins(40, 30, 40, 30)
+        self.estimate_layout.setContentsMargins(50, 30, 50, 30)
         self.estimate_layout.setSpacing(15)
 
         # 견적서 내용 생성
