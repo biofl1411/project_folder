@@ -24,9 +24,15 @@ class ClientTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.all_clients = []  # 전체 업체 목록 저장
+        self.all_clients = []  # 현재 페이지 업체 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+
+        # 페이지네이션 설정
+        self.current_page = 1
+        self.per_page = 100  # 페이지당 표시 개수
+        self.total_count = 0
+        self.total_pages = 1
 
         # 검색 디바운싱을 위한 타이머 (300ms 지연)
         self.search_timer = QTimer()
@@ -147,6 +153,81 @@ class ClientTab(QWidget):
         search_layout.addStretch()
 
         layout.addWidget(search_frame)
+
+        # 페이지네이션 컨트롤 영역
+        pagination_frame = QFrame()
+        pagination_frame.setStyleSheet("""
+            QFrame {
+                background-color: #e8f5e9;
+                border-radius: 5px;
+                padding: 3px;
+            }
+            QPushButton {
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 5px 15px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+            QComboBox {
+                background-color: white;
+                border: 1px solid #4caf50;
+                border-radius: 3px;
+                padding: 3px 8px;
+            }
+        """)
+        pagination_layout = QHBoxLayout(pagination_frame)
+
+        # 첫 페이지 버튼
+        self.first_page_btn = QPushButton("◀◀ 처음")
+        self.first_page_btn.clicked.connect(self.go_to_first_page)
+        pagination_layout.addWidget(self.first_page_btn)
+
+        # 이전 페이지 버튼
+        self.prev_page_btn = QPushButton("◀ 이전")
+        self.prev_page_btn.clicked.connect(self.go_to_prev_page)
+        pagination_layout.addWidget(self.prev_page_btn)
+
+        # 페이지 정보 라벨
+        self.page_info_label = QLabel("1 / 1 페이지")
+        self.page_info_label.setStyleSheet("font-weight: bold; padding: 0 10px;")
+        pagination_layout.addWidget(self.page_info_label)
+
+        # 다음 페이지 버튼
+        self.next_page_btn = QPushButton("다음 ▶")
+        self.next_page_btn.clicked.connect(self.go_to_next_page)
+        pagination_layout.addWidget(self.next_page_btn)
+
+        # 마지막 페이지 버튼
+        self.last_page_btn = QPushButton("마지막 ▶▶")
+        self.last_page_btn.clicked.connect(self.go_to_last_page)
+        pagination_layout.addWidget(self.last_page_btn)
+
+        pagination_layout.addSpacing(20)
+
+        # 페이지당 표시 개수 선택
+        pagination_layout.addWidget(QLabel("페이지당:"))
+        self.per_page_combo = QComboBox()
+        self.per_page_combo.addItems(["50", "100", "200", "500"])
+        self.per_page_combo.setCurrentText("100")
+        self.per_page_combo.currentTextChanged.connect(self.on_per_page_changed)
+        pagination_layout.addWidget(self.per_page_combo)
+
+        # 총 개수 표시
+        self.total_count_label = QLabel("(총 0개)")
+        self.total_count_label.setStyleSheet("color: #666; padding-left: 10px;")
+        pagination_layout.addWidget(self.total_count_label)
+
+        pagination_layout.addStretch()
+
+        layout.addWidget(pagination_frame)
 
         # 2. 업체 목록 테이블
         self.client_table = QTableWidget()
@@ -291,17 +372,112 @@ class ClientTab(QWidget):
             self.load_clients()
 
     def load_clients(self):
-        """업체 목록 로드"""
+        """업체 목록 로드 (페이지네이션 적용)"""
         try:
-            log_message('ClientTab', '업체 목록 로드 시작')
-            raw_clients = Client.get_all() or []
-            # sqlite3.Row를 딕셔너리로 변환
-            self.all_clients = [dict(c) for c in raw_clients]
+            log_message('ClientTab', f'업체 목록 로드 시작 (페이지 {self.current_page})')
+
+            # 검색어 확인
+            search_keyword = self.search_input.text().strip() if hasattr(self, 'search_input') else None
+            search_field = self.search_field_combo.currentText() if hasattr(self, 'search_field_combo') else None
+
+            # 초성 검색인 경우 DB 검색 대신 전체 로드 후 필터링 (초성은 DB에서 처리 불가)
+            if search_keyword and self.is_chosung_only(search_keyword):
+                # 초성 검색은 기존 방식 유지 (전체 로드 후 필터링)
+                raw_clients = Client.get_all() or []
+                self.all_clients = [dict(c) for c in raw_clients]
+                self.filter_clients_chosung(search_keyword, search_field)
+                return
+
+            # 페이지네이션 데이터 로드
+            result = Client.get_paginated(
+                page=self.current_page,
+                per_page=self.per_page,
+                search_keyword=search_keyword if search_keyword else None,
+                search_field=search_field
+            )
+
+            self.all_clients = result['clients']
+            self.total_count = result['total_count']
+            self.total_pages = result['total_pages']
+
             self.display_clients(self.all_clients)
-            log_message('ClientTab', f'업체 {len(self.all_clients)}개 로드 완료')
+            self.update_pagination_ui()
+
+            log_message('ClientTab', f'업체 {len(self.all_clients)}개 로드 완료 (총 {self.total_count}개)')
         except Exception as e:
             log_exception('ClientTab', f'업체 로드 중 오류: {str(e)}')
             QMessageBox.critical(self, "오류", f"업체 로드 중 오류 발생: {str(e)}")
+
+    def filter_clients_chosung(self, search_text, search_field):
+        """초성 검색 필터링 (DB에서 처리할 수 없는 초성 검색용)"""
+        filtered = []
+        for client in self.all_clients:
+            name = str(client.get('name', '') or '')
+            ceo = str(client.get('ceo', '') or '')
+            contact_person = str(client.get('contact_person', '') or '')
+
+            match = False
+            if search_field == "전체":
+                match = (self.match_chosung(name, search_text) or
+                         self.match_chosung(ceo, search_text) or
+                         self.match_chosung(contact_person, search_text))
+            elif search_field == "고객/회사명":
+                match = self.match_chosung(name, search_text)
+            elif search_field == "대표자":
+                match = self.match_chosung(ceo, search_text)
+            elif search_field == "담당자":
+                match = self.match_chosung(contact_person, search_text)
+
+            if match:
+                filtered.append(client)
+
+        # 초성 검색은 페이지네이션 없이 모두 표시 (결과가 적을 것으로 예상)
+        self.total_count = len(filtered)
+        self.total_pages = 1
+        self.current_page = 1
+        self.display_clients(filtered)
+        self.update_pagination_ui()
+
+    def update_pagination_ui(self):
+        """페이지네이션 UI 업데이트"""
+        self.page_info_label.setText(f"{self.current_page} / {self.total_pages} 페이지")
+        self.total_count_label.setText(f"(총 {self.total_count:,}개)")
+
+        # 버튼 활성화/비활성화
+        self.first_page_btn.setEnabled(self.current_page > 1)
+        self.prev_page_btn.setEnabled(self.current_page > 1)
+        self.next_page_btn.setEnabled(self.current_page < self.total_pages)
+        self.last_page_btn.setEnabled(self.current_page < self.total_pages)
+
+    def go_to_first_page(self):
+        """첫 페이지로 이동"""
+        if self.current_page > 1:
+            self.current_page = 1
+            self.load_clients()
+
+    def go_to_prev_page(self):
+        """이전 페이지로 이동"""
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_clients()
+
+    def go_to_next_page(self):
+        """다음 페이지로 이동"""
+        if self.current_page < self.total_pages:
+            self.current_page += 1
+            self.load_clients()
+
+    def go_to_last_page(self):
+        """마지막 페이지로 이동"""
+        if self.current_page < self.total_pages:
+            self.current_page = self.total_pages
+            self.load_clients()
+
+    def on_per_page_changed(self, value):
+        """페이지당 표시 개수 변경"""
+        self.per_page = int(value)
+        self.current_page = 1  # 첫 페이지로 리셋
+        self.load_clients()
 
     def display_clients(self, clients):
         """업체 목록을 테이블에 표시"""
@@ -359,60 +535,11 @@ class ClientTab(QWidget):
         self.search_timer.start(300)  # 300ms 후 필터링 실행
 
     def filter_clients(self):
-        """실시간 검색 필터링 (초성 검색 지원)"""
+        """실시간 검색 필터링 (페이지네이션 + 초성 검색 지원)"""
         try:
-            search_text = self.search_input.text().strip()
-            search_field = self.search_field_combo.currentText()
-
-            if not search_text:
-                self.display_clients(self.all_clients)
-                return
-
-            filtered = []
-            is_chosung = self.is_chosung_only(search_text)
-
-            for client in self.all_clients:
-                # 안전한 값 접근 (딕셔너리로 변환됨)
-                name = str(client.get('name', '') or '')
-                ceo = str(client.get('ceo', '') or '')
-                contact_person = str(client.get('contact_person', '') or '')
-                business_no = str(client.get('business_no', '') or '')
-
-                match = False
-
-                if search_field == "전체":
-                    if is_chosung:
-                        match = (self.match_chosung(name, search_text) or
-                                 self.match_chosung(ceo, search_text) or
-                                 self.match_chosung(contact_person, search_text))
-                    else:
-                        search_lower = search_text.lower()
-                        match = (search_lower in name.lower() or
-                                 search_lower in ceo.lower() or
-                                 search_lower in contact_person.lower() or
-                                 search_lower in business_no.lower())
-                elif search_field == "고객/회사명":
-                    if is_chosung:
-                        match = self.match_chosung(name, search_text)
-                    else:
-                        match = search_text.lower() in name.lower()
-                elif search_field == "대표자":
-                    if is_chosung:
-                        match = self.match_chosung(ceo, search_text)
-                    else:
-                        match = search_text.lower() in ceo.lower()
-                elif search_field == "담당자":
-                    if is_chosung:
-                        match = self.match_chosung(contact_person, search_text)
-                    else:
-                        match = search_text.lower() in contact_person.lower()
-                elif search_field == "사업자번호":
-                    match = search_text.lower() in business_no.lower()
-
-                if match:
-                    filtered.append(client)
-
-            self.display_clients(filtered)
+            # 검색 시 첫 페이지로 리셋
+            self.current_page = 1
+            self.load_clients()
         except Exception as e:
             log_exception('ClientTab', f'검색 필터링 중 오류: {str(e)}')
 
@@ -420,7 +547,8 @@ class ClientTab(QWidget):
         """검색 초기화"""
         self.search_input.clear()
         self.search_field_combo.setCurrentIndex(0)
-        self.display_clients(self.all_clients)
+        self.current_page = 1
+        self.load_clients()
 
     def on_header_clicked(self, logical_index):
         """헤더 클릭 시 해당 컬럼으로 정렬"""
