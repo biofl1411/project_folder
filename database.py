@@ -61,15 +61,44 @@ def init_database():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         ceo TEXT,
+        business_no TEXT,
+        category TEXT,
         phone TEXT,
-        address TEXT,
+        fax TEXT,
         contact_person TEXT,
-        mobile TEXT,
+        email TEXT,
         sales_rep TEXT,
+        toll_free TEXT,
+        zip_code TEXT,
+        address TEXT,
         notes TEXT,
+        sales_business TEXT,
+        sales_phone TEXT,
+        sales_mobile TEXT,
+        sales_address TEXT,
+        mobile TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
+
+    # 기존 clients 테이블에 새 컬럼 추가 (마이그레이션)
+    new_columns = [
+        ('business_no', 'TEXT'),
+        ('category', 'TEXT'),
+        ('fax', 'TEXT'),
+        ('email', 'TEXT'),
+        ('toll_free', 'TEXT'),
+        ('zip_code', 'TEXT'),
+        ('sales_business', 'TEXT'),
+        ('sales_phone', 'TEXT'),
+        ('sales_mobile', 'TEXT'),
+        ('sales_address', 'TEXT')
+    ]
+    for col_name, col_type in new_columns:
+        try:
+            cursor.execute(f'ALTER TABLE clients ADD COLUMN {col_name} {col_type}')
+        except:
+            pass  # 컬럼이 이미 존재하면 무시
     
     # 스케줄 및 견적 테이블
     cursor.execute('''
