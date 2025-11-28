@@ -2,7 +2,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
-    QScrollArea, QGridLayout, QGroupBox, QTextEdit, QMessageBox
+    QScrollArea, QGridLayout, QGroupBox, QTextEdit, QMessageBox,
+    QLineEdit, QSizePolicy
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -43,16 +44,17 @@ class EstimateTab(QWidget):
 
         main_layout.addWidget(button_frame)
 
-        # 스크롤 영역
+        # 스크롤 영역 - 수직 스크롤만, 수평은 창에 맞춤
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 수평 스크롤 비활성화
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)    # 수직 스크롤만 필요시 표시
         scroll_area.setStyleSheet("QScrollArea { border: none; background-color: #e0e0e0; }")
 
-        # 견적서 컨테이너
+        # 견적서 컨테이너 - 창 너비에 맞게 확장
         self.estimate_container = QWidget()
         self.estimate_container.setStyleSheet("background-color: white;")
-        self.estimate_container.setMinimumWidth(800)
-        self.estimate_container.setMaximumWidth(900)
+        self.estimate_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.estimate_layout = QVBoxLayout(self.estimate_container)
         self.estimate_layout.setContentsMargins(40, 30, 40, 30)
@@ -63,13 +65,7 @@ class EstimateTab(QWidget):
 
         scroll_area.setWidget(self.estimate_container)
 
-        # 스크롤 영역을 중앙에 배치
-        scroll_layout = QHBoxLayout()
-        scroll_layout.addStretch()
-        scroll_layout.addWidget(scroll_area)
-        scroll_layout.addStretch()
-
-        main_layout.addLayout(scroll_layout)
+        main_layout.addWidget(scroll_area)
 
     def create_estimate_content(self):
         """견적서 내용 생성"""
@@ -123,13 +119,51 @@ class EstimateTab(QWidget):
         # 2. 견적 정보 테이블
         info_frame = QFrame()
         info_layout = QGridLayout(info_frame)
-        info_layout.setSpacing(5)
+        info_layout.setSpacing(8)
+        info_layout.setColumnStretch(1, 1)  # 입력창 영역 확장
 
-        # 왼쪽 정보
-        self.estimate_no_label = QLabel("견 적 번 호 :   BFL_소비기한_20250401-2")
-        self.estimate_date_label = QLabel("견 적 일 자 :   2025년 04월 01일")
-        self.receiver_label = QLabel("수       신 :   ")
-        self.sender_label = QLabel("발       신 :   ㈜바이오푸드랩")
+        # 입력창 스타일 (스케줄에서 가져온 데이터임을 표시)
+        input_style = """
+            QLineEdit {
+                border: 1px solid #a0c4ff;
+                border-radius: 3px;
+                padding: 4px 8px;
+                background-color: #f0f8ff;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #1e90ff;
+                background-color: #ffffff;
+            }
+        """
+
+        # 왼쪽 정보 - 제목(라벨) + 값(입력창)
+        # 견적번호
+        estimate_no_title = QLabel("견 적 번 호 :")
+        estimate_no_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.estimate_no_input = QLineEdit("BFL_소비기한_20250401-2")
+        self.estimate_no_input.setStyleSheet(input_style)
+        self.estimate_no_input.setPlaceholderText("스케줄에서 자동 생성")
+
+        # 견적일자
+        estimate_date_title = QLabel("견 적 일 자 :")
+        estimate_date_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.estimate_date_input = QLineEdit("2025년 04월 01일")
+        self.estimate_date_input.setStyleSheet(input_style)
+        self.estimate_date_input.setPlaceholderText("스케줄에서 자동 생성")
+
+        # 수신
+        receiver_title = QLabel("수       신 :")
+        receiver_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.receiver_input = QLineEdit("")
+        self.receiver_input.setStyleSheet(input_style)
+        self.receiver_input.setPlaceholderText("업체명 (스케줄에서 가져옴)")
+
+        # 발신
+        sender_title = QLabel("발       신 :")
+        sender_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.sender_input = QLineEdit("㈜바이오푸드랩")
+        self.sender_input.setStyleSheet(input_style)
 
         # 오른쪽 정보 (회사 정보)
         right_info = QLabel("""(주)바이오푸드랩
@@ -141,11 +175,19 @@ TEL: (070) 7410-1400
 FAX: (070) 7410-1430""")
         right_info.setStyleSheet("font-size: 11px;")
 
-        info_layout.addWidget(self.estimate_no_label, 0, 0)
-        info_layout.addWidget(right_info, 0, 1, 4, 1, Qt.AlignRight)
-        info_layout.addWidget(self.estimate_date_label, 1, 0)
-        info_layout.addWidget(self.receiver_label, 2, 0)
-        info_layout.addWidget(self.sender_label, 3, 0)
+        # 그리드 레이아웃에 배치
+        info_layout.addWidget(estimate_no_title, 0, 0)
+        info_layout.addWidget(self.estimate_no_input, 0, 1)
+        info_layout.addWidget(right_info, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
+
+        info_layout.addWidget(estimate_date_title, 1, 0)
+        info_layout.addWidget(self.estimate_date_input, 1, 1)
+
+        info_layout.addWidget(receiver_title, 2, 0)
+        info_layout.addWidget(self.receiver_input, 2, 1)
+
+        info_layout.addWidget(sender_title, 3, 0)
+        info_layout.addWidget(self.sender_input, 3, 1)
 
         self.estimate_layout.addWidget(info_frame)
 
@@ -304,14 +346,14 @@ FAX: (070) 7410-1430""")
         else:
             date_str = datetime.now().strftime('%Y%m%d')
 
-        self.estimate_no_label.setText(f"견 적 번 호 :   BFL_소비기한_{date_str}-{schedule_id}")
+        self.estimate_no_input.setText(f"BFL_소비기한_{date_str}-{schedule_id}")
 
         # 견적일자
-        self.estimate_date_label.setText(f"견 적 일 자 :   {datetime.now().strftime('%Y년 %m월 %d일')}")
+        self.estimate_date_input.setText(f"{datetime.now().strftime('%Y년 %m월 %d일')}")
 
         # 수신 (업체명)
         client_name = schedule.get('client_name', '')
-        self.receiver_label.setText(f"수       신 :   {client_name}")
+        self.receiver_input.setText(client_name)
 
         # 견적 명칭
         self.title_value.setText("소비기한설정시험의 건")
