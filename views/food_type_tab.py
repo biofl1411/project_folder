@@ -1,7 +1,8 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                           QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                           QFrame, QMessageBox, QFileDialog, QProgressDialog,
-                          QDialog, QFormLayout, QLineEdit, QCheckBox, QApplication)
+                          QDialog, QFormLayout, QLineEdit, QCheckBox, QApplication,
+                          QComboBox)
 from PyQt5.QtCore import Qt, QCoreApplication
 import pandas as pd
 import os
@@ -10,8 +11,14 @@ from models.product_types import ProductType
 from database import get_connection
 
 class FoodTypeTab(QWidget):
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.all_food_types = []  # 전체 식품유형 목록 저장
+        self.current_sort_column = -1
+        self.current_sort_order = Qt.AscendingOrder
         self.initUI()
         self.load_food_types()
         
@@ -91,7 +98,39 @@ class FoodTypeTab(QWidget):
         button_layout.addStretch()
         
         layout.addWidget(button_frame)
-        
+
+        # 검색 영역
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #e8f4fc; border-radius: 5px; padding: 5px;")
+        search_layout = QHBoxLayout(search_frame)
+
+        search_layout.addWidget(QLabel("검색:"))
+
+        # 검색 필드 선택
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItems(["전체", "식품유형", "카테고리", "검사항목"])
+        self.search_field_combo.setMinimumWidth(100)
+        search_layout.addWidget(self.search_field_combo)
+
+        # 검색 입력
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㄱㄹㄴㅈ)")
+        self.search_input.setMinimumWidth(300)
+        self.search_input.textChanged.connect(self.filter_food_types)
+        search_layout.addWidget(self.search_input)
+
+        # 검색 필드 변경 시에도 필터 적용
+        self.search_field_combo.currentIndexChanged.connect(self.filter_food_types)
+
+        # 초기화 버튼
+        reset_btn = QPushButton("초기화")
+        reset_btn.clicked.connect(self.reset_search)
+        search_layout.addWidget(reset_btn)
+
+        search_layout.addStretch()
+
+        layout.addWidget(search_frame)
+
         # 2. 식품유형 목록 테이블
         self.food_type_table = QTableWidget()
         self.food_type_table.setColumnCount(8)  # 8개 열 (검사항목 필드 추가)
@@ -109,7 +148,12 @@ class FoodTypeTab(QWidget):
             
         self.food_type_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.food_type_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        
+
+        # 헤더 클릭으로 정렬 기능 활성화
+        self.food_type_table.setSortingEnabled(True)
+        self.food_type_table.horizontalHeader().setSortIndicatorShown(True)
+        self.food_type_table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
+
         layout.addWidget(self.food_type_table)
     
     def select_all_rows(self, checked):
@@ -140,38 +184,137 @@ class FoodTypeTab(QWidget):
         """식품유형 목록 로드"""
         try:
             self.log_message("INFO", "식품유형 목록 로드 시작")
-            food_types = ProductType.get_all()
-            
-            self.food_type_table.setRowCount(len(food_types) if food_types else 0)
-            
-            if food_types:
-                for row, food_type in enumerate(food_types):
-                    # 체크박스 추가
-                    checkbox = QCheckBox()
-                    checkbox_widget = QWidget()
-                    checkbox_layout = QHBoxLayout(checkbox_widget)
-                    checkbox_layout.addWidget(checkbox)
-                    checkbox_layout.setAlignment(Qt.AlignCenter)
-                    checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                    self.food_type_table.setCellWidget(row, 0, checkbox_widget)
-                    
-                    # 나머지 데이터 설정
-                    self.food_type_table.setItem(row, 1, QTableWidgetItem(food_type['type_name']))
-                    self.food_type_table.setItem(row, 2, QTableWidgetItem(food_type['category'] or ""))
-                    self.food_type_table.setItem(row, 3, QTableWidgetItem(food_type['sterilization'] or ""))
-                    self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))
-                    self.food_type_table.setItem(row, 5, QTableWidgetItem(food_type['appearance'] or ""))
-                    self.food_type_table.setItem(row, 6, QTableWidgetItem(food_type['test_items'] or ""))  # 검사항목 추가
-                    self.food_type_table.setItem(row, 7, QTableWidgetItem(food_type['created_at'] or ""))
-                
-                self.log_message("INFO", f"식품유형 {len(food_types)}개 로드 완료")
-            else:
-                self.log_message("INFO", "로드할 식품유형이 없음")
+            self.all_food_types = ProductType.get_all() or []
+            self.display_food_types(self.all_food_types)
+            self.log_message("INFO", f"식품유형 {len(self.all_food_types)}개 로드 완료")
         except Exception as e:
             import traceback
             error_msg = f"식품유형 로드 중 오류 발생: {str(e)}"
             self.log_message("ERROR", f"{error_msg}\n{traceback.format_exc()}")
             QMessageBox.critical(self, "오류", error_msg)
+
+    def display_food_types(self, food_types):
+        """식품유형 목록을 테이블에 표시"""
+        self.food_type_table.setRowCount(len(food_types) if food_types else 0)
+
+        if food_types:
+            for row, food_type in enumerate(food_types):
+                # 체크박스 추가
+                checkbox = QCheckBox()
+                checkbox_widget = QWidget()
+                checkbox_layout = QHBoxLayout(checkbox_widget)
+                checkbox_layout.addWidget(checkbox)
+                checkbox_layout.setAlignment(Qt.AlignCenter)
+                checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                self.food_type_table.setCellWidget(row, 0, checkbox_widget)
+
+                # 나머지 데이터 설정
+                self.food_type_table.setItem(row, 1, QTableWidgetItem(food_type['type_name']))
+                self.food_type_table.setItem(row, 2, QTableWidgetItem(food_type['category'] or ""))
+                self.food_type_table.setItem(row, 3, QTableWidgetItem(food_type['sterilization'] or ""))
+                self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))
+                self.food_type_table.setItem(row, 5, QTableWidgetItem(food_type['appearance'] or ""))
+                self.food_type_table.setItem(row, 6, QTableWidgetItem(food_type['test_items'] or ""))
+                self.food_type_table.setItem(row, 7, QTableWidgetItem(food_type['created_at'] or ""))
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filter_food_types(self):
+        """실시간 검색 필터링 (초성 검색 지원)"""
+        search_text = self.search_input.text().strip()
+        search_field = self.search_field_combo.currentText()
+
+        if not search_text:
+            self.display_food_types(self.all_food_types)
+            return
+
+        filtered = []
+        is_chosung = self.is_chosung_only(search_text)
+
+        for food_type in self.all_food_types:
+            type_name = food_type.get('type_name', '') or ''
+            category = food_type.get('category', '') or ''
+            test_items = food_type.get('test_items', '') or ''
+
+            match = False
+
+            if search_field == "전체":
+                if is_chosung:
+                    match = (self.match_chosung(type_name, search_text) or
+                             self.match_chosung(category, search_text) or
+                             self.match_chosung(test_items, search_text))
+                else:
+                    search_lower = search_text.lower()
+                    match = (search_lower in type_name.lower() or
+                             search_lower in category.lower() or
+                             search_lower in test_items.lower())
+            elif search_field == "식품유형":
+                if is_chosung:
+                    match = self.match_chosung(type_name, search_text)
+                else:
+                    match = search_text.lower() in type_name.lower()
+            elif search_field == "카테고리":
+                if is_chosung:
+                    match = self.match_chosung(category, search_text)
+                else:
+                    match = search_text.lower() in category.lower()
+            elif search_field == "검사항목":
+                if is_chosung:
+                    match = self.match_chosung(test_items, search_text)
+                else:
+                    match = search_text.lower() in test_items.lower()
+
+            if match:
+                filtered.append(food_type)
+
+        self.display_food_types(filtered)
+
+    def reset_search(self):
+        """검색 초기화"""
+        self.search_input.clear()
+        self.search_field_combo.setCurrentIndex(0)
+        self.display_food_types(self.all_food_types)
+
+    def on_header_clicked(self, logical_index):
+        """헤더 클릭 시 해당 컬럼으로 정렬"""
+        # 선택 열(0번)은 정렬 제외
+        if logical_index == 0:
+            return
+
+        # 같은 컬럼을 다시 클릭하면 정렬 순서 변경
+        if self.current_sort_column == logical_index:
+            if self.current_sort_order == Qt.AscendingOrder:
+                self.current_sort_order = Qt.DescendingOrder
+            else:
+                self.current_sort_order = Qt.AscendingOrder
+        else:
+            self.current_sort_column = logical_index
+            self.current_sort_order = Qt.AscendingOrder
+
+        # 정렬 실행
+        self.food_type_table.sortItems(logical_index, self.current_sort_order)
 
     # create_new_food_type 함수 수정
     def create_new_food_type(self):

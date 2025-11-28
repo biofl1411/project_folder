@@ -778,31 +778,47 @@ class ScheduleManagementTab(QWidget):
         self.total_rounds_cost.setAlignment(Qt.AlignRight)
         cost_layout.addWidget(self.total_rounds_cost, 0, 3)
 
-        # 3. 보고서 비용
+        # 3. 보고서 비용 (수정 가능)
         cost_layout.addWidget(QLabel("3. 보고서 비용"), 1, 0)
-        self.report_cost = QLabel("-")
-        self.report_cost.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.report_cost, 1, 1)
+        self.report_cost_input = QLineEdit("300,000")
+        self.report_cost_input.setAlignment(Qt.AlignRight)
+        self.report_cost_input.setStyleSheet("background-color: white; border: 1px solid #ccc; padding: 2px;")
+        self.report_cost_input.setFixedWidth(100)
+        self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
+        cost_layout.addWidget(self.report_cost_input, 1, 1)
+
+        # 3-1. 중간 보고서 비용 (수정 가능, 중간보고서 체크 시에만 표시)
+        self.interim_report_label = QLabel("3-1. 중간 보고서 비용")
+        cost_layout.addWidget(self.interim_report_label, 1, 2)
+        self.interim_report_cost_input = QLineEdit("200,000")
+        self.interim_report_cost_input.setAlignment(Qt.AlignRight)
+        self.interim_report_cost_input.setStyleSheet("background-color: white; border: 1px solid #ccc; padding: 2px;")
+        self.interim_report_cost_input.setFixedWidth(100)
+        self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
+        cost_layout.addWidget(self.interim_report_cost_input, 1, 3)
+        # 초기에는 숨김
+        self.interim_report_label.hide()
+        self.interim_report_cost_input.hide()
 
         # 4. 최종비용 (부가세별도) - 계산식 포함
         final_label = QLabel("4. 최종비용 (부가세별도)")
         final_label.setStyleSheet("font-weight: bold; color: #e67e22;")
-        cost_layout.addWidget(final_label, 1, 2)
+        cost_layout.addWidget(final_label, 2, 0)
 
         self.final_cost_formula = QLabel("-")
         self.final_cost_formula.setStyleSheet("font-weight: bold; color: #e67e22;")
         self.final_cost_formula.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.final_cost_formula, 1, 3)
+        cost_layout.addWidget(self.final_cost_formula, 2, 1, 1, 2)
 
         # 5. 최종비용 (부가세 포함)
         final_vat_label = QLabel("5. 최종비용 (부가세 포함)")
         final_vat_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #c0392b;")
-        cost_layout.addWidget(final_vat_label, 2, 2)
+        cost_layout.addWidget(final_vat_label, 2, 3)
 
         self.final_cost_with_vat = QLabel("-")
         self.final_cost_with_vat.setStyleSheet("font-weight: bold; font-size: 13px; color: white; background-color: #e67e22; padding: 5px; border-radius: 3px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignRight)
-        cost_layout.addWidget(self.final_cost_with_vat, 2, 3)
+        cost_layout.addWidget(self.final_cost_with_vat, 3, 3)
 
         parent_layout.addWidget(cost_frame)
 
@@ -1339,11 +1355,26 @@ class ScheduleManagementTab(QWidget):
             report_cost = 300000
         else:
             report_cost = 200000  # 기본값
-        self.report_cost.setText(f"{report_cost:,}원")
+        self.report_cost_input.setText(f"{report_cost:,}")
+
+        # 3-1. 중간 보고서 비용 (중간보고서 체크 시에만 표시)
+        report_interim = schedule.get('report_interim', False)
+        interim_report_cost = 0
+        if report_interim:
+            interim_report_cost = 200000
+            self.interim_report_cost_input.setText(f"{interim_report_cost:,}")
+            self.interim_report_label.show()
+            self.interim_report_cost_input.show()
+        else:
+            self.interim_report_label.hide()
+            self.interim_report_cost_input.hide()
 
         # 4. 최종비용 (부가세별도) - 계산식 표시
-        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost)
-        formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
+        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost + interim_report_cost)
+        if interim_report_cost > 0:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} + {interim_report_cost:,} = {final_cost_no_vat:,}원"
+        else:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
         self.final_cost_formula.setText(formula_text)
 
         # 5. 최종비용 (부가세 포함) - 10% 부가세
@@ -1665,22 +1696,75 @@ class ScheduleManagementTab(QWidget):
         total_rounds_cost = sum(column_costs)
         self.total_rounds_cost.setText(f"{total_rounds_cost:,}원")
 
-        # 3. 보고서 비용
-        if test_method in ['real', 'custom_real']:
+        # 3. 보고서 비용 (입력 필드에서 값 가져오기)
+        try:
+            report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
+        except:
             report_cost = 200000
-        elif test_method in ['acceleration', 'custom_acceleration']:
-            report_cost = 300000
-        else:
-            report_cost = 200000
-        self.report_cost.setText(f"{report_cost:,}원")
+
+        # 3-1. 중간 보고서 비용 (표시 중인 경우에만 계산에 포함)
+        interim_report_cost = 0
+        if self.interim_report_cost_input.isVisible():
+            try:
+                interim_report_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
+            except:
+                interim_report_cost = 200000
 
         # 4. 최종비용 (부가세별도) - 계산식 표시
-        # 실측: 회차별총계 × 1 + 보고서비용
-        # 가속: 회차별총계 × 3 + 보고서비용
-        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost)
-        formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
+        # 실측: 회차별총계 × 1 + 보고서비용 + 중간보고서비용
+        # 가속: 회차별총계 × 3 + 보고서비용 + 중간보고서비용
+        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost + interim_report_cost)
+        if interim_report_cost > 0:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} + {interim_report_cost:,} = {final_cost_no_vat:,}원"
+        else:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
         self.final_cost_formula.setText(formula_text)
 
         # 5. 최종비용 (부가세 포함) - 10% 부가세
+        final_cost_with_vat = int(final_cost_no_vat * 1.1)
+        self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")
+
+    def on_cost_input_changed(self):
+        """보고서 비용 입력 변경 시 총비용 재계산"""
+        if not self.current_schedule:
+            return
+
+        # 현재 회차별 총계 가져오기
+        try:
+            total_rounds_text = self.total_rounds_cost.text().replace(',', '').replace('원', '')
+            total_rounds_cost = int(total_rounds_text)
+        except:
+            return
+
+        # 실험 방법에 따른 구간 수 결정
+        test_method = self.current_schedule.get('test_method', 'real')
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 보고서 비용 가져오기
+        try:
+            report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
+        except:
+            report_cost = 0
+
+        # 중간 보고서 비용 가져오기 (표시 중인 경우에만)
+        interim_report_cost = 0
+        if self.interim_report_cost_input.isVisible():
+            try:
+                interim_report_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
+            except:
+                interim_report_cost = 0
+
+        # 최종비용 계산 및 표시
+        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost + interim_report_cost)
+        if interim_report_cost > 0:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} + {interim_report_cost:,} = {final_cost_no_vat:,}원"
+        else:
+            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
+        self.final_cost_formula.setText(formula_text)
+
+        # 부가세 포함 금액
         final_cost_with_vat = int(final_cost_no_vat * 1.1)
         self.final_cost_with_vat.setText(f"{final_cost_with_vat:,}원")

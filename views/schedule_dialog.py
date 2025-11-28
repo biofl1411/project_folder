@@ -405,8 +405,8 @@ class ScheduleCreateDialog(QDialog):
         self.estimate_date.setDate(QDate.currentDate())
         self.estimate_date.setCalendarPopup(True)
         self.estimate_date_check = QCheckBox("미정")
-        self.estimate_date_check.setChecked(True)  # 기본값은 미정
-        self.estimate_date.setEnabled(False)  # 미정 체크 시 비활성화
+        self.estimate_date_check.setChecked(False)  # 기본값은 오늘 날짜
+        self.estimate_date.setEnabled(True)  # 날짜 입력 활성화
         estimate_date_layout.addWidget(self.estimate_date)
         estimate_date_layout.addWidget(self.estimate_date_check)
         estimate_date_layout.addStretch()

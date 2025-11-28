@@ -279,8 +279,8 @@ FAX: (070) 7410-1430""")
         self.remark_text.setWordWrap(True)
         self.remark_text.setStyleSheet("""
             QLabel {
-                font-size: 10px;
-                line-height: 1.3;
+                font-size: 11px;
+                line-height: 1.4;
                 padding: 5px;
             }
         """)
@@ -445,6 +445,9 @@ FAX: (070) 7410-1430""")
                 # 실측실험: 1구간 온도
                 temps = [real_temps.get(storage_code, '15')]
 
+        # 샘플링 횟수
+        sampling_count = schedule.get('sampling_count', 6) or 6
+
         # 검사항목 (스케줄에서 동적으로 가져오기)
         test_items_str = schedule.get('test_items', '')
         if test_items_str:
@@ -465,7 +468,9 @@ FAX: (070) 7410-1430""")
 소비기한 : {storage} {period_str}
 시험기간 : {test_duration}
 실험방법 : {method_str}
-실험 온도: {temp_str}"""
+실험 온도: {temp_str}
+연장시험 : {'진행' if schedule.get('extension_test') else '미진행'}
+실험 횟수: {sampling_count}회"""
 
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
@@ -659,7 +664,7 @@ FAX: (070) 7410-1430""")
 
         # 최종 보고서 라인
         final_date_text = f" / {final_expected_date}" if final_expected_date else ""
-        test_period_text += f"→ 실험기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
+        test_period_text += f"→ 실험 기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
 
         remark_text = f"""※ 검체량
 → 검체는 판매 또는 판매 예정인 제품과 동일하게 검사제품을 준비해주시기 바랍니다.
@@ -670,12 +675,12 @@ FAX: (070) 7410-1430""")
 {test_period_text}
 약 8~12일에 온도별({zone_text}) 1회씩 실험- 실험스케쥴(구간 및 횟수)은 실험결과의 유의성에 따라 보고서 발행일 수가 변경될 수 있습니다.
 
-※ 제시해 주신 예상소비기한 설정 실험에 대한 견적이며 품질안전한계기간 도달하지 않더라도 실험연장은 불가합니다.
-※ 지표항목으로 수정하고 싶으신 항목이 있으시면 연락바랍니다.
-※ 견적 금액은 검사비용 외 보관비 및 보고서작성 비용 포함입니다.
-※ 실험스케줄 관련 문의사항있으시면 연락바랍니다.
-※ 소비기한 검사 중 품질한계 도달로 실험 중단시 중단건까지의 실험발생된 비용만 청구됩니다.
-※ 소비기한설정실험은 입금 후 진행됩니다"""
+* 예상 소비기한은 견적이며, 품질안전한계기간 미도달 시에도 실험연장 불가합니다.
+* 견적 금액은 검사비용 외 보관비 및 보고서작성 비용 포함입니다.
+* 지표 항목의 수정(추가)이나 삭제가 필요한 경우 사전 연락을 해주시고 문의사항은 연락 바랍니다.
+* 모든 실험은 온도 구간별 1회 실험을 진행하며, 반복 실험은 진행하지 않습니다. 반복 실험이 필요한 경우 연락 바랍니다.
+
+소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다."""
 
         self.remark_text.setText(remark_text)
 
