@@ -508,7 +508,17 @@ FAX: (070) 7410-1430""")
         self.items_table.setItem(0, 4, subtotal_item)
 
     def calculate_total_price(self, schedule):
-        """총 금액 계산 - 스케줄 관리와 동일한 방식"""
+        """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
+        # 스케줄 관리에서 계산된 비용 정보가 있으면 그대로 사용
+        if schedule.get('total_rounds_cost') is not None and schedule.get('report_cost') is not None:
+            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
+            report_cost = schedule.get('report_cost', 0) or 0
+            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+
+            total = total_rounds_cost + report_cost + interim_report_cost
+            return int(total)
+
+        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
         total = 0
 
         # 실험방법 확인

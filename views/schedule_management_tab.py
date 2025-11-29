@@ -1441,6 +1441,32 @@ class ScheduleManagementTab(QWidget):
             if client:
                 schedule_data['client_name'] = client.get('name', '')
 
+        # 스케줄 관리에서 계산된 비용 정보 추가
+        try:
+            # 보고서 비용
+            report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
+            schedule_data['report_cost'] = report_cost
+
+            # 중간 보고서 비용
+            if self.interim_report_cost_input.isVisible():
+                interim_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
+                schedule_data['interim_report_cost'] = interim_cost
+            else:
+                schedule_data['interim_report_cost'] = 0
+
+            # 1회 검사비
+            cost_per_test_text = self.cost_per_test.text().replace(',', '').replace('원', '')
+            if cost_per_test_text and cost_per_test_text != '-':
+                schedule_data['cost_per_test'] = int(cost_per_test_text)
+
+            # 회차 총계
+            total_rounds_text = self.total_rounds_cost.text().replace(',', '').replace('원', '')
+            if total_rounds_text and total_rounds_text != '-':
+                schedule_data['total_rounds_cost'] = int(total_rounds_text)
+
+        except Exception as e:
+            print(f"비용 정보 추가 중 오류: {e}")
+
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
 
