@@ -13,7 +13,7 @@ from PyQt5.QtGui import QFont
 
 
 class CollapsibleGroupBox(QWidget):
-    """접이식 그룹박스 - +/- 버튼으로 내용을 펼치거나 접을 수 있음"""
+    """접이식 그룹박스 - ▼/▶ 버튼으로 내용을 펼치거나 접을 수 있음"""
 
     def __init__(self, title="", parent=None, collapsed=False):
         super().__init__(parent)
@@ -22,21 +22,22 @@ class CollapsibleGroupBox(QWidget):
         self.title = title
 
         # 메인 레이아웃
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 5)
+        main_layout.setSpacing(0)
 
         # 헤더 프레임 (토글 버튼 + 제목)
         self.header_frame = QFrame()
         self.header_frame.setStyleSheet("""
             QFrame {
-                background-color: #e0e0e0;
-                border: 1px solid #ccc;
+                background-color: #4a90d9;
+                border: 1px solid #3a7bc8;
                 border-radius: 3px;
             }
         """)
+        self.header_frame.setCursor(Qt.PointingHandCursor)
         header_layout = QHBoxLayout(self.header_frame)
-        header_layout.setContentsMargins(5, 3, 5, 3)
+        header_layout.setContentsMargins(8, 5, 8, 5)
 
         # 토글 버튼
         self.toggle_btn = QToolButton()
@@ -44,7 +45,8 @@ class CollapsibleGroupBox(QWidget):
             QToolButton {
                 border: none;
                 font-weight: bold;
-                font-size: 14px;
+                font-size: 12px;
+                color: white;
             }
         """)
         self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
@@ -53,7 +55,7 @@ class CollapsibleGroupBox(QWidget):
 
         # 제목 라벨
         self.title_label = QLabel(title)
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; border: none;")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: white; border: none;")
 
         header_layout.addWidget(self.toggle_btn)
         header_layout.addWidget(self.title_label)
@@ -62,53 +64,42 @@ class CollapsibleGroupBox(QWidget):
         # 헤더 클릭으로도 토글 가능하게
         self.header_frame.mousePressEvent = lambda e: self.toggle_content()
 
-        self.main_layout.addWidget(self.header_frame)
+        main_layout.addWidget(self.header_frame)
 
-        # 콘텐츠 프레임
-        self.content_frame = QFrame()
-        self.content_frame.setStyleSheet("""
-            QFrame {
+        # 콘텐츠 위젯 (레이아웃 없이 생성)
+        self.content_widget = QWidget()
+        self.content_widget.setStyleSheet("""
+            QWidget {
                 border: 1px solid #ccc;
                 border-top: none;
-                background-color: white;
+                background-color: #fafafa;
             }
         """)
-        self.content_layout = QVBoxLayout(self.content_frame)
-        self.content_layout.setContentsMargins(10, 10, 10, 10)
-
-        self.main_layout.addWidget(self.content_frame)
+        main_layout.addWidget(self.content_widget)
 
         # 초기 상태 설정
         if collapsed:
-            self.content_frame.hide()
+            self.content_widget.hide()
 
     def toggle_content(self):
         """콘텐츠 표시/숨김 토글"""
         self.is_collapsed = not self.is_collapsed
 
         if self.is_collapsed:
-            self.content_frame.hide()
+            self.content_widget.hide()
             self.toggle_btn.setText("▶")
         else:
-            self.content_frame.show()
+            self.content_widget.show()
             self.toggle_btn.setText("▼")
 
     def setContentLayout(self, layout):
-        """콘텐츠 레이아웃 설정"""
-        # 기존 레이아웃 제거
-        if self.content_frame.layout():
-            QWidget().setLayout(self.content_frame.layout())
+        """콘텐츠 레이아웃 설정 - 반드시 한 번만 호출"""
+        layout.setContentsMargins(10, 10, 10, 10)
+        self.content_widget.setLayout(layout)
 
-        self.content_layout = layout
-        self.content_frame.setLayout(layout)
-
-    def addWidget(self, widget):
-        """콘텐츠에 위젯 추가"""
-        self.content_layout.addWidget(widget)
-
-    def layout(self):
-        """콘텐츠 레이아웃 반환"""
-        return self.content_layout
+    def getContentWidget(self):
+        """콘텐츠 위젯 반환 (직접 레이아웃 설정용)"""
+        return self.content_widget
 
 # 온도 레이블 상수 정의
 ROOM_TEMP_LABEL = "상온 (15℃)"
@@ -401,10 +392,9 @@ class ScheduleCreateDialog(QDialog):
         scroll_area.setWidget(scroll_widget)
         dialog_layout.addWidget(scroll_area, 1)  # stretch factor 1로 공간 확보
 
-        # 업체 정보 영역 - QGroupBox 사용
-        self.client_group = QGroupBox("업체 정보")
-        self.client_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        client_layout = QFormLayout(self.client_group)
+        # 업체 정보 영역 - 접이식 그룹박스 사용
+        self.client_group = CollapsibleGroupBox("업체 정보", collapsed=False)
+        client_layout = QFormLayout()
         client_layout.setSpacing(8)
 
         # 업체명 입력 및 검색
@@ -445,12 +435,12 @@ class ScheduleCreateDialog(QDialog):
         self.client_memo_label = QLabel("- ")  # 메모
         client_layout.addRow("메모:", self.client_memo_label)
 
+        self.client_group.setContentLayout(client_layout)
         self.main_layout.addWidget(self.client_group)
 
-        # 실험 정보 영역 - QGroupBox 사용
-        self.test_group = QGroupBox("실험 정보")
-        self.test_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        test_layout = QFormLayout(self.test_group)
+        # 실험 정보 영역 - 접이식 그룹박스 사용
+        self.test_group = CollapsibleGroupBox("실험 정보", collapsed=False)
+        test_layout = QFormLayout()
         test_layout.setSpacing(8)
         
         # 실험 방법 라디오 버튼 - 4가지 옵션으로 확장
@@ -638,12 +628,12 @@ class ScheduleCreateDialog(QDialog):
         # 체크박스 상태 변경 시 레이블 업데이트를 위한 함수 연결
         self.extension_check.stateChanged.connect(self.update_extension_status)
 
+        self.test_group.setContentLayout(test_layout)
         self.main_layout.addWidget(self.test_group)
 
-        # 제품 정보 영역 - QGroupBox 사용
-        self.product_group = QGroupBox("제품 정보")
-        self.product_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        product_layout = QFormLayout(self.product_group)
+        # 제품 정보 영역 - 접이식 그룹박스 사용
+        self.product_group = CollapsibleGroupBox("제품 정보", collapsed=False)
+        product_layout = QFormLayout()
         product_layout.setSpacing(8)
 
         # 제품명
@@ -697,6 +687,7 @@ class ScheduleCreateDialog(QDialog):
         self.test_items_layout.addWidget(test_items_links)
         product_layout.addRow("검사항목:", self.test_items_layout)
 
+        self.product_group.setContentLayout(product_layout)
         self.main_layout.addWidget(self.product_group)
 
         # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당 (스크롤 영역 아래에 고정)
