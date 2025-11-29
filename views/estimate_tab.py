@@ -543,15 +543,15 @@ FAX: (070) 7410-1430""")
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 테이블에 데이터 추가 - QWidget 컨테이너를 사용하여 수직 중앙 정렬
+        # 테이블에 데이터 추가 - QWidget 컨테이너를 사용하여 상단 정렬
         # 셀 위젯 생성 헬퍼 함수
-        def create_centered_cell(text, align=Qt.AlignCenter, word_wrap=False):
-            """수직 가운데 정렬된 셀 위젯 생성"""
+        def create_top_aligned_cell(text, align=Qt.AlignCenter, word_wrap=False):
+            """상단 정렬된 셀 위젯 생성"""
             from PyQt5.QtWidgets import QVBoxLayout
             container = QWidget()
             layout = QVBoxLayout(container)
-            layout.setContentsMargins(5, 5, 5, 5)
-            layout.setAlignment(Qt.AlignVCenter)
+            layout.setContentsMargins(5, 8, 5, 5)
+            layout.setAlignment(Qt.AlignTop)
 
             label = QLabel(text)
             label.setAlignment(align)
@@ -559,27 +559,28 @@ FAX: (070) 7410-1430""")
             if word_wrap:
                 label.setWordWrap(True)
             layout.addWidget(label)
+            layout.addStretch()  # 아래쪽에 여백 추가
 
             container.setStyleSheet("background-color: white;")
             return container
 
         # No. 열
-        self.items_table.setCellWidget(0, 0, create_centered_cell("1"))
+        self.items_table.setCellWidget(0, 0, create_top_aligned_cell("1"))
 
         # 식품유형 열에 상세 정보 포함
-        self.items_table.setCellWidget(0, 1, create_centered_cell(food_type_text, Qt.AlignVCenter | Qt.AlignLeft, True))
+        self.items_table.setCellWidget(0, 1, create_top_aligned_cell(food_type_text, Qt.AlignTop | Qt.AlignLeft, True))
 
         # 검사 항목 열에 검사항목만 표시
-        self.items_table.setCellWidget(0, 2, create_centered_cell(test_items_text, Qt.AlignVCenter | Qt.AlignLeft, True))
+        self.items_table.setCellWidget(0, 2, create_top_aligned_cell(test_items_text, Qt.AlignTop | Qt.AlignLeft, True))
 
         # 금액 계산
         total_price = self.calculate_total_price(schedule)
 
         # 계 열
-        self.items_table.setCellWidget(0, 3, create_centered_cell(f"{total_price:,}", Qt.AlignVCenter | Qt.AlignRight))
+        self.items_table.setCellWidget(0, 3, create_top_aligned_cell(f"{total_price:,}", Qt.AlignTop | Qt.AlignRight))
 
         # 소계 열
-        self.items_table.setCellWidget(0, 4, create_centered_cell(f"{total_price:,} 원", Qt.AlignVCenter | Qt.AlignRight))
+        self.items_table.setCellWidget(0, 4, create_top_aligned_cell(f"{total_price:,} 원", Qt.AlignTop | Qt.AlignRight))
 
     def calculate_total_price(self, schedule):
         """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
