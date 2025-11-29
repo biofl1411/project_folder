@@ -478,15 +478,18 @@ class ScheduleCreateDialog(QDialog):
         
         # 샘플링 횟수 설정
         sampling_layout = QHBoxLayout()
-        
+
+        # 설정에서 기본 샘플링 횟수 불러오기
+        default_sampling = self.get_default_sampling_count()
+
         # 기본값 체크박스
-        self.default_sampling_check = QCheckBox("기본값 사용 (6회)")
+        self.default_sampling_check = QCheckBox(f"기본값 사용 ({default_sampling}회)")
         self.default_sampling_check.setChecked(True)
-        
+
         # 사용자 정의 입력
         self.sampling_spin = QSpinBox()
         self.sampling_spin.setRange(1, 30)
-        self.sampling_spin.setValue(6)
+        self.sampling_spin.setValue(default_sampling)
         self.sampling_spin.setEnabled(False)  # 처음에는 비활성화
         
         sampling_layout.addWidget(self.default_sampling_check)
@@ -1394,8 +1397,24 @@ class ScheduleCreateDialog(QDialog):
         else:
             self.extension_status_label.setText("미진행")
             self.extension_status_label.setStyleSheet("color: gray;")
-        
+
         print(f"연장실험 상태 변경: {'진행' if state == Qt.Checked else '미진행'}")
+
+    def get_default_sampling_count(self):
+        """설정에서 기본 샘플링 횟수 불러오기"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'default_sampling_count'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return int(result['value'])
+            return 6  # 기본값
+        except Exception as e:
+            print(f"기본 샘플링 횟수 로드 오류: {e}")
+            return 6  # 기본값
                     
     def get_test_method(self):
         """현재 선택된 실험 방법 반환"""
