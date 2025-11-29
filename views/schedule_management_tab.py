@@ -647,10 +647,10 @@ class ScheduleManagementTab(QWidget):
         self.temp_zone3_value = self._create_value_label("-", temp_value_style)
         grid.addWidget(self.temp_zone3_value, 4, 7)
 
-        # 샘플링횟수는 다른 곳에서 사용하므로 숨겨진 라벨로 유지
-        self.sampling_count_label = QLabel("샘플링횟수")
+        # 샘플링횟수는 다른 곳에서 사용하므로 숨겨진 라벨로 유지 (부모 지정 필수)
+        self.sampling_count_label = QLabel("샘플링횟수", self)
         self.sampling_count_label.hide()
-        self.sampling_count_value = QLabel("-")
+        self.sampling_count_value = QLabel("-", self)
         self.sampling_count_value.hide()
 
         parent_layout.addWidget(group)
