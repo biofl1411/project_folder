@@ -536,6 +536,37 @@ class ScheduleTab(QWidget):
                             status_item.setBackground(Qt.green)
                         self.schedule_table.setItem(row, col_index, status_item)
 
+                    elif col_key == 'custom_temperatures':
+                        # 실험온도 표시 - 의뢰자 요청 온도 또는 보관조건에 따른 온도
+                        custom_temps = schedule.get('custom_temperatures', '') or ''
+                        if custom_temps:
+                            # 의뢰자 요청 온도가 있으면 표시
+                            temp_text = custom_temps.replace(',', ', ')
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem(f"{temp_text}℃"))
+                        else:
+                            # 보관조건과 실험방법에 따라 온도 결정
+                            test_method = schedule.get('test_method', 'real') or 'real'
+                            storage = schedule.get('storage_condition', 'room_temp') or 'room_temp'
+
+                            if test_method in ['acceleration', 'custom_acceleration']:
+                                # 가속실험 온도
+                                temp_map = {
+                                    'room_temp': '15℃, 25℃, 35℃',
+                                    'warm': '25℃, 35℃, 45℃',
+                                    'cool': '5℃, 10℃, 15℃',
+                                    'freeze': '-6℃, -12℃, -18℃'
+                                }
+                            else:
+                                # 실측실험 온도
+                                temp_map = {
+                                    'room_temp': '15℃',
+                                    'warm': '25℃',
+                                    'cool': '10℃',
+                                    'freeze': '-18℃ 이하'
+                                }
+                            temp_text = temp_map.get(storage, '')
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem(temp_text))
+
                     else:
                         # 기타 필드 (직접 매핑)
                         value = schedule.get(data_key, '') if data_key else ''

@@ -241,14 +241,13 @@ class EstimateTab(QWidget):
         self.items_table.setColumnCount(5)
         self.items_table.setHorizontalHeaderLabels(["No.", "식품유형", "검사 항목", "계", "소 계"])
         self.items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # 식품유형 열 확장
         self.items_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.items_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         self.items_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
         self.items_table.setColumnWidth(0, 35)
-        self.items_table.setColumnWidth(1, 180)
-        self.items_table.setColumnWidth(3, 70)
-        self.items_table.setColumnWidth(4, 90)
+        self.items_table.setColumnWidth(3, 80)
+        self.items_table.setColumnWidth(4, 100)
         self.items_table.setMinimumHeight(200)
         self.items_table.setStyleSheet("""
             QTableWidget {
@@ -263,10 +262,12 @@ class EstimateTab(QWidget):
                 border: 1px solid #ccc;
                 padding: 5px;
                 font-weight: bold;
+                text-align: center;
             }
         """)
         # 수직 정렬을 위한 기본 설정
         self.items_table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter)
+        self.items_table.verticalHeader().setVisible(False)  # 행 헤더 숨김
 
         self.estimate_layout.addWidget(self.items_table)
 
@@ -542,41 +543,43 @@ FAX: (070) 7410-1430""")
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 테이블에 데이터 추가 - QLabel 위젯을 사용하여 수직 중앙 정렬
+        # 테이블에 데이터 추가 - QWidget 컨테이너를 사용하여 수직 중앙 정렬
+        # 셀 위젯 생성 헬퍼 함수
+        def create_centered_cell(text, align=Qt.AlignCenter, word_wrap=False):
+            """수직 가운데 정렬된 셀 위젯 생성"""
+            from PyQt5.QtWidgets import QVBoxLayout
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(5, 5, 5, 5)
+            layout.setAlignment(Qt.AlignVCenter)
+
+            label = QLabel(text)
+            label.setAlignment(align)
+            label.setStyleSheet("background-color: transparent;")
+            if word_wrap:
+                label.setWordWrap(True)
+            layout.addWidget(label)
+
+            container.setStyleSheet("background-color: white;")
+            return container
+
         # No. 열
-        no_label = QLabel("1.")
-        no_label.setAlignment(Qt.AlignCenter)
-        no_label.setStyleSheet("background-color: white; padding: 5px;")
-        self.items_table.setCellWidget(0, 0, no_label)
+        self.items_table.setCellWidget(0, 0, create_centered_cell("1"))
 
         # 식품유형 열에 상세 정보 포함
-        food_type_label = QLabel(food_type_text)
-        food_type_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        food_type_label.setStyleSheet("background-color: white; padding: 5px;")
-        food_type_label.setWordWrap(True)
-        self.items_table.setCellWidget(0, 1, food_type_label)
+        self.items_table.setCellWidget(0, 1, create_centered_cell(food_type_text, Qt.AlignVCenter | Qt.AlignLeft, True))
 
         # 검사 항목 열에 검사항목만 표시
-        test_items_label = QLabel(test_items_text)
-        test_items_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        test_items_label.setStyleSheet("background-color: white; padding: 5px;")
-        test_items_label.setWordWrap(True)
-        self.items_table.setCellWidget(0, 2, test_items_label)
+        self.items_table.setCellWidget(0, 2, create_centered_cell(test_items_text, Qt.AlignVCenter | Qt.AlignLeft, True))
 
         # 금액 계산
         total_price = self.calculate_total_price(schedule)
 
         # 계 열
-        price_label = QLabel(f"{total_price:,}")
-        price_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        price_label.setStyleSheet("background-color: white; padding: 5px;")
-        self.items_table.setCellWidget(0, 3, price_label)
+        self.items_table.setCellWidget(0, 3, create_centered_cell(f"{total_price:,}", Qt.AlignVCenter | Qt.AlignRight))
 
         # 소계 열
-        subtotal_label = QLabel(f"{total_price:,} 원")
-        subtotal_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        subtotal_label.setStyleSheet("background-color: white; padding: 5px;")
-        self.items_table.setCellWidget(0, 4, subtotal_label)
+        self.items_table.setCellWidget(0, 4, create_centered_cell(f"{total_price:,} 원", Qt.AlignVCenter | Qt.AlignRight))
 
     def calculate_total_price(self, schedule):
         """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
@@ -586,7 +589,14 @@ FAX: (070) 7410-1430""")
             report_cost = schedule.get('report_cost', 0) or 0
             interim_report_cost = schedule.get('interim_report_cost', 0) or 0
 
-            total = total_rounds_cost + report_cost + interim_report_cost
+            # 가속 실험인 경우 온도 구간 수(3) 적용
+            test_method = schedule.get('test_method', 'real')
+            if test_method in ['acceleration', 'custom_acceleration', 'custom_accel']:
+                zone_count = 3
+            else:
+                zone_count = 1
+
+            total = (total_rounds_cost * zone_count) + report_cost + interim_report_cost
             return int(total)
 
         # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
