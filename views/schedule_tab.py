@@ -21,16 +21,31 @@ class ScheduleDisplaySettingsDialog(QDialog):
 
     # 설정 가능한 컬럼 목록 (key, display_name, default_visible)
     COLUMN_OPTIONS = [
+        # 업체 정보
         ('client_name', '업체명', True),
+        ('client_ceo', '대표자', False),
+        ('client_contact', '담당자', False),
+        ('client_email', '이메일', False),
+        ('client_phone', '전화번호', False),
+        # 제품/실험 정보
         ('product_name', '샘플명', True),
+        ('food_type', '식품유형', False),
         ('test_method', '실험방법', False),
         ('storage_condition', '보관조건', False),
-        ('food_type', '식품유형', False),
+        ('custom_temperatures', '실험온도', False),
+        ('expiry_period', '소비기한', False),
+        ('test_period', '실험기간', False),
+        ('sampling_count', '샘플링횟수', False),
+        ('report_type', '보고서종류', False),
+        ('extension_test', '연장실험', False),
+        # 포장/기타
+        ('packaging', '포장단위', False),
+        # 일정
         ('start_date', '시작일', True),
         ('end_date', '종료일', True),
         ('estimate_date', '견적일자', True),
-        ('sampling_count', '샘플링횟수', False),
         ('status', '상태', True),
+        ('memo', '메모', False),
     ]
 
     def __init__(self, parent=None):
@@ -162,19 +177,35 @@ class ScheduleTab(QWidget):
         self.initUI()
     
     # 컬럼 정의 (key, header_name, data_key, column_index)
+    # column_index는 동적으로 계산되므로 None으로 설정
     ALL_COLUMNS = [
-        ('select', '선택', None, 0),
-        ('id', 'ID', 'id', 1),
-        ('client_name', '업체명', 'client_name', 2),
-        ('product_name', '샘플명', 'product_name', 3),
-        ('test_method', '실험방법', 'test_method', 4),
-        ('storage_condition', '보관조건', 'storage_condition', 5),
-        ('food_type', '식품유형', 'food_type_id', 6),
-        ('start_date', '시작일', 'start_date', 7),
-        ('end_date', '종료일', 'end_date', 8),
-        ('estimate_date', '견적일자', 'estimate_date', 9),
-        ('sampling_count', '샘플링횟수', 'sampling_count', 10),
-        ('status', '상태', 'status', 11),
+        ('select', '선택', None),
+        ('id', 'ID', 'id'),
+        # 업체 정보
+        ('client_name', '업체명', 'client_name'),
+        ('client_ceo', '대표자', 'client_ceo'),
+        ('client_contact', '담당자', 'client_contact'),
+        ('client_email', '이메일', 'client_email'),
+        ('client_phone', '전화번호', 'client_phone'),
+        # 제품/실험 정보
+        ('product_name', '샘플명', 'product_name'),
+        ('food_type', '식품유형', 'food_type_id'),
+        ('test_method', '실험방법', 'test_method'),
+        ('storage_condition', '보관조건', 'storage_condition'),
+        ('custom_temperatures', '실험온도', 'custom_temperatures'),
+        ('expiry_period', '소비기한', 'expiry_period'),
+        ('test_period', '실험기간', 'test_period'),
+        ('sampling_count', '샘플링횟수', 'sampling_count'),
+        ('report_type', '보고서종류', 'report_type'),
+        ('extension_test', '연장실험', 'extension_test'),
+        # 포장/기타
+        ('packaging', '포장단위', 'packaging'),
+        # 일정
+        ('start_date', '시작일', 'start_date'),
+        ('end_date', '종료일', 'end_date'),
+        ('estimate_date', '견적일자', 'estimate_date'),
+        ('status', '상태', 'status'),
+        ('memo', '메모', 'memo'),
     ]
 
     def initUI(self):
@@ -308,21 +339,34 @@ class ScheduleTab(QWidget):
         header.setSectionResizeMode(0, QHeaderView.Fixed)
         self.schedule_table.setColumnWidth(0, 50)
 
-        # 각 열의 기본 너비 설정
+        # 각 열의 기본 너비 설정 (컬럼 키 기반)
         column_widths = {
-            2: 150,   # 업체명
-            3: 150,   # 샘플명
-            4: 80,    # 실험방법
-            5: 80,    # 보관조건
-            6: 120,   # 식품유형
-            7: 100,   # 시작일
-            8: 100,   # 종료일
-            9: 100,   # 견적일자
-            10: 80,   # 샘플링횟수
-            11: 80,   # 상태
+            'client_name': 120,
+            'client_ceo': 80,
+            'client_contact': 80,
+            'client_email': 150,
+            'client_phone': 100,
+            'product_name': 120,
+            'food_type': 100,
+            'test_method': 80,
+            'storage_condition': 70,
+            'custom_temperatures': 120,
+            'expiry_period': 90,
+            'test_period': 70,
+            'sampling_count': 70,
+            'report_type': 100,
+            'extension_test': 70,
+            'packaging': 80,
+            'start_date': 90,
+            'end_date': 90,
+            'estimate_date': 90,
+            'status': 70,
+            'memo': 150,
         }
-        for col, width in column_widths.items():
-            self.schedule_table.setColumnWidth(col, width)
+        for col_index, col_def in enumerate(self.ALL_COLUMNS):
+            col_key = col_def[0]
+            if col_key in column_widths:
+                self.schedule_table.setColumnWidth(col_index, column_widths[col_key])
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
@@ -367,94 +411,137 @@ class ScheduleTab(QWidget):
         try:
             self.schedule_table.setRowCount(0)
 
+            # 컬럼 키와 인덱스 매핑
+            col_map = {col[0]: idx for idx, col in enumerate(self.ALL_COLUMNS)}
+
             for row, schedule in enumerate(schedules):
                 self.schedule_table.insertRow(row)
 
-                # 체크박스 (선택 열) - 0번
-                checkbox = QCheckBox()
-                checkbox_widget = QWidget()
-                checkbox_layout = QHBoxLayout(checkbox_widget)
-                checkbox_layout.addWidget(checkbox)
-                checkbox_layout.setAlignment(Qt.AlignCenter)
-                checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                self.schedule_table.setCellWidget(row, 0, checkbox_widget)
+                # 각 컬럼에 대해 데이터 채우기
+                for col_index, col_def in enumerate(self.ALL_COLUMNS):
+                    col_key = col_def[0]
+                    data_key = col_def[2] if len(col_def) > 2 else None
 
-                # ID (숨김 열) - 1번
-                schedule_id = schedule.get('id', '')
-                self.schedule_table.setItem(row, 1, QTableWidgetItem(str(schedule_id)))
+                    if col_key == 'select':
+                        # 체크박스
+                        checkbox = QCheckBox()
+                        checkbox_widget = QWidget()
+                        checkbox_layout = QHBoxLayout(checkbox_widget)
+                        checkbox_layout.addWidget(checkbox)
+                        checkbox_layout.setAlignment(Qt.AlignCenter)
+                        checkbox_layout.setContentsMargins(0, 0, 0, 0)
+                        self.schedule_table.setCellWidget(row, col_index, checkbox_widget)
 
-                # 업체명 - 2번
-                client_name = schedule.get('client_name', '') or ''
-                self.schedule_table.setItem(row, 2, QTableWidgetItem(client_name))
+                    elif col_key == 'id':
+                        # ID
+                        schedule_id = schedule.get('id', '')
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(str(schedule_id)))
 
-                # 제품명/샘플명 - 3번
-                product_name = schedule.get('product_name', '') or schedule.get('title', '') or ''
-                self.schedule_table.setItem(row, 3, QTableWidgetItem(product_name))
+                    elif col_key == 'test_method':
+                        # 실험방법 (코드 → 텍스트 변환)
+                        test_method = schedule.get('test_method', '') or ''
+                        test_method_text = {
+                            'real': '실측', 'acceleration': '가속',
+                            'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'
+                        }.get(test_method, test_method)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(test_method_text))
 
-                # 실험방법 - 4번
-                test_method = schedule.get('test_method', '') or ''
-                test_method_text = {
-                    'real': '실측', 'acceleration': '가속',
-                    'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'
-                }.get(test_method, test_method)
-                self.schedule_table.setItem(row, 4, QTableWidgetItem(test_method_text))
+                    elif col_key == 'storage_condition':
+                        # 보관조건 (코드 → 텍스트 변환)
+                        storage = schedule.get('storage_condition', '') or ''
+                        storage_text = {
+                            'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'
+                        }.get(storage, storage)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(storage_text))
 
-                # 보관조건 - 5번
-                storage = schedule.get('storage_condition', '') or ''
-                storage_text = {
-                    'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'
-                }.get(storage, storage)
-                self.schedule_table.setItem(row, 5, QTableWidgetItem(storage_text))
+                    elif col_key == 'food_type':
+                        # 식품유형 (ID → 이름 변환)
+                        food_type_id = schedule.get('food_type_id', '')
+                        food_type_name = ''
+                        if food_type_id:
+                            try:
+                                from models.product_types import ProductType
+                                food_type = ProductType.get_by_id(food_type_id)
+                                if food_type:
+                                    food_type_name = food_type.get('type_name', '') or ''
+                            except:
+                                pass
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(food_type_name))
 
-                # 식품유형 - 6번
-                food_type_id = schedule.get('food_type_id', '')
-                food_type_name = ''
-                if food_type_id:
-                    try:
-                        from models.product_types import ProductType
-                        food_type = ProductType.get_by_id(food_type_id)
-                        if food_type:
-                            food_type_name = food_type.get('type_name', '') or ''
-                    except:
-                        pass
-                self.schedule_table.setItem(row, 6, QTableWidgetItem(food_type_name))
+                    elif col_key == 'expiry_period':
+                        # 소비기한 (일/월/년 조합)
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        parts = []
+                        if years > 0:
+                            parts.append(f"{years}년")
+                        if months > 0:
+                            parts.append(f"{months}개월")
+                        if days > 0:
+                            parts.append(f"{days}일")
+                        expiry_text = ' '.join(parts) if parts else ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(expiry_text))
 
-                # 시작일 - 7번
-                start_date = schedule.get('start_date', '') or ''
-                self.schedule_table.setItem(row, 7, QTableWidgetItem(start_date))
+                    elif col_key == 'test_period':
+                        # 실험기간 계산
+                        test_method = schedule.get('test_method', 'real')
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        total_days = days + (months * 30) + (years * 365)
+                        if test_method in ['acceleration', 'custom_acceleration']:
+                            test_days = total_days // 2
+                        else:
+                            test_days = int(total_days * 1.5)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(f"{test_days}일" if test_days > 0 else ''))
 
-                # 종료일 - 8번
-                end_date = schedule.get('end_date', '') or ''
-                self.schedule_table.setItem(row, 8, QTableWidgetItem(end_date))
+                    elif col_key == 'report_type':
+                        # 보고서 종류
+                        types = []
+                        if schedule.get('report_interim'):
+                            types.append('중간')
+                        if schedule.get('report_korean'):
+                            types.append('국문')
+                        if schedule.get('report_english'):
+                            types.append('영문')
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(', '.join(types)))
 
-                # 견적일자 - 9번
-                estimate_date = schedule.get('estimate_date', '') or ''
-                self.schedule_table.setItem(row, 9, QTableWidgetItem(estimate_date))
+                    elif col_key == 'extension_test':
+                        # 연장실험
+                        ext = schedule.get('extension_test', False)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem('진행' if ext else '미진행'))
 
-                # 샘플링횟수 - 10번
-                sampling_count = schedule.get('sampling_count', '') or ''
-                self.schedule_table.setItem(row, 10, QTableWidgetItem(str(sampling_count) if sampling_count else ''))
+                    elif col_key == 'packaging':
+                        # 포장단위
+                        weight = schedule.get('packaging_weight', 0) or 0
+                        unit = schedule.get('packaging_unit', 'g') or 'g'
+                        packaging_text = f"{weight}{unit}" if weight > 0 else ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(packaging_text))
 
-                # 상태 - 11번
-                status = schedule.get('status', 'pending') or 'pending'
-                status_text = {
-                    'pending': '대기',
-                    'scheduled': '입고예정',
-                    'received': '입고',
-                    'completed': '종료',
-                    'in_progress': '입고',
-                    'cancelled': '종료'
-                }.get(status, status)
+                    elif col_key == 'status':
+                        # 상태 (배경색 포함)
+                        status = schedule.get('status', 'pending') or 'pending'
+                        status_text = {
+                            'pending': '대기', 'scheduled': '입고예정',
+                            'received': '입고', 'completed': '종료',
+                            'in_progress': '입고', 'cancelled': '종료'
+                        }.get(status, status)
+                        status_item = QTableWidgetItem(status_text)
+                        if status in ['scheduled']:
+                            status_item.setBackground(Qt.cyan)
+                        elif status in ['received', 'in_progress']:
+                            status_item.setBackground(Qt.yellow)
+                        elif status in ['completed', 'cancelled']:
+                            status_item.setBackground(Qt.green)
+                        self.schedule_table.setItem(row, col_index, status_item)
 
-                status_item = QTableWidgetItem(status_text)
-                if status in ['scheduled']:
-                    status_item.setBackground(Qt.cyan)
-                elif status in ['received', 'in_progress']:
-                    status_item.setBackground(Qt.yellow)
-                elif status in ['completed', 'cancelled']:
-                    status_item.setBackground(Qt.green)
-
-                self.schedule_table.setItem(row, 11, status_item)
+                    else:
+                        # 기타 필드 (직접 매핑)
+                        value = schedule.get(data_key, '') if data_key else ''
+                        if value is None:
+                            value = ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(str(value)))
 
             log_message('ScheduleTab', f'스케줄 {len(schedules)}개 표시 완료')
         except Exception as e:
@@ -755,10 +842,9 @@ class ScheduleTab(QWidget):
         """컬럼 표시 설정을 테이블에 적용"""
         visible_columns = self.get_column_settings()
 
-        # 컬럼 키와 인덱스 매핑
-        column_indices = {col[0]: col[3] for col in self.ALL_COLUMNS}
-
-        for col_key, col_index in column_indices.items():
+        # 컬럼 키와 인덱스 매핑 (enumerate로 동적 인덱스 생성)
+        for col_index, col_def in enumerate(self.ALL_COLUMNS):
+            col_key = col_def[0]
             if col_key == 'select':
                 # 선택 열은 항상 표시
                 self.schedule_table.setColumnHidden(col_index, False)

@@ -5,9 +5,110 @@ from PyQt5.QtWidgets import (
     QGroupBox, QLineEdit, QPushButton, QTextEdit, QDateEdit,
     QComboBox, QLabel, QMessageBox, QWidget, QRadioButton,
     QTableWidget, QTableWidgetItem, QSpinBox, QButtonGroup,
-    QFrame, QApplication, QCheckBox, QHeaderView
+    QFrame, QApplication, QCheckBox, QHeaderView, QScrollArea,
+    QToolButton, QSizePolicy
 )
-from PyQt5.QtCore import QDate, Qt, QTranslator, QEvent
+from PyQt5.QtCore import QDate, Qt, QTranslator, QEvent, QPropertyAnimation, QParallelAnimationGroup
+from PyQt5.QtGui import QFont
+
+
+class CollapsibleGroupBox(QWidget):
+    """접이식 그룹박스 - +/- 버튼으로 내용을 펼치거나 접을 수 있음"""
+
+    def __init__(self, title="", parent=None, collapsed=False):
+        super().__init__(parent)
+
+        self.is_collapsed = collapsed
+        self.title = title
+
+        # 메인 레이아웃
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+
+        # 헤더 프레임 (토글 버튼 + 제목)
+        self.header_frame = QFrame()
+        self.header_frame.setStyleSheet("""
+            QFrame {
+                background-color: #e0e0e0;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+            }
+        """)
+        header_layout = QHBoxLayout(self.header_frame)
+        header_layout.setContentsMargins(5, 3, 5, 3)
+
+        # 토글 버튼
+        self.toggle_btn = QToolButton()
+        self.toggle_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                font-weight: bold;
+                font-size: 14px;
+            }
+        """)
+        self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self.toggle_btn.setText("▼" if not collapsed else "▶")
+        self.toggle_btn.clicked.connect(self.toggle_content)
+
+        # 제목 라벨
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; border: none;")
+
+        header_layout.addWidget(self.toggle_btn)
+        header_layout.addWidget(self.title_label)
+        header_layout.addStretch()
+
+        # 헤더 클릭으로도 토글 가능하게
+        self.header_frame.mousePressEvent = lambda e: self.toggle_content()
+
+        self.main_layout.addWidget(self.header_frame)
+
+        # 콘텐츠 프레임
+        self.content_frame = QFrame()
+        self.content_frame.setStyleSheet("""
+            QFrame {
+                border: 1px solid #ccc;
+                border-top: none;
+                background-color: white;
+            }
+        """)
+        self.content_layout = QVBoxLayout(self.content_frame)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+
+        self.main_layout.addWidget(self.content_frame)
+
+        # 초기 상태 설정
+        if collapsed:
+            self.content_frame.hide()
+
+    def toggle_content(self):
+        """콘텐츠 표시/숨김 토글"""
+        self.is_collapsed = not self.is_collapsed
+
+        if self.is_collapsed:
+            self.content_frame.hide()
+            self.toggle_btn.setText("▶")
+        else:
+            self.content_frame.show()
+            self.toggle_btn.setText("▼")
+
+    def setContentLayout(self, layout):
+        """콘텐츠 레이아웃 설정"""
+        # 기존 레이아웃 제거
+        if self.content_frame.layout():
+            QWidget().setLayout(self.content_frame.layout())
+
+        self.content_layout = layout
+        self.content_frame.setLayout(layout)
+
+    def addWidget(self, widget):
+        """콘텐츠에 위젯 추가"""
+        self.content_layout.addWidget(widget)
+
+    def layout(self):
+        """콘텐츠 레이아웃 반환"""
+        return self.content_layout
 
 # 온도 레이블 상수 정의
 ROOM_TEMP_LABEL = "상온 (15℃)"
@@ -277,18 +378,30 @@ class ScheduleCreateDialog(QDialog):
         self.translator = QTranslator()
         self.translator.load('ko_KR', ':/translations/')
         QApplication.instance().installTranslator(self.translator)
-        
-        # 레이아웃 설정
-        self.main_layout = QVBoxLayout()
-        self.main_layout.setSpacing(10)
-        self.main_layout.setContentsMargins(15, 15, 15, 15)
-        self.setLayout(self.main_layout)
 
-        # 업체 정보 영역
-        client_group = QGroupBox("업체 정보")
+        # 다이얼로그 메인 레이아웃
+        dialog_layout = QVBoxLayout(self)
+        dialog_layout.setContentsMargins(5, 5, 5, 5)
+        dialog_layout.setSpacing(5)
+
+        # 스크롤 영역 추가
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("QScrollArea { border: none; }")
+
+        # 스크롤 내용 위젯
+        scroll_widget = QWidget()
+        self.main_layout = QVBoxLayout(scroll_widget)
+        self.main_layout.setSpacing(10)
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+
+        scroll_area.setWidget(scroll_widget)
+        dialog_layout.addWidget(scroll_area)
+
+        # 업체 정보 영역 - 접이식 그룹박스 사용
+        self.client_group = CollapsibleGroupBox("업체 정보", collapsed=False)
         client_layout = QFormLayout()
         client_layout.setSpacing(8)
-        client_group.setLayout(client_layout)
 
         # 업체명 입력 및 검색
         self.client_input = QLineEdit()
@@ -328,13 +441,14 @@ class ScheduleCreateDialog(QDialog):
         self.client_memo_label = QLabel("- ")  # 메모
         client_layout.addRow("메모:", self.client_memo_label)
 
-        self.main_layout.addWidget(client_group)
-            
-        # 실험 정보 영역
-        test_group = QGroupBox("실험 정보")
+        # 업체 정보 그룹에 레이아웃 설정
+        self.client_group.setContentLayout(client_layout)
+        self.main_layout.addWidget(self.client_group)
+
+        # 실험 정보 영역 - 접이식 그룹박스 사용
+        self.test_group = CollapsibleGroupBox("실험 정보", collapsed=False)
         test_layout = QFormLayout()
         test_layout.setSpacing(8)
-        test_group.setLayout(test_layout)
         
         # 실험 방법 라디오 버튼 - 4가지 옵션으로 확장
         test_method_layout = QHBoxLayout()
@@ -478,15 +592,18 @@ class ScheduleCreateDialog(QDialog):
         
         # 샘플링 횟수 설정
         sampling_layout = QHBoxLayout()
-        
+
+        # 설정에서 기본 샘플링 횟수 불러오기
+        default_sampling = self.get_default_sampling_count()
+
         # 기본값 체크박스
-        self.default_sampling_check = QCheckBox("기본값 사용 (6회)")
+        self.default_sampling_check = QCheckBox(f"기본값 사용 ({default_sampling}회)")
         self.default_sampling_check.setChecked(True)
-        
+
         # 사용자 정의 입력
         self.sampling_spin = QSpinBox()
         self.sampling_spin.setRange(1, 30)
-        self.sampling_spin.setValue(6)
+        self.sampling_spin.setValue(default_sampling)
         self.sampling_spin.setEnabled(False)  # 처음에는 비활성화
         
         sampling_layout.addWidget(self.default_sampling_check)
@@ -517,15 +634,15 @@ class ScheduleCreateDialog(QDialog):
 
         # 체크박스 상태 변경 시 레이블 업데이트를 위한 함수 연결
         self.extension_check.stateChanged.connect(self.update_extension_status)
-        
-        # 실험 정보 영역 추가
-        self.main_layout.addWidget(test_group)
-        
-        # 제품 정보 영역
-        product_group = QGroupBox("제품 정보")
+
+        # 실험 정보 그룹에 레이아웃 설정
+        self.test_group.setContentLayout(test_layout)
+        self.main_layout.addWidget(self.test_group)
+
+        # 제품 정보 영역 - 접이식 그룹박스 사용
+        self.product_group = CollapsibleGroupBox("제품 정보", collapsed=False)
         product_layout = QFormLayout()
         product_layout.setSpacing(8)
-        product_group.setLayout(product_layout)
 
         # 제품명
         self.product_name_input = QLineEdit()
@@ -578,27 +695,33 @@ class ScheduleCreateDialog(QDialog):
         self.test_items_layout.addWidget(test_items_links)
         product_layout.addRow("검사항목:", self.test_items_layout)
 
-        # 제품 정보 그룹을 메인 레이아웃에 추가
-        self.main_layout.addWidget(product_group)
-        
-        # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당
-        button_layout = QHBoxLayout()
+        # 제품 정보 그룹에 레이아웃 설정
+        self.product_group.setContentLayout(product_layout)
+        self.main_layout.addWidget(self.product_group)
+
+        # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당 (스크롤 영역 아래에 고정)
+        button_frame = QFrame()
+        button_frame.setStyleSheet("background-color: #f5f5f5; border-top: 1px solid #ccc;")
+        button_layout = QHBoxLayout(button_frame)
+        button_layout.setContentsMargins(10, 10, 10, 10)
+
         self.preview_btn = QPushButton("미리보기")
         self.preview_btn.setAutoDefault(False)
         self.preview_btn.setDefault(False)
         self.save_btn = QPushButton("저장")
         self.save_btn.setAutoDefault(False)
         self.save_btn.setDefault(False)
+        self.save_btn.setStyleSheet("background-color: #4CAF50; color: white;")
         self.cancel_btn = QPushButton("취소")
         self.cancel_btn.setAutoDefault(False)
         self.cancel_btn.setDefault(False)
-        
+
         button_layout.addStretch()
         button_layout.addWidget(self.preview_btn)
         button_layout.addWidget(self.save_btn)
         button_layout.addWidget(self.cancel_btn)
-        
-        self.main_layout.addLayout(button_layout)
+
+        dialog_layout.addWidget(button_frame)
         
         # 필요한 변수 초기화
         self.selected_client_id = None
@@ -988,35 +1111,29 @@ class ScheduleCreateDialog(QDialog):
         """의뢰자 요청 온도 입력창 표시"""
         try:
             print("온도 입력창 생성 시작")
-            
-            # 기존에 추가된 "요청 온도:" 행을 찾아 제거
-            test_group = None
-            for i in range(self.main_layout.count()):
-                item = self.main_layout.itemAt(i)
-                if item and item.widget() and isinstance(item.widget(), QGroupBox) and item.widget().title() == "실험 정보":
-                    test_group = item.widget()
-                    test_layout = test_group.layout()
-                    
-                    # QFormLayout에서 "요청 온도:" 라벨을 찾아 제거
-                    if test_layout:
-                        for row in range(test_layout.rowCount()):
-                            label_item = test_layout.itemAt(row, QFormLayout.LabelRole)
-                            if label_item and label_item.widget():
-                                label_widget = label_item.widget()
-                                if isinstance(label_widget, QLabel) and label_widget.text() == "요청 온도:":
-                                    # 필드 항목 가져오기
-                                    field_item = test_layout.itemAt(row, QFormLayout.FieldRole)
-                                    if field_item and field_item.widget():
-                                        field_widget = field_item.widget()
-                                        # 위젯 제거 및 삭제
-                                        test_layout.removeRow(row)
-                                        field_widget.setParent(None)
-                                        field_widget.deleteLater()
-                                        label_widget.setParent(None)
-                                        label_widget.deleteLater()
-                                        print("기존 '요청 온도:' 행 제거 완료")
-                                        break
-                    break
+
+            # 실험 정보 그룹의 레이아웃 가져오기 (CollapsibleGroupBox 사용)
+            test_layout = self.test_group.layout()
+
+            # QFormLayout에서 "요청 온도:" 라벨을 찾아 제거
+            if test_layout and isinstance(test_layout, QFormLayout):
+                for row in range(test_layout.rowCount()):
+                    label_item = test_layout.itemAt(row, QFormLayout.LabelRole)
+                    if label_item and label_item.widget():
+                        label_widget = label_item.widget()
+                        if isinstance(label_widget, QLabel) and label_widget.text() == "요청 온도:":
+                            # 필드 항목 가져오기
+                            field_item = test_layout.itemAt(row, QFormLayout.FieldRole)
+                            if field_item and field_item.widget():
+                                field_widget = field_item.widget()
+                                # 위젯 제거 및 삭제
+                                test_layout.removeRow(row)
+                                field_widget.setParent(None)
+                                field_widget.deleteLater()
+                                label_widget.setParent(None)
+                                label_widget.deleteLater()
+                                print("기존 '요청 온도:' 행 제거 완료")
+                                break
             
             # 기존 입력창이 있다면 제거
             if hasattr(self, 'custom_temp_frame'):
@@ -1045,8 +1162,8 @@ class ScheduleCreateDialog(QDialog):
                 
                 temp_layout.addLayout(temp_input_layout)
             
-            # 실험 정보 그룹을 이미 찾았으니 바로 추가
-            if test_group and test_layout:
+            # 실험 정보 그룹에 온도 입력창 추가
+            if test_layout and isinstance(test_layout, QFormLayout):
                 self.custom_temp_frame.setLayout(temp_layout)
                 test_layout.addRow("요청 온도:", self.custom_temp_frame)
                 print(f"온도 입력창 {temp_count}개 생성 완료")
@@ -1394,8 +1511,24 @@ class ScheduleCreateDialog(QDialog):
         else:
             self.extension_status_label.setText("미진행")
             self.extension_status_label.setStyleSheet("color: gray;")
-        
+
         print(f"연장실험 상태 변경: {'진행' if state == Qt.Checked else '미진행'}")
+
+    def get_default_sampling_count(self):
+        """설정에서 기본 샘플링 횟수 불러오기"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'default_sampling_count'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return int(result['value'])
+            return 6  # 기본값
+        except Exception as e:
+            print(f"기본 샘플링 횟수 로드 오류: {e}")
+            return 6  # 기본값
                     
     def get_test_method(self):
         """현재 선택된 실험 방법 반환"""

@@ -62,8 +62,20 @@ class SettingsDialog(QDialog):
         self.company_name_input = QLineEdit()
         company_layout.addRow("회사명:", self.company_name_input)
 
+        self.company_ceo_input = QLineEdit()
+        company_layout.addRow("대표자:", self.company_ceo_input)
+
+        self.company_manager_input = QLineEdit()
+        company_layout.addRow("담당자:", self.company_manager_input)
+
         self.company_phone_input = QLineEdit()
         company_layout.addRow("연락처:", self.company_phone_input)
+
+        self.company_mobile_input = QLineEdit()
+        company_layout.addRow("핸드폰:", self.company_mobile_input)
+
+        self.company_fax_input = QLineEdit()
+        company_layout.addRow("팩스:", self.company_fax_input)
 
         self.company_address_input = QLineEdit()
         company_layout.addRow("주소:", self.company_address_input)
@@ -151,6 +163,26 @@ class SettingsDialog(QDialog):
 
             settings_dict = {s['key']: s['value'] for s in settings}
 
+            # 회사 정보
+            if 'company_name' in settings_dict:
+                self.company_name_input.setText(settings_dict['company_name'])
+            if 'company_ceo' in settings_dict:
+                self.company_ceo_input.setText(settings_dict['company_ceo'])
+            if 'company_manager' in settings_dict:
+                self.company_manager_input.setText(settings_dict['company_manager'])
+            if 'company_phone' in settings_dict:
+                self.company_phone_input.setText(settings_dict['company_phone'])
+            if 'company_mobile' in settings_dict:
+                self.company_mobile_input.setText(settings_dict['company_mobile'])
+            if 'company_fax' in settings_dict:
+                self.company_fax_input.setText(settings_dict['company_fax'])
+            if 'company_address' in settings_dict:
+                self.company_address_input.setText(settings_dict['company_address'])
+
+            # 기본 샘플링 횟수
+            if 'default_sampling_count' in settings_dict:
+                self.default_sampling_spin.setValue(int(settings_dict['default_sampling_count']))
+
             # 부가세율
             if 'tax_rate' in settings_dict:
                 self.tax_rate_spin.setValue(int(settings_dict['tax_rate']))
@@ -180,6 +212,16 @@ class SettingsDialog(QDialog):
 
             # 설정 값 업데이트
             settings = [
+                # 회사 정보
+                ('company_name', self.company_name_input.text()),
+                ('company_ceo', self.company_ceo_input.text()),
+                ('company_manager', self.company_manager_input.text()),
+                ('company_phone', self.company_phone_input.text()),
+                ('company_mobile', self.company_mobile_input.text()),
+                ('company_fax', self.company_fax_input.text()),
+                ('company_address', self.company_address_input.text()),
+                # 기본 설정
+                ('default_sampling_count', str(self.default_sampling_spin.value())),
                 ('tax_rate', str(self.tax_rate_spin.value())),
                 ('default_discount', str(self.default_discount_spin.value())),
                 ('output_path', self.output_path_input.text()),

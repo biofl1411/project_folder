@@ -99,7 +99,12 @@ class Schedule:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT s.*, c.name as client_name
+                SELECT s.*,
+                       c.name as client_name,
+                       c.ceo as client_ceo,
+                       c.contact_person as client_contact,
+                       c.email as client_email,
+                       c.phone as client_phone
                 FROM schedules s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC

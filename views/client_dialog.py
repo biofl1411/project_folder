@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                             QLineEdit, QPushButton, QLabel, QMessageBox,
                             QTableWidget, QTableWidgetItem, QHeaderView,
                             QGridLayout, QScrollArea, QGroupBox, QComboBox, QWidget)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 from models.clients import Client
 
 
@@ -13,14 +13,32 @@ class ClientSearchDialog(QDialog):
     # 한글 초성 매핑
     CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
 
+    # 컬럼 정의 (키, 헤더명, 기본너비)
+    COLUMNS = [
+        ('id', 'ID', 40),
+        ('name', '고객/회사명', 150),
+        ('ceo', '대표자', 80),
+        ('business_no', '사업자번호', 100),
+        ('contact_person', '담당자', 80),
+        ('phone', '전화번호', 100),
+        ('email', 'EMAIL', 150),
+        ('sales_rep', '영업담당', 80),
+        ('category', '분류', 70),
+        ('address', '소재지', 200),
+        ('detail_address', '상세주소', 150),
+        ('notes', '메모', 100),
+    ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("업체 검색")
-        self.setMinimumWidth(1000)
-        self.setMinimumHeight(400)
+        self.setMinimumWidth(1100)
+        self.setMinimumHeight(500)
         self.selected_client = None
         self.all_clients = []  # 전체 업체 목록 저장
+        self.settings = QSettings("MyApp", "ClientSearchDialog")
         self.initUI()
+        self.loadColumnSettings()
         self.loadClients()
 
     def initUI(self):
@@ -45,34 +63,38 @@ class ClientSearchDialog(QDialog):
 
         # 업체 목록 테이블
         self.client_table = QTableWidget()
-        self.client_table.setColumnCount(12)
-        self.client_table.setHorizontalHeaderLabels([
-            "ID", "고객/회사명", "대표자", "사업자번호", "담당자",
-            "전화번호", "EMAIL", "영업담당", "분류", "소재지", "상세주소", "메모"
-        ])
+        self.client_table.setColumnCount(len(self.COLUMNS))
+        self.client_table.setHorizontalHeaderLabels([col[1] for col in self.COLUMNS])
         self.client_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.client_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.client_table.doubleClicked.connect(self.selectClient)
 
-        # 열 너비 설정
+        # 헤더 설정 - 드래그로 열 순서 변경 가능
         header = self.client_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # ID
-        header.setSectionResizeMode(1, QHeaderView.Stretch)  # 고객/회사명
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # 대표자
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 사업자번호
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 담당자
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # 전화번호
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # EMAIL
-        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # 영업담당
-        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # 분류
-        header.setSectionResizeMode(9, QHeaderView.Stretch)  # 소재지
-        header.setSectionResizeMode(10, QHeaderView.Stretch)  # 상세주소
-        header.setSectionResizeMode(11, QHeaderView.Stretch)  # 메모
+        header.setSectionsMovable(True)  # 열 순서 변경 가능
+        header.setDragEnabled(True)
+        header.setDragDropMode(QHeaderView.InternalMove)
+        header.setSectionResizeMode(QHeaderView.Interactive)  # 마우스로 너비 조절 가능
+        header.setStretchLastSection(True)
+
+        # 기본 열 너비 설정
+        for i, (key, name, width) in enumerate(self.COLUMNS):
+            self.client_table.setColumnWidth(i, width)
+
+        # 열 순서/너비 변경 시 저장
+        header.sectionMoved.connect(self.saveColumnSettings)
+        header.sectionResized.connect(self.saveColumnSettings)
 
         layout.addWidget(self.client_table)
 
         # 버튼 영역
         btn_layout = QHBoxLayout()
+
+        # 열 설정 초기화 버튼
+        reset_btn = QPushButton("열 설정 초기화")
+        reset_btn.setAutoDefault(False)
+        reset_btn.clicked.connect(self.resetColumnSettings)
+
         select_btn = QPushButton("선택")
         select_btn.setAutoDefault(False)
         select_btn.setDefault(False)
@@ -82,10 +104,74 @@ class ClientSearchDialog(QDialog):
         cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
 
+        btn_layout.addWidget(reset_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(select_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def saveColumnSettings(self):
+        """열 순서 및 너비 저장"""
+        header = self.client_table.horizontalHeader()
+
+        # 열 순서 저장 (논리적 인덱스 -> 시각적 인덱스 매핑)
+        column_order = []
+        for logical in range(header.count()):
+            visual = header.visualIndex(logical)
+            column_order.append(visual)
+        self.settings.setValue("column_order", column_order)
+
+        # 열 너비 저장
+        column_widths = []
+        for i in range(header.count()):
+            column_widths.append(header.sectionSize(i))
+        self.settings.setValue("column_widths", column_widths)
+
+    def loadColumnSettings(self):
+        """저장된 열 순서 및 너비 불러오기"""
+        header = self.client_table.horizontalHeader()
+
+        # 열 순서 복원
+        column_order = self.settings.value("column_order", None)
+        if column_order:
+            try:
+                for logical, visual in enumerate(column_order):
+                    current_visual = header.visualIndex(logical)
+                    if current_visual != visual:
+                        header.moveSection(current_visual, visual)
+            except:
+                pass
+
+        # 열 너비 복원
+        column_widths = self.settings.value("column_widths", None)
+        if column_widths:
+            try:
+                for i, width in enumerate(column_widths):
+                    if isinstance(width, int) and width > 0:
+                        self.client_table.setColumnWidth(i, width)
+            except:
+                pass
+
+    def resetColumnSettings(self):
+        """열 설정 초기화"""
+        # 저장된 설정 삭제
+        self.settings.remove("column_order")
+        self.settings.remove("column_widths")
+
+        # 헤더 초기화
+        header = self.client_table.horizontalHeader()
+
+        # 열 순서 초기화
+        for logical in range(header.count()):
+            current_visual = header.visualIndex(logical)
+            if current_visual != logical:
+                header.moveSection(current_visual, logical)
+
+        # 열 너비 초기화
+        for i, (key, name, width) in enumerate(self.COLUMNS):
+            self.client_table.setColumnWidth(i, width)
+
+        QMessageBox.information(self, "초기화", "열 설정이 초기화되었습니다.")
 
     def loadClients(self):
         """데이터베이스에서 업체 정보 불러오기"""
@@ -177,18 +263,13 @@ class ClientSearchDialog(QDialog):
 
         for row, client in enumerate(clients):
             self.client_table.insertRow(row)
-            self.client_table.setItem(row, 0, QTableWidgetItem(str(client['id'])))
-            self.client_table.setItem(row, 1, QTableWidgetItem(client.get('name', '') or ''))
-            self.client_table.setItem(row, 2, QTableWidgetItem(client.get('ceo', '') or ''))
-            self.client_table.setItem(row, 3, QTableWidgetItem(client.get('business_no', '') or ''))
-            self.client_table.setItem(row, 4, QTableWidgetItem(client.get('contact_person', '') or ''))
-            self.client_table.setItem(row, 5, QTableWidgetItem(client.get('phone', '') or ''))
-            self.client_table.setItem(row, 6, QTableWidgetItem(client.get('email', '') or ''))
-            self.client_table.setItem(row, 7, QTableWidgetItem(client.get('sales_rep', '') or ''))
-            self.client_table.setItem(row, 8, QTableWidgetItem(client.get('category', '') or ''))
-            self.client_table.setItem(row, 9, QTableWidgetItem(client.get('address', '') or ''))
-            self.client_table.setItem(row, 10, QTableWidgetItem(client.get('detail_address', '') or ''))
-            self.client_table.setItem(row, 11, QTableWidgetItem(client.get('notes', '') or ''))
+            # COLUMNS 정의 순서대로 데이터 표시
+            for col, (key, name, width) in enumerate(self.COLUMNS):
+                if key == 'id':
+                    value = str(client.get('id', ''))
+                else:
+                    value = client.get(key, '') or ''
+                self.client_table.setItem(row, col, QTableWidgetItem(value))
 
     def selectClient(self):
         """선택한 업체 정보 반환"""
@@ -198,25 +279,19 @@ class ClientSearchDialog(QDialog):
             return
 
         row = selected_rows[0].row()
-        client_id = int(self.client_table.item(row, 0).text())
 
-        self.selected_client = (
-            client_id,
-            {
-                'name': self.client_table.item(row, 1).text(),
-                'ceo': self.client_table.item(row, 2).text(),
-                'business_no': self.client_table.item(row, 3).text(),
-                'contact_person': self.client_table.item(row, 4).text(),
-                'phone': self.client_table.item(row, 5).text(),
-                'email': self.client_table.item(row, 6).text(),
-                'sales_rep': self.client_table.item(row, 7).text(),
-                'category': self.client_table.item(row, 8).text(),
-                'address': self.client_table.item(row, 9).text(),
-                'detail_address': self.client_table.item(row, 10).text(),
-                'notes': self.client_table.item(row, 11).text()
-            }
-        )
+        # COLUMNS 정의에서 데이터 추출 (논리적 인덱스 기준)
+        client_data = {}
+        client_id = None
+        for col, (key, name, width) in enumerate(self.COLUMNS):
+            item = self.client_table.item(row, col)
+            value = item.text() if item else ''
+            if key == 'id':
+                client_id = int(value) if value else 0
+            else:
+                client_data[key] = value
 
+        self.selected_client = (client_id, client_data)
         self.accept()
 
 

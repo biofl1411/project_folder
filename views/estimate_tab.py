@@ -105,15 +105,15 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addLayout(header_layout)
 
-        # 회사명
-        company_label = QLabel("(주) 바이오푸드랩")
-        company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        self.estimate_layout.addWidget(company_label)
+        # 회사명 (설정에서 불러옴)
+        self.header_company_label = QLabel("(주) 바이오푸드랩")
+        self.header_company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.estimate_layout.addWidget(self.header_company_label)
 
-        # 주소/연락처
-        address_label = QLabel("#1411 Mario Tower, 28, Digital-ro 30 gil, Guro-gu, Seoul, Korea")
-        address_label.setStyleSheet("font-size: 10px; color: #666;")
-        self.estimate_layout.addWidget(address_label)
+        # 주소/연락처 (설정에서 불러옴)
+        self.header_address_label = QLabel("")
+        self.header_address_label.setStyleSheet("font-size: 10px; color: #666;")
+        self.estimate_layout.addWidget(self.header_address_label)
 
         website_label = QLabel("http://www.biofl.co.kr")
         website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
@@ -171,20 +171,14 @@ class EstimateTab(QWidget):
         self.sender_input = QLineEdit("㈜바이오푸드랩")
         self.sender_input.setStyleSheet(input_style)
 
-        # 오른쪽 정보 (회사 정보)
-        right_info = QLabel("""(주)바이오푸드랩
-대표이사 이 용 표
-서울특별시 구로구 디지털로30길 28
-1410호~1414호(구로동,마리오타워)
-
-TEL: (070) 7410-1400
-FAX: (070) 7410-1430""")
-        right_info.setStyleSheet("font-size: 11px;")
+        # 오른쪽 정보 (회사 정보 - 설정에서 불러옴)
+        self.right_company_info = QLabel("")
+        self.right_company_info.setStyleSheet("font-size: 11px;")
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
         info_layout.addWidget(self.estimate_no_input, 0, 1)
-        info_layout.addWidget(right_info, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
+        info_layout.addWidget(self.right_company_info, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
 
         info_layout.addWidget(estimate_date_title, 1, 0)
         info_layout.addWidget(self.estimate_date_input, 1, 1)
@@ -261,6 +255,9 @@ FAX: (070) 7410-1430""")
                 border: 1px solid #ccc;
                 gridline-color: #ccc;
             }
+            QTableWidget::item {
+                padding: 8px 5px;
+            }
             QHeaderView::section {
                 background-color: #f0f0f0;
                 border: 1px solid #ccc;
@@ -268,6 +265,8 @@ FAX: (070) 7410-1430""")
                 font-weight: bold;
             }
         """)
+        # 수직 정렬을 위한 기본 설정
+        self.items_table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter)
 
         self.estimate_layout.addWidget(self.items_table)
 
@@ -331,6 +330,64 @@ FAX: (070) 7410-1430""")
         separator.setFixedHeight(1)
         self.estimate_layout.addWidget(separator)
 
+    def load_company_info(self):
+        """설정에서 회사 정보 불러오기"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            settings = cursor.fetchall()
+            conn.close()
+
+            settings_dict = {s['key']: s['value'] for s in settings}
+
+            # 회사명
+            company_name = settings_dict.get('company_name', '(주)바이오푸드랩')
+            self.header_company_label.setText(company_name)
+            self.sender_input.setText(company_name)
+
+            # 주소
+            address = settings_dict.get('company_address', '')
+            self.header_address_label.setText(address)
+
+            # 오른쪽 회사 정보 구성
+            ceo = settings_dict.get('company_ceo', '')
+            manager = settings_dict.get('company_manager', '')
+            phone = settings_dict.get('company_phone', '')
+            mobile = settings_dict.get('company_mobile', '')
+            fax = settings_dict.get('company_fax', '')
+
+            info_lines = []
+            if company_name:
+                info_lines.append(company_name)
+            if ceo:
+                info_lines.append(f"대표이사 {ceo}")
+            if manager:
+                info_lines.append(f"담당자: {manager}")
+            if address:
+                info_lines.append(address)
+            info_lines.append("")  # 빈 줄
+            if phone:
+                info_lines.append(f"TEL: {phone}")
+            if mobile:
+                info_lines.append(f"HP: {mobile}")
+            if fax:
+                info_lines.append(f"FAX: {fax}")
+
+            self.right_company_info.setText('\n'.join(info_lines))
+
+        except Exception as e:
+            print(f"회사 정보 로드 오류: {e}")
+            # 기본값 설정
+            self.right_company_info.setText("""(주)바이오푸드랩
+대표이사 이 용 표
+서울특별시 구로구 디지털로30길 28
+1410호~1414호(구로동,마리오타워)
+
+TEL: (070) 7410-1400
+FAX: (070) 7410-1430""")
+
     def load_schedule_data(self, schedule):
         """스케줄 데이터로 견적서 로드"""
         self.current_schedule = schedule
@@ -338,6 +395,9 @@ FAX: (070) 7410-1430""")
             return
 
         from datetime import datetime
+
+        # 회사 정보 로드
+        self.load_company_info()
 
         # 견적번호
         schedule_id = schedule.get('id', '')
@@ -475,40 +535,61 @@ FAX: (070) 7410-1430""")
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
 
-        # 테이블에 데이터 추가 (수직 가운데 정렬)
-        no_item = QTableWidgetItem("1.")
-        no_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
-        self.items_table.setItem(0, 0, no_item)
-
-        # 식품유형 열에 상세 정보 포함
-        food_type_item = QTableWidgetItem(food_type_text)
-        food_type_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.items_table.setItem(0, 1, food_type_item)
-
-        # 검사 항목 열에 검사항목만 표시
-        test_items_item = QTableWidgetItem(test_items_text)
-        test_items_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.items_table.setItem(0, 2, test_items_item)
-
-        # 행 높이 동적 조정
+        # 행 높이 동적 조정 (먼저 계산)
         base_height = 140
         item_height = 18
         temp_lines = len(temps) - 1 if len(temps) > 1 else 0
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 금액 계산 (수직 가운데 정렬)
-        total_price = self.calculate_total_price(schedule)
-        price_item = QTableWidgetItem(f"{total_price:,}")
-        price_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.items_table.setItem(0, 3, price_item)
+        # 테이블에 데이터 추가 - QLabel 위젯을 사용하여 수직 중앙 정렬
+        # No. 열
+        no_label = QLabel("1.")
+        no_label.setAlignment(Qt.AlignCenter)
+        no_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 0, no_label)
 
-        subtotal_item = QTableWidgetItem(f"{total_price:,} 원")
-        subtotal_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.items_table.setItem(0, 4, subtotal_item)
+        # 식품유형 열에 상세 정보 포함
+        food_type_label = QLabel(food_type_text)
+        food_type_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        food_type_label.setStyleSheet("background-color: white; padding: 5px;")
+        food_type_label.setWordWrap(True)
+        self.items_table.setCellWidget(0, 1, food_type_label)
+
+        # 검사 항목 열에 검사항목만 표시
+        test_items_label = QLabel(test_items_text)
+        test_items_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        test_items_label.setStyleSheet("background-color: white; padding: 5px;")
+        test_items_label.setWordWrap(True)
+        self.items_table.setCellWidget(0, 2, test_items_label)
+
+        # 금액 계산
+        total_price = self.calculate_total_price(schedule)
+
+        # 계 열
+        price_label = QLabel(f"{total_price:,}")
+        price_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        price_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 3, price_label)
+
+        # 소계 열
+        subtotal_label = QLabel(f"{total_price:,} 원")
+        subtotal_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        subtotal_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 4, subtotal_label)
 
     def calculate_total_price(self, schedule):
-        """총 금액 계산 - 스케줄 관리와 동일한 방식"""
+        """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
+        # 스케줄 관리에서 계산된 비용 정보가 있으면 그대로 사용
+        if schedule.get('total_rounds_cost') is not None and schedule.get('report_cost') is not None:
+            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
+            report_cost = schedule.get('report_cost', 0) or 0
+            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+
+            total = total_rounds_cost + report_cost + interim_report_cost
+            return int(total)
+
+        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
         total = 0
 
         # 실험방법 확인

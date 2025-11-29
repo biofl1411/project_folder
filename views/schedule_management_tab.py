@@ -764,46 +764,53 @@ class ScheduleManagementTab(QWidget):
         left_layout = QVBoxLayout()
         left_layout.setSpacing(1)
 
+        # 공통 스타일 (글씨 크기 12px, 자간 2px)
+        label_style = "font-size: 12px; letter-spacing: 2px;"
+        bold_style = "font-size: 12px; letter-spacing: 2px; font-weight: bold;"
+        input_style = "font-size: 12px; letter-spacing: 2px; background-color: white; border: 1px solid #ccc; padding: 1px;"
+
         # 1행: 항목별 비용 내역
         row1 = QHBoxLayout()
-        row1.setSpacing(5)
+        row1.setSpacing(8)
         self.item_cost_detail = QLabel("-")
-        self.item_cost_detail.setStyleSheet("font-size: 10px; color: #333;")
+        self.item_cost_detail.setStyleSheet(f"{label_style} color: #333;")
         row1.addWidget(self.item_cost_detail)
 
-        row1.addWidget(QLabel("|"))
+        separator = QLabel("|")
+        separator.setStyleSheet(label_style)
+        row1.addWidget(separator)
 
         lbl1 = QLabel("1회")
-        lbl1.setStyleSheet("font-size: 10px;")
+        lbl1.setStyleSheet(label_style)
         row1.addWidget(lbl1)
         self.cost_per_test = QLabel("-")
-        self.cost_per_test.setStyleSheet("font-size: 10px; font-weight: bold;")
+        self.cost_per_test.setStyleSheet(bold_style)
         row1.addWidget(self.cost_per_test)
 
         lbl2 = QLabel("회차")
-        lbl2.setStyleSheet("font-size: 10px;")
+        lbl2.setStyleSheet(label_style)
         row1.addWidget(lbl2)
         self.total_rounds_cost = QLabel("-")
-        self.total_rounds_cost.setStyleSheet("font-size: 10px; font-weight: bold;")
+        self.total_rounds_cost.setStyleSheet(bold_style)
         row1.addWidget(self.total_rounds_cost)
 
         lbl3 = QLabel("보고서")
-        lbl3.setStyleSheet("font-size: 10px;")
+        lbl3.setStyleSheet(label_style)
         row1.addWidget(lbl3)
         self.report_cost_input = QLineEdit("300,000")
         self.report_cost_input.setAlignment(Qt.AlignRight)
-        self.report_cost_input.setStyleSheet("font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 1px;")
-        self.report_cost_input.setFixedWidth(55)
+        self.report_cost_input.setStyleSheet(input_style)
+        self.report_cost_input.setFixedWidth(70)
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row1.addWidget(self.report_cost_input)
 
         self.interim_cost_label = QLabel("중간")
-        self.interim_cost_label.setStyleSheet("font-size: 10px;")
+        self.interim_cost_label.setStyleSheet(label_style)
         row1.addWidget(self.interim_cost_label)
         self.interim_report_cost_input = QLineEdit("200,000")
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
-        self.interim_report_cost_input.setStyleSheet("font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 1px;")
-        self.interim_report_cost_input.setFixedWidth(55)
+        self.interim_report_cost_input.setStyleSheet(input_style)
+        self.interim_report_cost_input.setFixedWidth(70)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row1.addWidget(self.interim_report_cost_input)
         self.interim_cost_label.hide()
@@ -814,9 +821,9 @@ class ScheduleManagementTab(QWidget):
 
         # 2행: 계산식
         row2 = QHBoxLayout()
-        row2.setSpacing(5)
+        row2.setSpacing(8)
         self.final_cost_formula = QLabel("-")
-        self.final_cost_formula.setStyleSheet("font-size: 10px; color: #e67e22;")
+        self.final_cost_formula.setStyleSheet(f"{label_style} color: #e67e22;")
         row2.addWidget(self.final_cost_formula)
         row2.addStretch()
         left_layout.addLayout(row2)
@@ -825,9 +832,9 @@ class ScheduleManagementTab(QWidget):
 
         # 우측: 공급가 + 세액 = 총계
         self.final_cost_with_vat = QLabel("-")
-        self.final_cost_with_vat.setStyleSheet("font-size: 11px; font-weight: bold; color: white; background-color: #e67e22; padding: 3px 8px; border-radius: 3px;")
+        self.final_cost_with_vat.setStyleSheet("font-size: 13px; letter-spacing: 2px; font-weight: bold; color: white; background-color: #e67e22; padding: 3px 8px; border-radius: 3px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
-        self.final_cost_with_vat.setMinimumWidth(200)
+        self.final_cost_with_vat.setMinimumWidth(220)
         cost_layout.addWidget(self.final_cost_with_vat)
 
         parent_layout.addWidget(cost_frame)
@@ -1440,6 +1447,32 @@ class ScheduleManagementTab(QWidget):
             client = Client.get_by_id(schedule_data['client_id'])
             if client:
                 schedule_data['client_name'] = client.get('name', '')
+
+        # 스케줄 관리에서 계산된 비용 정보 추가
+        try:
+            # 보고서 비용
+            report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
+            schedule_data['report_cost'] = report_cost
+
+            # 중간 보고서 비용
+            if self.interim_report_cost_input.isVisible():
+                interim_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
+                schedule_data['interim_report_cost'] = interim_cost
+            else:
+                schedule_data['interim_report_cost'] = 0
+
+            # 1회 검사비
+            cost_per_test_text = self.cost_per_test.text().replace(',', '').replace('원', '')
+            if cost_per_test_text and cost_per_test_text != '-':
+                schedule_data['cost_per_test'] = int(cost_per_test_text)
+
+            # 회차 총계
+            total_rounds_text = self.total_rounds_cost.text().replace(',', '').replace('원', '')
+            if total_rounds_text and total_rounds_text != '-':
+                schedule_data['total_rounds_cost'] = int(total_rounds_text)
+
+        except Exception as e:
+            print(f"비용 정보 추가 중 오류: {e}")
 
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
