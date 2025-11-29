@@ -797,16 +797,16 @@ class ScheduleManagementTab(QWidget):
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row1.addWidget(self.report_cost_input)
 
-        self.interim_report_label = QLabel("중간")
-        self.interim_report_label.setStyleSheet("font-size: 10px;")
-        row1.addWidget(self.interim_report_label)
+        self.interim_cost_label = QLabel("중간")
+        self.interim_cost_label.setStyleSheet("font-size: 10px;")
+        row1.addWidget(self.interim_cost_label)
         self.interim_report_cost_input = QLineEdit("200,000")
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
         self.interim_report_cost_input.setStyleSheet("font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 1px;")
         self.interim_report_cost_input.setFixedWidth(55)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row1.addWidget(self.interim_report_cost_input)
-        self.interim_report_label.hide()
+        self.interim_cost_label.hide()
         self.interim_report_cost_input.hide()
 
         row1.addStretch()
@@ -1381,10 +1381,10 @@ class ScheduleManagementTab(QWidget):
         if report_interim:
             interim_report_cost = 200000
             self.interim_report_cost_input.setText(f"{interim_report_cost:,}")
-            self.interim_report_label.show()
+            self.interim_cost_label.show()
             self.interim_report_cost_input.show()
         else:
-            self.interim_report_label.hide()
+            self.interim_cost_label.hide()
             self.interim_report_cost_input.hide()
 
         # 4. 최종비용 (부가세별도) - 계산식 표시
