@@ -21,23 +21,27 @@ class CollapsibleGroupBox(QWidget):
         self.is_collapsed = collapsed
         self.title = title
 
+        # 크기 정책 설정 - 접을 때 공간이 줄어들도록
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+
         # 메인 레이아웃
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 5)
         main_layout.setSpacing(0)
 
-        # 헤더 프레임 (토글 버튼 + 제목)
+        # 헤더 프레임 (토글 버튼 + 제목) - 옅은 파란색
         self.header_frame = QFrame()
         self.header_frame.setStyleSheet("""
             QFrame {
-                background-color: #4a90d9;
-                border: 1px solid #3a7bc8;
-                border-radius: 3px;
+                background-color: #7eb8e8;
+                border: 1px solid #5a9fd4;
+                border-radius: 4px;
             }
         """)
         self.header_frame.setCursor(Qt.PointingHandCursor)
+        self.header_frame.setFixedHeight(32)
         header_layout = QHBoxLayout(self.header_frame)
-        header_layout.setContentsMargins(8, 5, 8, 5)
+        header_layout.setContentsMargins(10, 0, 10, 0)
 
         # 토글 버튼
         self.toggle_btn = QToolButton()
@@ -45,8 +49,8 @@ class CollapsibleGroupBox(QWidget):
             QToolButton {
                 border: none;
                 font-weight: bold;
-                font-size: 12px;
-                color: white;
+                font-size: 14px;
+                color: #1a4a6e;
             }
         """)
         self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
@@ -55,7 +59,7 @@ class CollapsibleGroupBox(QWidget):
 
         # 제목 라벨
         self.title_label = QLabel(title)
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: white; border: none;")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #1a4a6e; border: none;")
 
         header_layout.addWidget(self.toggle_btn)
         header_layout.addWidget(self.title_label)
@@ -72,9 +76,10 @@ class CollapsibleGroupBox(QWidget):
             QWidget {
                 border: 1px solid #ccc;
                 border-top: none;
-                background-color: #fafafa;
+                background-color: #ffffff;
             }
         """)
+        self.content_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         main_layout.addWidget(self.content_widget)
 
         # 초기 상태 설정
@@ -91,6 +96,11 @@ class CollapsibleGroupBox(QWidget):
         else:
             self.content_widget.show()
             self.toggle_btn.setText("▼")
+
+        # 부모 레이아웃 갱신하여 공간 재조정
+        if self.parent():
+            self.parent().updateGeometry()
+            self.parent().adjustSize()
 
     def setContentLayout(self, layout):
         """콘텐츠 레이아웃 설정 - 반드시 한 번만 호출"""
@@ -690,24 +700,69 @@ class ScheduleCreateDialog(QDialog):
         self.product_group.setContentLayout(product_layout)
         self.main_layout.addWidget(self.product_group)
 
-        # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당 (스크롤 영역 아래에 고정)
+        # 버튼 영역 - 스크롤 영역 아래에 고정, 명확한 경계
         button_frame = QFrame()
-        button_frame.setStyleSheet("background-color: #f5f5f5; border-top: 1px solid #ccc;")
+        button_frame.setStyleSheet("""
+            QFrame {
+                background-color: #e8e8e8;
+                border: 2px solid #b0b0b0;
+                border-radius: 5px;
+                margin-top: 5px;
+            }
+        """)
         button_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        button_frame.setMinimumHeight(50)
+        button_frame.setFixedHeight(55)
         button_layout = QHBoxLayout(button_frame)
-        button_layout.setContentsMargins(10, 10, 10, 10)
+        button_layout.setContentsMargins(15, 8, 15, 8)
+        button_layout.setSpacing(10)
 
         self.preview_btn = QPushButton("미리보기")
         self.preview_btn.setAutoDefault(False)
         self.preview_btn.setDefault(False)
+        self.preview_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5dade2;
+                color: white;
+                border: 1px solid #3498db;
+                border-radius: 4px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #3498db; }
+            QPushButton:pressed { background-color: #2980b9; }
+        """)
+
         self.save_btn = QPushButton("저장")
         self.save_btn.setAutoDefault(False)
         self.save_btn.setDefault(False)
-        self.save_btn.setStyleSheet("background-color: #4CAF50; color: white;")
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #58d68d;
+                color: white;
+                border: 1px solid #27ae60;
+                border-radius: 4px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #27ae60; }
+            QPushButton:pressed { background-color: #1e8449; }
+        """)
+
         self.cancel_btn = QPushButton("취소")
         self.cancel_btn.setAutoDefault(False)
         self.cancel_btn.setDefault(False)
+        self.cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #aeb6bf;
+                color: white;
+                border: 1px solid #808b96;
+                border-radius: 4px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #808b96; }
+            QPushButton:pressed { background-color: #5d6d7e; }
+        """)
 
         button_layout.addStretch()
         button_layout.addWidget(self.preview_btn)
