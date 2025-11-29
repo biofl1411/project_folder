@@ -26,7 +26,7 @@ class CollapsibleGroupBox(QWidget):
 
         # 메인 레이아웃
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 5)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
         # 헤더 프레임 (토글 버튼 + 제목) - 옅은 파란색
@@ -34,7 +34,7 @@ class CollapsibleGroupBox(QWidget):
         self.header_frame.setStyleSheet("""
             QFrame {
                 background-color: #7eb8e8;
-                border: 1px solid #5a9fd4;
+                border: 2px solid #5a9fd4;
                 border-radius: 4px;
             }
         """)
@@ -74,8 +74,10 @@ class CollapsibleGroupBox(QWidget):
         self.content_widget = QWidget()
         self.content_widget.setStyleSheet("""
             QWidget {
-                border: 1px solid #ccc;
+                border: 2px solid #5a9fd4;
                 border-top: none;
+                border-bottom-left-radius: 4px;
+                border-bottom-right-radius: 4px;
                 background-color: #ffffff;
             }
         """)
@@ -85,6 +87,26 @@ class CollapsibleGroupBox(QWidget):
         # 초기 상태 설정
         if collapsed:
             self.content_widget.hide()
+            # 접힌 상태에서 헤더 하단 모서리도 둥글게
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #7eb8e8;
+                    border: 2px solid #5a9fd4;
+                    border-radius: 4px;
+                }
+            """)
+        else:
+            # 펼친 상태에서 헤더 하단 모서리는 직각
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #7eb8e8;
+                    border: 2px solid #5a9fd4;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                    border-bottom-left-radius: 0px;
+                    border-bottom-right-radius: 0px;
+                }
+            """)
 
     def toggle_content(self):
         """콘텐츠 표시/숨김 토글"""
@@ -93,14 +115,40 @@ class CollapsibleGroupBox(QWidget):
         if self.is_collapsed:
             self.content_widget.hide()
             self.toggle_btn.setText("▶")
+            # 접힌 상태에서 헤더 하단 모서리도 둥글게
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #7eb8e8;
+                    border: 2px solid #5a9fd4;
+                    border-radius: 4px;
+                }
+            """)
         else:
             self.content_widget.show()
             self.toggle_btn.setText("▼")
+            # 펼친 상태에서 헤더 하단 모서리는 직각
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #7eb8e8;
+                    border: 2px solid #5a9fd4;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                    border-bottom-left-radius: 0px;
+                    border-bottom-right-radius: 0px;
+                }
+            """)
 
         # 부모 레이아웃 갱신하여 공간 재조정
         if self.parent():
             self.parent().updateGeometry()
             self.parent().adjustSize()
+            # 스크롤 영역이 있는 경우 레이아웃 재계산
+            parent = self.parent()
+            while parent:
+                if isinstance(parent, QScrollArea):
+                    parent.widget().adjustSize()
+                    break
+                parent = parent.parent() if hasattr(parent, 'parent') else None
 
     def setContentLayout(self, layout):
         """콘텐츠 레이아웃 설정 - 반드시 한 번만 호출"""
@@ -396,7 +444,7 @@ class ScheduleCreateDialog(QDialog):
         # 스크롤 내용 위젯
         scroll_widget = QWidget()
         self.main_layout = QVBoxLayout(scroll_widget)
-        self.main_layout.setSpacing(10)
+        self.main_layout.setSpacing(5)
         self.main_layout.setContentsMargins(10, 10, 10, 10)
 
         scroll_area.setWidget(scroll_widget)
@@ -1606,25 +1654,15 @@ class ScheduleCreateDialog(QDialog):
         """모든 온도 입력 필드를 제거합니다."""
         try:
             print("모든 온도 입력 필드 제거 시작")
-            
-            # 실험 정보 그룹 찾기
-            test_group = None
-            for i in range(self.main_layout.count()):
-                item = self.main_layout.itemAt(i)
-                if item and item.widget() and isinstance(item.widget(), QGroupBox) and item.widget().title() == "실험 정보":
-                    test_group = item.widget()
-                    break
-            
-            if not test_group:
-                print("실험 정보 그룹을 찾을 수 없음")
-                return
-                
-            # 레이아웃에서 모든 "요청 온도:" 항목 제거
-            test_layout = test_group.layout()
+
+            # CollapsibleGroupBox의 콘텐츠 위젯에서 레이아웃 가져오기
+            content_widget = self.test_group.getContentWidget()
+            test_layout = content_widget.layout()
+
             if not test_layout or not isinstance(test_layout, QFormLayout):
                 print("적절한 레이아웃을 찾을 수 없음")
                 return
-                
+
             # 레이아웃에서 모든 행을 확인하며 "요청 온도:" 라벨이 있는 행을 찾아 제거
             rows_to_remove = []
             for row in range(test_layout.rowCount()):
@@ -1633,41 +1671,41 @@ class ScheduleCreateDialog(QDialog):
                     label = label_item.widget()
                     if isinstance(label, QLabel) and "요청 온도" in label.text():
                         rows_to_remove.append(row)
-            
+
             # 높은 인덱스부터 제거 (낮은 인덱스부터 제거하면 인덱스가 변경됨)
             for row in sorted(rows_to_remove, reverse=True):
                 # 해당 행의 모든 위젯 제거
                 label_item = test_layout.itemAt(row, QFormLayout.LabelRole)
                 field_item = test_layout.itemAt(row, QFormLayout.FieldRole)
-                
+
                 if label_item and label_item.widget():
                     widget = label_item.widget()
                     test_layout.removeItem(label_item)
                     widget.setParent(None)
                     widget.deleteLater()
-                    
+
                 if field_item and field_item.widget():
                     widget = field_item.widget()
                     test_layout.removeItem(field_item)
                     widget.setParent(None)
                     widget.deleteLater()
-                    
+
                 # 행 자체를 제거
                 test_layout.takeRow(row)
-                
+
             print(f"{len(rows_to_remove)}개의 '요청 온도:' 행 제거 완료")
-            
+
             # 클래스 속성으로 저장된 프레임도 제거
             if hasattr(self, 'custom_temp_frame'):
                 self.custom_temp_frame.setParent(None)
                 self.custom_temp_frame.deleteLater()
                 delattr(self, 'custom_temp_frame')
                 print("custom_temp_frame 제거 완료")
-                
+
             # temp_inputs 변수도 초기화
             if hasattr(self, 'temp_inputs'):
                 delattr(self, 'temp_inputs')
-                
+
         except Exception as e:
             import traceback
             error_msg = f"온도 입력 필드 제거 중 오류 발생: {str(e)}"
@@ -1677,55 +1715,47 @@ class ScheduleCreateDialog(QDialog):
         """새로운 온도 입력 필드를 생성합니다."""
         try:
             print("새 온도 입력 필드 생성 시작")
-            
+
             # 입력 필드 개수 결정
             temp_count = 3 if is_acceleration else 2
-            
-            # 실험 정보 그룹 찾기
-            test_group = None
-            for i in range(self.main_layout.count()):
-                item = self.main_layout.itemAt(i)
-                if item and item.widget() and isinstance(item.widget(), QGroupBox) and item.widget().title() == "실험 정보":
-                    test_group = item.widget()
-                    break
-                    
-            if not test_group:
-                print("실험 정보 그룹을 찾을 수 없음")
-                return
-                
-            test_layout = test_group.layout()
+
+            # CollapsibleGroupBox의 콘텐츠 위젯에서 레이아웃 가져오기
+            content_widget = self.test_group.getContentWidget()
+            test_layout = content_widget.layout()
+
             if not test_layout or not isinstance(test_layout, QFormLayout):
                 print("적절한 레이아웃을 찾을 수 없음")
                 return
-                
+
             # 새 컨테이너 프레임 생성
             self.custom_temp_frame = QFrame()
             self.custom_temp_frame.setFrameShape(QFrame.StyledPanel)
             temp_layout = QVBoxLayout(self.custom_temp_frame)
             temp_layout.setContentsMargins(0, 0, 0, 0)
-            
+
             self.temp_inputs = []
-            
+
             # 온도 입력 필드 생성
             for i in range(temp_count):
                 row_layout = QHBoxLayout()
                 label = QLabel(f"온도 {i+1}:")
                 input_field = QLineEdit()
                 input_field.setPlaceholderText(f"온도 {i+1} (℃)")
+                input_field.setFixedWidth(100)
                 unit_label = QLabel("℃")
-                
+
                 row_layout.addWidget(label)
                 row_layout.addWidget(input_field)
                 row_layout.addWidget(unit_label)
                 row_layout.addStretch()
-                
+
                 self.temp_inputs.append(input_field)
                 temp_layout.addLayout(row_layout)
-                
+
             # 레이아웃에 추가
             test_layout.addRow("요청 온도:", self.custom_temp_frame)
             print(f"{temp_count}개의 온도 입력 필드 생성 완료")
-            
+
         except Exception as e:
             import traceback
             error_msg = f"온도 입력 필드 생성 중 오류 발생: {str(e)}"
