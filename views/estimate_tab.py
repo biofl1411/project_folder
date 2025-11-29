@@ -261,6 +261,9 @@ FAX: (070) 7410-1430""")
                 border: 1px solid #ccc;
                 gridline-color: #ccc;
             }
+            QTableWidget::item {
+                padding: 8px 5px;
+            }
             QHeaderView::section {
                 background-color: #f0f0f0;
                 border: 1px solid #ccc;
@@ -268,6 +271,8 @@ FAX: (070) 7410-1430""")
                 font-weight: bold;
             }
         """)
+        # 수직 정렬을 위한 기본 설정
+        self.items_table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter)
 
         self.estimate_layout.addWidget(self.items_table)
 
@@ -475,37 +480,48 @@ FAX: (070) 7410-1430""")
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
 
-        # 테이블에 데이터 추가 (수직 가운데 정렬)
-        no_item = QTableWidgetItem("1.")
-        no_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
-        self.items_table.setItem(0, 0, no_item)
-
-        # 식품유형 열에 상세 정보 포함
-        food_type_item = QTableWidgetItem(food_type_text)
-        food_type_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.items_table.setItem(0, 1, food_type_item)
-
-        # 검사 항목 열에 검사항목만 표시
-        test_items_item = QTableWidgetItem(test_items_text)
-        test_items_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.items_table.setItem(0, 2, test_items_item)
-
-        # 행 높이 동적 조정
+        # 행 높이 동적 조정 (먼저 계산)
         base_height = 140
         item_height = 18
         temp_lines = len(temps) - 1 if len(temps) > 1 else 0
         row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
         self.items_table.setRowHeight(0, row_height)
 
-        # 금액 계산 (수직 가운데 정렬)
-        total_price = self.calculate_total_price(schedule)
-        price_item = QTableWidgetItem(f"{total_price:,}")
-        price_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.items_table.setItem(0, 3, price_item)
+        # 테이블에 데이터 추가 - QLabel 위젯을 사용하여 수직 중앙 정렬
+        # No. 열
+        no_label = QLabel("1.")
+        no_label.setAlignment(Qt.AlignCenter)
+        no_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 0, no_label)
 
-        subtotal_item = QTableWidgetItem(f"{total_price:,} 원")
-        subtotal_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.items_table.setItem(0, 4, subtotal_item)
+        # 식품유형 열에 상세 정보 포함
+        food_type_label = QLabel(food_type_text)
+        food_type_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        food_type_label.setStyleSheet("background-color: white; padding: 5px;")
+        food_type_label.setWordWrap(True)
+        self.items_table.setCellWidget(0, 1, food_type_label)
+
+        # 검사 항목 열에 검사항목만 표시
+        test_items_label = QLabel(test_items_text)
+        test_items_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        test_items_label.setStyleSheet("background-color: white; padding: 5px;")
+        test_items_label.setWordWrap(True)
+        self.items_table.setCellWidget(0, 2, test_items_label)
+
+        # 금액 계산
+        total_price = self.calculate_total_price(schedule)
+
+        # 계 열
+        price_label = QLabel(f"{total_price:,}")
+        price_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        price_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 3, price_label)
+
+        # 소계 열
+        subtotal_label = QLabel(f"{total_price:,} 원")
+        subtotal_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        subtotal_label.setStyleSheet("background-color: white; padding: 5px;")
+        self.items_table.setCellWidget(0, 4, subtotal_label)
 
     def calculate_total_price(self, schedule):
         """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
