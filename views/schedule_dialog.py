@@ -357,7 +357,8 @@ class ScheduleCreateDialog(QDialog):
         self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
         self.is_edit_mode = schedule_id is not None
         self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
-        self.resize(700, 850)
+        self.resize(750, 900)
+        self.setMinimumSize(700, 700)
         
         # 온도 상수 정의 - 인스턴스 변수로 추가
         # 실측실험 온도
@@ -388,6 +389,8 @@ class ScheduleCreateDialog(QDialog):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("QScrollArea { border: none; }")
+        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scroll_area.setMinimumHeight(500)
 
         # 스크롤 내용 위젯
         scroll_widget = QWidget()
@@ -396,7 +399,7 @@ class ScheduleCreateDialog(QDialog):
         self.main_layout.setContentsMargins(10, 10, 10, 10)
 
         scroll_area.setWidget(scroll_widget)
-        dialog_layout.addWidget(scroll_area)
+        dialog_layout.addWidget(scroll_area, 1)  # stretch factor 1로 공간 확보
 
         # 업체 정보 영역 - 접이식 그룹박스 사용
         self.client_group = CollapsibleGroupBox("업체 정보", collapsed=False)
@@ -702,6 +705,8 @@ class ScheduleCreateDialog(QDialog):
         # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당 (스크롤 영역 아래에 고정)
         button_frame = QFrame()
         button_frame.setStyleSheet("background-color: #f5f5f5; border-top: 1px solid #ccc;")
+        button_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        button_frame.setMinimumHeight(50)
         button_layout = QHBoxLayout(button_frame)
         button_layout.setContentsMargins(10, 10, 10, 10)
 
@@ -721,7 +726,7 @@ class ScheduleCreateDialog(QDialog):
         button_layout.addWidget(self.save_btn)
         button_layout.addWidget(self.cancel_btn)
 
-        dialog_layout.addWidget(button_frame)
+        dialog_layout.addWidget(button_frame, 0)  # stretch factor 0으로 고정 크기 유지
         
         # 필요한 변수 초기화
         self.selected_client_id = None
