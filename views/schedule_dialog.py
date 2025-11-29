@@ -401,9 +401,10 @@ class ScheduleCreateDialog(QDialog):
         scroll_area.setWidget(scroll_widget)
         dialog_layout.addWidget(scroll_area, 1)  # stretch factor 1로 공간 확보
 
-        # 업체 정보 영역 - 접이식 그룹박스 사용
-        self.client_group = CollapsibleGroupBox("업체 정보", collapsed=False)
-        client_layout = QFormLayout()
+        # 업체 정보 영역 - QGroupBox 사용
+        self.client_group = QGroupBox("업체 정보")
+        self.client_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        client_layout = QFormLayout(self.client_group)
         client_layout.setSpacing(8)
 
         # 업체명 입력 및 검색
@@ -444,13 +445,12 @@ class ScheduleCreateDialog(QDialog):
         self.client_memo_label = QLabel("- ")  # 메모
         client_layout.addRow("메모:", self.client_memo_label)
 
-        # 업체 정보 그룹에 레이아웃 설정
-        self.client_group.setContentLayout(client_layout)
         self.main_layout.addWidget(self.client_group)
 
-        # 실험 정보 영역 - 접이식 그룹박스 사용
-        self.test_group = CollapsibleGroupBox("실험 정보", collapsed=False)
-        test_layout = QFormLayout()
+        # 실험 정보 영역 - QGroupBox 사용
+        self.test_group = QGroupBox("실험 정보")
+        self.test_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        test_layout = QFormLayout(self.test_group)
         test_layout.setSpacing(8)
         
         # 실험 방법 라디오 버튼 - 4가지 옵션으로 확장
@@ -638,13 +638,12 @@ class ScheduleCreateDialog(QDialog):
         # 체크박스 상태 변경 시 레이블 업데이트를 위한 함수 연결
         self.extension_check.stateChanged.connect(self.update_extension_status)
 
-        # 실험 정보 그룹에 레이아웃 설정
-        self.test_group.setContentLayout(test_layout)
         self.main_layout.addWidget(self.test_group)
 
-        # 제품 정보 영역 - 접이식 그룹박스 사용
-        self.product_group = CollapsibleGroupBox("제품 정보", collapsed=False)
-        product_layout = QFormLayout()
+        # 제품 정보 영역 - QGroupBox 사용
+        self.product_group = QGroupBox("제품 정보")
+        self.product_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        product_layout = QFormLayout(self.product_group)
         product_layout.setSpacing(8)
 
         # 제품명
@@ -698,8 +697,6 @@ class ScheduleCreateDialog(QDialog):
         self.test_items_layout.addWidget(test_items_links)
         product_layout.addRow("검사항목:", self.test_items_layout)
 
-        # 제품 정보 그룹에 레이아웃 설정
-        self.product_group.setContentLayout(product_layout)
         self.main_layout.addWidget(self.product_group)
 
         # 버튼 영역 - 버튼 객체를 먼저 생성하고 할당 (스크롤 영역 아래에 고정)
