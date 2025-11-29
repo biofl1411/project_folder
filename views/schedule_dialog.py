@@ -33,8 +33,8 @@ class CollapsibleGroupBox(QWidget):
         self.header_frame = QFrame()
         self.header_frame.setStyleSheet("""
             QFrame {
-                background-color: #7eb8e8;
-                border: 2px solid #5a9fd4;
+                background-color: #e8f4fc;
+                border: 1px solid #b8d4e8;
                 border-radius: 4px;
             }
         """)
@@ -50,7 +50,7 @@ class CollapsibleGroupBox(QWidget):
                 border: none;
                 font-weight: bold;
                 font-size: 14px;
-                color: #1a4a6e;
+                color: #4a7a9e;
             }
         """)
         self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
@@ -59,7 +59,7 @@ class CollapsibleGroupBox(QWidget):
 
         # 제목 라벨
         self.title_label = QLabel(title)
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #1a4a6e; border: none;")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #4a7a9e; border: none;")
 
         header_layout.addWidget(self.toggle_btn)
         header_layout.addWidget(self.title_label)
@@ -72,13 +72,71 @@ class CollapsibleGroupBox(QWidget):
 
         # 콘텐츠 위젯 (레이아웃 없이 생성)
         self.content_widget = QWidget()
+        self.content_widget.setObjectName("collapsibleContent")
         self.content_widget.setStyleSheet("""
-            QWidget {
-                border: 2px solid #5a9fd4;
+            QWidget#collapsibleContent {
+                border: 1px solid #c8dced;
                 border-top: none;
                 border-bottom-left-radius: 4px;
                 border-bottom-right-radius: 4px;
-                background-color: #ffffff;
+                background-color: #fafcfe;
+            }
+            QWidget#collapsibleContent QLabel {
+                border: none;
+                background: transparent;
+                padding: 2px 0px;
+            }
+            QWidget#collapsibleContent QLineEdit {
+                border: none;
+                border-bottom: 1px solid #d0d0d0;
+                background: transparent;
+                padding: 4px 2px;
+            }
+            QWidget#collapsibleContent QLineEdit:focus {
+                border-bottom: 2px solid #5a9fd4;
+            }
+            QWidget#collapsibleContent QDateEdit {
+                border: none;
+                border-bottom: 1px solid #d0d0d0;
+                background: transparent;
+                padding: 4px 2px;
+            }
+            QWidget#collapsibleContent QDateEdit:focus {
+                border-bottom: 2px solid #5a9fd4;
+            }
+            QWidget#collapsibleContent QSpinBox {
+                border: none;
+                border-bottom: 1px solid #d0d0d0;
+                background: transparent;
+                padding: 4px 2px;
+            }
+            QWidget#collapsibleContent QSpinBox:focus {
+                border-bottom: 2px solid #5a9fd4;
+            }
+            QWidget#collapsibleContent QComboBox {
+                border: none;
+                border-bottom: 1px solid #d0d0d0;
+                background: transparent;
+                padding: 4px 2px;
+            }
+            QWidget#collapsibleContent QComboBox:focus {
+                border-bottom: 2px solid #5a9fd4;
+            }
+            QWidget#collapsibleContent QRadioButton {
+                border: none;
+                background: transparent;
+            }
+            QWidget#collapsibleContent QCheckBox {
+                border: none;
+                background: transparent;
+            }
+            QWidget#collapsibleContent QTextEdit {
+                border: 1px solid #d0d0d0;
+                border-radius: 3px;
+                background: white;
+            }
+            QWidget#collapsibleContent QTextEdit:focus {
+                border: 1px solid #5a9fd4;
             }
         """)
         self.content_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
@@ -90,8 +148,8 @@ class CollapsibleGroupBox(QWidget):
             # 접힌 상태에서 헤더 하단 모서리도 둥글게
             self.header_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #7eb8e8;
-                    border: 2px solid #5a9fd4;
+                    background-color: #e8f4fc;
+                    border: 1px solid #b8d4e8;
                     border-radius: 4px;
                 }
             """)
@@ -99,8 +157,8 @@ class CollapsibleGroupBox(QWidget):
             # 펼친 상태에서 헤더 하단 모서리는 직각
             self.header_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #7eb8e8;
-                    border: 2px solid #5a9fd4;
+                    background-color: #e8f4fc;
+                    border: 1px solid #b8d4e8;
                     border-top-left-radius: 4px;
                     border-top-right-radius: 4px;
                     border-bottom-left-radius: 0px;
@@ -118,8 +176,8 @@ class CollapsibleGroupBox(QWidget):
             # 접힌 상태에서 헤더 하단 모서리도 둥글게
             self.header_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #7eb8e8;
-                    border: 2px solid #5a9fd4;
+                    background-color: #e8f4fc;
+                    border: 1px solid #b8d4e8;
                     border-radius: 4px;
                 }
             """)
@@ -129,8 +187,8 @@ class CollapsibleGroupBox(QWidget):
             # 펼친 상태에서 헤더 하단 모서리는 직각
             self.header_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #7eb8e8;
-                    border: 2px solid #5a9fd4;
+                    background-color: #e8f4fc;
+                    border: 1px solid #b8d4e8;
                     border-top-left-radius: 4px;
                     border-top-right-radius: 4px;
                     border-bottom-left-radius: 0px;
@@ -748,13 +806,13 @@ class ScheduleCreateDialog(QDialog):
         self.product_group.setContentLayout(product_layout)
         self.main_layout.addWidget(self.product_group)
 
-        # 버튼 영역 - 스크롤 영역 아래에 고정, 명확한 경계
+        # 버튼 영역 - 스크롤 영역 아래에 고정
         button_frame = QFrame()
         button_frame.setStyleSheet("""
             QFrame {
-                background-color: #e8e8e8;
-                border: 2px solid #b0b0b0;
-                border-radius: 5px;
+                background-color: #f5f5f5;
+                border: none;
+                border-top: 1px solid #e0e0e0;
                 margin-top: 5px;
             }
         """)
