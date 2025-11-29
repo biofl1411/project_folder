@@ -753,38 +753,43 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (2줄 컴팩트 레이아웃) - 계산식을 위로, 비용 항목을 아래로"""
+        """비용 요약 (2줄 레이아웃) - 위: 항목비용+계산식, 아래: 1회/회차/보고서/중간"""
         cost_frame = QFrame()
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(3)
-        cost_layout.setContentsMargins(5, 2, 5, 2)
+        cost_layout.setContentsMargins(5, 3, 5, 3)
 
-        # 좌측: 계산식(위) + 항목별 비용(아래)
+        # 좌측: 2줄 레이아웃
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(2)
+        left_layout.setSpacing(3)
 
-        # 공통 스타일 (글씨 크기 12px, 자간 2px)
-        label_style = "font-size: 12px; letter-spacing: 2px;"
-        bold_style = "font-size: 12px; letter-spacing: 2px; font-weight: bold;"
-        input_style = "font-size: 12px; letter-spacing: 2px; background-color: white; border: 1px solid #ccc; padding: 1px;"
-        formula_style = "font-size: 13px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
+        # 공통 스타일
+        label_style = "font-size: 11px; letter-spacing: 1px;"
+        bold_style = "font-size: 11px; letter-spacing: 1px; font-weight: bold;"
+        input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 1px;"
+        formula_style = "font-size: 12px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
 
-        # 1행: 계산식 (위로 이동)
+        # 1행: 항목별 비용 내역 + 계산식 (옆으로 배열)
         row1 = QHBoxLayout()
-        row1.setSpacing(8)
+        row1.setSpacing(10)
+
+        # 항목별 비용 내역
+        self.item_cost_detail = QLabel("-")
+        self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
+        row1.addWidget(self.item_cost_detail)
+
+        # 계산식
         self.final_cost_formula = QLabel("-")
         self.final_cost_formula.setStyleSheet(formula_style)
         row1.addWidget(self.final_cost_formula)
+
         row1.addStretch()
         left_layout.addLayout(row1)
 
-        # 2행: 항목별 비용 내역 + 1회/회차/보고서/중간 (아래로 이동)
+        # 2행: | 1회/회차/보고서/중간
         row2 = QHBoxLayout()
         row2.setSpacing(8)
-        self.item_cost_detail = QLabel("-")
-        self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        row2.addWidget(self.item_cost_detail)
 
         separator = QLabel("|")
         separator.setStyleSheet(label_style)
