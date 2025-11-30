@@ -509,6 +509,12 @@ FAX: (070) 7410-1430""")
         # 샘플링 횟수
         sampling_count = schedule.get('sampling_count', 6) or 6
 
+        # 실험 주기 계산 (실험일수 / 샘플링 횟수)
+        if experiment_days > 0 and sampling_count > 0:
+            experiment_interval = experiment_days // sampling_count
+        else:
+            experiment_interval = 15  # 기본값
+
         # 검사항목 (스케줄에서 동적으로 가져오기)
         test_items_str = schedule.get('test_items', '')
         if test_items_str:
@@ -531,7 +537,8 @@ FAX: (070) 7410-1430""")
 실험방법 : {method_str}
 실험 온도: {temp_str}
 연장시험 : {'진행' if schedule.get('extension_test') else '미진행'}
-실험 횟수: {sampling_count}회"""
+실험 횟수: {sampling_count}회
+실험 주기: {experiment_interval}일"""
 
         # 검사항목 목록 텍스트 (위에 배치)
         test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
