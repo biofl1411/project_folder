@@ -995,10 +995,15 @@ class ScheduleManagementTab(QWidget):
                 print(f"식품유형 조회 오류: {e}")
         self.food_type_value.setText(food_type_name)
 
-        if test_method in ['real', 'custom_real']:
-            experiment_days = int(total_days * 1.5)
+        # 저장된 실제 실험일수 사용 (없으면 기본 공식으로 계산)
+        actual_experiment_days = schedule.get('actual_experiment_days')
+        if actual_experiment_days is not None and actual_experiment_days > 0:
+            experiment_days = actual_experiment_days
         else:
-            experiment_days = total_days // 2 if total_days > 0 else 0
+            if test_method in ['real', 'custom_real']:
+                experiment_days = int(total_days * 1.5)
+            else:
+                experiment_days = total_days // 2 if total_days > 0 else 0
 
         exp_years = experiment_days // 365
         exp_months = (experiment_days % 365) // 30
@@ -1754,6 +1759,9 @@ class ScheduleManagementTab(QWidget):
             # 사용자 수정 날짜를 JSON으로 변환
             custom_dates_json = json.dumps(self.custom_dates, ensure_ascii=False) if self.custom_dates else None
 
+            # 실제 실험일수 (날짜 수정 시 계산된 값)
+            actual_experiment_days = self.current_schedule.get('actual_experiment_days')
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -1766,10 +1774,11 @@ class ScheduleManagementTab(QWidget):
                     status = ?,
                     report_interim = ?,
                     start_date = ?,
-                    custom_dates = ?
+                    custom_dates = ?,
+                    actual_experiment_days = ?
                 WHERE id = ?
             """, (additional_items_json, removed_items_json, experiment_data_json,
-                  status, report_interim, start_date, custom_dates_json, schedule_id))
+                  status, report_interim, start_date, custom_dates_json, actual_experiment_days, schedule_id))
 
             conn.commit()
             conn.close()
@@ -2050,6 +2059,9 @@ class ScheduleManagementTab(QWidget):
                         time_item.setText(f"{days_elapsed}일")
                         time_item.setBackground(QColor('#FFE4B5'))
 
+                # 실험기간 업데이트 (날짜 변경 반영)
+                self._update_experiment_period_display()
+
     def _recalculate_all_dates(self, new_start_date):
         """시작일 변경 시 모든 날짜 재계산"""
         if not self.current_schedule:
@@ -2102,6 +2114,64 @@ class ScheduleManagementTab(QWidget):
 
         # 중간보고일 재계산
         self._update_interim_date()
+
+        # 실험기간 업데이트
+        self._update_experiment_period_display()
+
+    def _update_experiment_period_display(self):
+        """테이블의 실제 날짜를 기준으로 실험기간 업데이트"""
+        if not self.current_schedule:
+            return
+
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        table = self.experiment_table
+
+        # 시작일 (1회차 날짜)
+        start_date_item = table.item(0, 1)
+        # 마지막 회차 날짜
+        last_date_item = table.item(0, sampling_count)
+
+        if not start_date_item or not last_date_item:
+            return
+
+        start_date_text = start_date_item.text()
+        last_date_text = last_date_item.text()
+
+        if start_date_text == '-' or last_date_text == '-':
+            return
+
+        try:
+            from datetime import datetime
+            start_date = datetime.strptime(start_date_text, '%Y-%m-%d')
+            last_date = datetime.strptime(last_date_text, '%Y-%m-%d')
+
+            # 실제 실험일수 계산
+            actual_days = (last_date - start_date).days
+
+            # 실험기간 표시 업데이트
+            exp_years = actual_days // 365
+            exp_months = (actual_days % 365) // 30
+            exp_days = actual_days % 30
+
+            period_parts = []
+            if exp_years > 0: period_parts.append(f"{exp_years}년")
+            if exp_months > 0: period_parts.append(f"{exp_months}개월")
+            if exp_days > 0: period_parts.append(f"{exp_days}일")
+            self.period_value.setText(' '.join(period_parts) if period_parts else '-')
+
+            # 마지막 실험일 업데이트
+            self.last_test_date_value.setText(last_date.strftime('%Y-%m-%d'))
+
+            # 현재 스케줄에 실제 실험일수 저장 (저장 시 DB에 반영)
+            self.current_schedule['actual_experiment_days'] = actual_days
+
+            # 샘플링 간격도 재계산
+            if sampling_count > 0:
+                interval = actual_days // sampling_count
+                self.sampling_interval_value.setText(f"{interval}일")
+
+        except Exception as e:
+            print(f"실험기간 업데이트 오류: {e}")
 
     def recalculate_costs(self):
         """셀 변경 시 비용 재계산"""

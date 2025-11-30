@@ -476,13 +476,30 @@ FAX: (070) 7410-1430""")
         }
         method_str = method_map.get(test_method, '실측실험')
 
-        # 시험기간 계산 (스케줄 관리와 동일한 방식)
+        # 시험기간 계산 (스케줄 관리에서 수정된 값 우선 사용)
         total_expiry_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
-        if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
-            experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
+
+        # 실제 실험일수가 저장되어 있으면 사용 (날짜 수정 반영)
+        actual_experiment_days = schedule.get('actual_experiment_days')
+        if actual_experiment_days is not None and actual_experiment_days > 0:
+            experiment_days = actual_experiment_days
         else:
-            experiment_days = int(total_expiry_days * 1.5)
-        test_duration = f"약 {experiment_days}일"
+            # 기본 계산 방식
+            if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+                experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
+            else:
+                experiment_days = int(total_expiry_days * 1.5)
+
+        # 시험기간 문자열 생성 (년/월/일 형식)
+        exp_years = experiment_days // 365
+        exp_months = (experiment_days % 365) // 30
+        exp_days_remaining = experiment_days % 30
+
+        duration_parts = []
+        if exp_years > 0: duration_parts.append(f"{exp_years}년")
+        if exp_months > 0: duration_parts.append(f"{exp_months}개월")
+        if exp_days_remaining > 0: duration_parts.append(f"{exp_days_remaining}일")
+        test_duration = ' '.join(duration_parts) if duration_parts else f"{experiment_days}일"
 
         # 온도 구간 처리 (스케줄 관리와 동일한 방식)
         # 보관조건별 기본 온도 설정
