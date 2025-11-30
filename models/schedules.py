@@ -104,7 +104,8 @@ class Schedule:
                        c.ceo as client_ceo,
                        c.contact_person as client_contact,
                        c.email as client_email,
-                       c.phone as client_phone
+                       c.phone as client_phone,
+                       c.sales_rep as sales_rep
                 FROM schedules s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC

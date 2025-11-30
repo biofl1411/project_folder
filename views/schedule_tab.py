@@ -27,6 +27,7 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('client_contact', '담당자', False),
         ('client_email', '이메일', False),
         ('client_phone', '전화번호', False),
+        ('sales_rep', '영업담당', True),
         # 제품/실험 정보
         ('product_name', '샘플명', True),
         ('food_type', '식품유형', False),
@@ -38,6 +39,7 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('sampling_count', '샘플링횟수', False),
         ('report_type', '보고서종류', False),
         ('extension_test', '연장실험', False),
+        ('interim_date', '중간보고일', True),
         # 포장/기타
         ('packaging', '포장단위', False),
         # 일정
@@ -187,6 +189,7 @@ class ScheduleTab(QWidget):
         ('client_contact', '담당자', 'client_contact'),
         ('client_email', '이메일', 'client_email'),
         ('client_phone', '전화번호', 'client_phone'),
+        ('sales_rep', '영업담당', 'sales_rep'),
         # 제품/실험 정보
         ('product_name', '샘플명', 'product_name'),
         ('food_type', '식품유형', 'food_type_id'),
@@ -198,6 +201,7 @@ class ScheduleTab(QWidget):
         ('sampling_count', '샘플링횟수', 'sampling_count'),
         ('report_type', '보고서종류', 'report_type'),
         ('extension_test', '연장실험', 'extension_test'),
+        ('interim_date', '중간보고일', 'interim_date'),
         # 포장/기타
         ('packaging', '포장단위', 'packaging'),
         # 일정
@@ -346,6 +350,7 @@ class ScheduleTab(QWidget):
             'client_contact': 80,
             'client_email': 150,
             'client_phone': 100,
+            'sales_rep': 80,
             'product_name': 120,
             'food_type': 100,
             'test_method': 80,
@@ -356,6 +361,7 @@ class ScheduleTab(QWidget):
             'sampling_count': 70,
             'report_type': 100,
             'extension_test': 70,
+            'interim_date': 90,
             'packaging': 80,
             'start_date': 90,
             'end_date': 90,
@@ -566,6 +572,42 @@ class ScheduleTab(QWidget):
                                 }
                             temp_text = temp_map.get(storage, '')
                             self.schedule_table.setItem(row, col_index, QTableWidgetItem(temp_text))
+
+                    elif col_key == 'interim_date':
+                        # 중간보고일 계산 (스케줄 관리 탭과 동일한 로직)
+                        report_interim = schedule.get('report_interim', False)
+                        start_date = schedule.get('start_date', '') or ''
+                        sampling_count = schedule.get('sampling_count', 6) or 6
+
+                        # 실험기간 계산
+                        test_method = schedule.get('test_method', 'real') or 'real'
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        total_expiry_days = days + (months * 30) + (years * 365)
+
+                        if test_method in ['acceleration', 'custom_acceleration']:
+                            experiment_days = total_expiry_days // 2
+                        else:
+                            experiment_days = int(total_expiry_days * 1.5)
+
+                        interim_date_text = '-'
+                        if report_interim and start_date and experiment_days > 0 and sampling_count >= 6:
+                            try:
+                                from datetime import datetime, timedelta
+                                start = datetime.strptime(start_date, '%Y-%m-%d')
+                                interval = experiment_days // sampling_count
+                                interim_date = start + timedelta(days=interval * 6)
+                                interim_date_text = interim_date.strftime('%Y-%m-%d')
+                            except:
+                                interim_date_text = '-'
+
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(interim_date_text))
+
+                    elif col_key == 'sales_rep':
+                        # 영업담당
+                        sales_rep = schedule.get('sales_rep', '') or ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(sales_rep))
 
                     else:
                         # 기타 필드 (직접 매핑)
