@@ -164,6 +164,18 @@ def init_database():
     except sqlite3.OperationalError:
         pass  # 이미 컬럼이 존재하는 경우
 
+    # 사용자 수정 날짜 저장 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN custom_dates TEXT")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
+
+    # 실제 실험일수 저장 컬럼 추가 (없는 경우) - 날짜 수정 시 계산된 값
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN actual_experiment_days INTEGER")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
+
     # 스케줄 항목 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS schedule_items (

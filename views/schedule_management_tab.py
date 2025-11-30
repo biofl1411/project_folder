@@ -771,6 +771,9 @@ class ScheduleManagementTab(QWidget):
         self.additional_test_items = []
         self.removed_base_items = []
 
+        # 저장된 O/X 상태 데이터
+        self.saved_experiment_data = {}
+
         # 사용자 정의 날짜 저장용 딕셔너리 {column_index: datetime}
         self.custom_dates = {}
 
@@ -902,10 +905,8 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
-            # 저장된 추가/삭제 항목 불러오기
+            # 저장된 추가/삭제 항목 및 사용자 수정 날짜 불러오기
             self._load_saved_test_items(schedule)
-            # 사용자 정의 날짜 초기화
-            self.custom_dates = {}
             client_name = schedule.get('client_name', '-') or '-'
             product_name = schedule.get('product_name', '-') or '-'
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
@@ -914,7 +915,7 @@ class ScheduleManagementTab(QWidget):
             self.load_memo_history()
 
     def _load_saved_test_items(self, schedule):
-        """저장된 추가/삭제 검사항목 불러오기"""
+        """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""
         import json
 
         # 추가된 검사항목 불러오기
@@ -936,6 +937,26 @@ class ScheduleManagementTab(QWidget):
                 self.removed_base_items = []
         else:
             self.removed_base_items = []
+
+        # O/X 상태 데이터 불러오기
+        experiment_data_json = schedule.get('experiment_schedule_data')
+        if experiment_data_json:
+            try:
+                self.saved_experiment_data = json.loads(experiment_data_json)
+            except (json.JSONDecodeError, TypeError):
+                self.saved_experiment_data = {}
+        else:
+            self.saved_experiment_data = {}
+
+        # 사용자 수정 날짜 불러오기
+        custom_dates_json = schedule.get('custom_dates')
+        if custom_dates_json:
+            try:
+                self.custom_dates = json.loads(custom_dates_json)
+            except (json.JSONDecodeError, TypeError):
+                self.custom_dates = {}
+        else:
+            self.custom_dates = {}
 
     def update_info_panel(self, schedule):
         """정보 패널 업데이트"""
@@ -974,10 +995,15 @@ class ScheduleManagementTab(QWidget):
                 print(f"식품유형 조회 오류: {e}")
         self.food_type_value.setText(food_type_name)
 
-        if test_method in ['real', 'custom_real']:
-            experiment_days = int(total_days * 1.5)
+        # 저장된 실제 실험일수 사용 (없으면 기본 공식으로 계산)
+        actual_experiment_days = schedule.get('actual_experiment_days')
+        if actual_experiment_days is not None and actual_experiment_days > 0:
+            experiment_days = actual_experiment_days
         else:
-            experiment_days = total_days // 2 if total_days > 0 else 0
+            if test_method in ['real', 'custom_real']:
+                experiment_days = int(total_days * 1.5)
+            else:
+                experiment_days = total_days // 2 if total_days > 0 else 0
 
         exp_years = experiment_days // 365
         exp_months = (experiment_days % 365) // 30
@@ -1379,8 +1405,16 @@ class ScheduleManagementTab(QWidget):
             item_label.setBackground(QColor('#90EE90'))
             table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
 
+            # 저장된 O/X 상태 불러오기
+            saved_row_data = self.saved_experiment_data.get(test_item, [])
+
             for i in range(sampling_count):
-                check_item = QTableWidgetItem("O")
+                # 저장된 상태가 있으면 사용, 없으면 기본값 "O"
+                if i < len(saved_row_data) and saved_row_data[i]:
+                    check_value = saved_row_data[i]
+                else:
+                    check_value = "O"
+                check_item = QTableWidgetItem(check_value)
                 check_item.setTextAlignment(Qt.AlignCenter)
                 table.setItem(row_idx + 2, i + 1, check_item)
 
@@ -1494,16 +1528,41 @@ class ScheduleManagementTab(QWidget):
             food_type = ProductType.get_by_id(schedule_data['food_type_id'])
             if food_type:
                 schedule_data['food_type_name'] = food_type.get('type_name', '')
-                # 기본 검사항목 + 추가 검사항목
-                base_items = food_type.get('test_items', '')
-                if self.additional_test_items:
-                    additional = ', '.join(self.additional_test_items)
-                    if base_items:
-                        schedule_data['test_items'] = f"{base_items}, {additional}"
-                    else:
-                        schedule_data['test_items'] = additional
+
+                # 기본 검사항목에서 삭제된 항목 제외
+                base_items_str = food_type.get('test_items', '') or ''
+                base_items_list = [item.strip() for item in base_items_str.split(',') if item.strip()]
+
+                # DB에서 저장된 추가/삭제 항목 불러오기
+                import json
+                additional_json = schedule_data.get('additional_test_items')
+                removed_json = schedule_data.get('removed_test_items')
+
+                additional_items = []
+                removed_items = []
+
+                if additional_json:
+                    try:
+                        additional_items = json.loads(additional_json)
+                    except:
+                        additional_items = self.additional_test_items
                 else:
-                    schedule_data['test_items'] = base_items
+                    additional_items = self.additional_test_items
+
+                if removed_json:
+                    try:
+                        removed_items = json.loads(removed_json)
+                    except:
+                        removed_items = self.removed_base_items
+                else:
+                    removed_items = self.removed_base_items
+
+                # 삭제된 항목 제외한 기본 항목
+                filtered_base_items = [item for item in base_items_list if item not in removed_items]
+
+                # 최종 검사항목 = 필터링된 기본항목 + 추가항목
+                all_items = filtered_base_items + additional_items
+                schedule_data['test_items'] = ', '.join(all_items) if all_items else ''
 
         # 업체명 추가
         if schedule_data.get('client_id'):
@@ -1697,6 +1756,12 @@ class ScheduleManagementTab(QWidget):
             # 시작일 (변경되었을 수 있음)
             start_date = self.current_schedule.get('start_date', '')
 
+            # 사용자 수정 날짜를 JSON으로 변환
+            custom_dates_json = json.dumps(self.custom_dates, ensure_ascii=False) if self.custom_dates else None
+
+            # 실제 실험일수 (날짜 수정 시 계산된 값)
+            actual_experiment_days = self.current_schedule.get('actual_experiment_days')
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -1708,10 +1773,12 @@ class ScheduleManagementTab(QWidget):
                     experiment_schedule_data = ?,
                     status = ?,
                     report_interim = ?,
-                    start_date = ?
+                    start_date = ?,
+                    custom_dates = ?,
+                    actual_experiment_days = ?
                 WHERE id = ?
             """, (additional_items_json, removed_items_json, experiment_data_json,
-                  status, report_interim, start_date, schedule_id))
+                  status, report_interim, start_date, custom_dates_json, actual_experiment_days, schedule_id))
 
             conn.commit()
             conn.close()
@@ -1992,6 +2059,9 @@ class ScheduleManagementTab(QWidget):
                         time_item.setText(f"{days_elapsed}일")
                         time_item.setBackground(QColor('#FFE4B5'))
 
+                # 실험기간 업데이트 (날짜 변경 반영)
+                self._update_experiment_period_display()
+
     def _recalculate_all_dates(self, new_start_date):
         """시작일 변경 시 모든 날짜 재계산"""
         if not self.current_schedule:
@@ -2044,6 +2114,64 @@ class ScheduleManagementTab(QWidget):
 
         # 중간보고일 재계산
         self._update_interim_date()
+
+        # 실험기간 업데이트
+        self._update_experiment_period_display()
+
+    def _update_experiment_period_display(self):
+        """테이블의 실제 날짜를 기준으로 실험기간 업데이트"""
+        if not self.current_schedule:
+            return
+
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        table = self.experiment_table
+
+        # 시작일 (1회차 날짜)
+        start_date_item = table.item(0, 1)
+        # 마지막 회차 날짜
+        last_date_item = table.item(0, sampling_count)
+
+        if not start_date_item or not last_date_item:
+            return
+
+        start_date_text = start_date_item.text()
+        last_date_text = last_date_item.text()
+
+        if start_date_text == '-' or last_date_text == '-':
+            return
+
+        try:
+            from datetime import datetime
+            start_date = datetime.strptime(start_date_text, '%Y-%m-%d')
+            last_date = datetime.strptime(last_date_text, '%Y-%m-%d')
+
+            # 실제 실험일수 계산
+            actual_days = (last_date - start_date).days
+
+            # 실험기간 표시 업데이트
+            exp_years = actual_days // 365
+            exp_months = (actual_days % 365) // 30
+            exp_days = actual_days % 30
+
+            period_parts = []
+            if exp_years > 0: period_parts.append(f"{exp_years}년")
+            if exp_months > 0: period_parts.append(f"{exp_months}개월")
+            if exp_days > 0: period_parts.append(f"{exp_days}일")
+            self.period_value.setText(' '.join(period_parts) if period_parts else '-')
+
+            # 마지막 실험일 업데이트
+            self.last_test_date_value.setText(last_date.strftime('%Y-%m-%d'))
+
+            # 현재 스케줄에 실제 실험일수 저장 (저장 시 DB에 반영)
+            self.current_schedule['actual_experiment_days'] = actual_days
+
+            # 샘플링 간격도 재계산
+            if sampling_count > 0:
+                interval = actual_days // sampling_count
+                self.sampling_interval_value.setText(f"{interval}일")
+
+        except Exception as e:
+            print(f"실험기간 업데이트 오류: {e}")
 
     def recalculate_costs(self):
         """셀 변경 시 비용 재계산"""
