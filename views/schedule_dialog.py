@@ -464,8 +464,8 @@ class ScheduleCreateDialog(QDialog):
         self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
         self.is_edit_mode = schedule_id is not None
         self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
-        self.resize(750, 900)
-        self.setMinimumSize(700, 700)
+        self.resize(500, 600)
+        self.setMinimumSize(450, 500)
         
         # 온도 상수 정의 - 인스턴스 변수로 추가
         # 실측실험 온도
@@ -611,16 +611,30 @@ class ScheduleCreateDialog(QDialog):
         test_layout.addRow("실험 온도:", self.storage_temp_label)
         
         # 의뢰 예상일
+        expected_date_layout = QHBoxLayout()
         self.expected_date = QDateEdit()
         self.expected_date.setDate(QDate.currentDate())
         self.expected_date.setCalendarPopup(True)
-        test_layout.addRow("의뢰 예상일(필수):", self.expected_date)
-        
+        self.expected_date_check = QCheckBox("미정")
+        self.expected_date_check.setChecked(False)
+        self.expected_date.setEnabled(True)
+        expected_date_layout.addWidget(self.expected_date)
+        expected_date_layout.addWidget(self.expected_date_check)
+        expected_date_layout.addStretch()
+        test_layout.addRow("의뢰 예상일(필수):", expected_date_layout)
+
         # 실험 시작일
+        start_date_layout = QHBoxLayout()
         self.test_start_date = QDateEdit()
         self.test_start_date.setDate(QDate.currentDate())
         self.test_start_date.setCalendarPopup(True)
-        test_layout.addRow("실험 시작일(필수):", self.test_start_date)
+        self.start_date_check = QCheckBox("미정")
+        self.start_date_check.setChecked(False)
+        self.test_start_date.setEnabled(True)
+        start_date_layout.addWidget(self.test_start_date)
+        start_date_layout.addWidget(self.start_date_check)
+        start_date_layout.addStretch()
+        test_layout.addRow("실험 시작일(필수):", start_date_layout)
 
         # 견적일자
         estimate_date_layout = QHBoxLayout()
@@ -698,7 +712,20 @@ class ScheduleCreateDialog(QDialog):
 
         # 폼 레이아웃에 추가
         test_layout.addRow("보고서 종류:", report_type_frame)
-        
+
+        # 중간 보고일자
+        interim_report_layout = QHBoxLayout()
+        self.interim_report_date = QDateEdit()
+        self.interim_report_date.setDate(QDate.currentDate())
+        self.interim_report_date.setCalendarPopup(True)
+        self.interim_report_date_check = QCheckBox("미정")
+        self.interim_report_date_check.setChecked(True)  # 기본값은 미정
+        self.interim_report_date.setEnabled(False)  # 기본으로 비활성화
+        interim_report_layout.addWidget(self.interim_report_date)
+        interim_report_layout.addWidget(self.interim_report_date_check)
+        interim_report_layout.addStretch()
+        test_layout.addRow("중간 보고일자:", interim_report_layout)
+
         # 샘플링 횟수 설정
         sampling_layout = QHBoxLayout()
 
@@ -902,6 +929,21 @@ class ScheduleCreateDialog(QDialog):
         """견적일자 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
         self.estimate_date.setEnabled(not state)
 
+    def toggle_expected_date(self, state):
+        """의뢰 예상일 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
+        self.expected_date.setEnabled(not state)
+        # 의뢰 예상일이 미정이면 실험 시작일도 자동으로 미정으로 설정
+        if state:
+            self.start_date_check.setChecked(True)
+
+    def toggle_start_date(self, state):
+        """실험 시작일 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
+        self.test_start_date.setEnabled(not state)
+
+    def toggle_interim_report_date(self, state):
+        """중간 보고일자 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
+        self.interim_report_date.setEnabled(not state)
+
     def connect_signals(self):
         """모든 시그널 연결을 한 곳에서 처리"""
         # 클라이언트 관련
@@ -943,6 +985,13 @@ class ScheduleCreateDialog(QDialog):
 
         # 견적일자 관련
         self.estimate_date_check.stateChanged.connect(self.toggle_estimate_date)
+
+        # 의뢰 예상일, 실험 시작일 관련
+        self.expected_date_check.stateChanged.connect(self.toggle_expected_date)
+        self.start_date_check.stateChanged.connect(self.toggle_start_date)
+
+        # 중간 보고일자 관련
+        self.interim_report_date_check.stateChanged.connect(self.toggle_interim_report_date)
 
         # 버튼 관련
         self.preview_btn.clicked.connect(self.preview_schedule)
@@ -1521,10 +1570,22 @@ class ScheduleCreateDialog(QDialog):
             # 데이터베이스에 저장/업데이트
             from models.schedules import Schedule
 
-            # 견적일자 값 처리
+            # 날짜 값 처리
             estimate_date_value = None
             if not self.estimate_date_check.isChecked():
                 estimate_date_value = self.estimate_date.date().toString('yyyy-MM-dd')
+
+            expected_date_value = None
+            if not self.expected_date_check.isChecked():
+                expected_date_value = self.expected_date.date().toString('yyyy-MM-dd')
+
+            start_date_value = None
+            if not self.start_date_check.isChecked():
+                start_date_value = self.test_start_date.date().toString('yyyy-MM-dd')
+
+            interim_report_date_value = None
+            if not self.interim_report_date_check.isChecked():
+                interim_report_date_value = self.interim_report_date.date().toString('yyyy-MM-dd')
 
             schedule_data = {
                 'client_id': self.selected_client_id,
@@ -1532,7 +1593,9 @@ class ScheduleCreateDialog(QDialog):
                 'food_type_id': self.selected_food_type_id,
                 'test_method': self.get_test_method(),
                 'storage_condition': self.get_storage_condition(),
-                'start_date': self.test_start_date.date().toString('yyyy-MM-dd'),
+                'start_date': start_date_value,
+                'expected_date': expected_date_value,
+                'interim_report_date': interim_report_date_value,
                 'test_period_days': self.days_spin.value(),
                 'test_period_months': self.months_spin.value(),
                 'test_period_years': self.years_spin.value(),
@@ -1564,7 +1627,9 @@ class ScheduleCreateDialog(QDialog):
                     food_type_id=self.selected_food_type_id,
                     test_method=self.get_test_method(),
                     storage_condition=self.get_storage_condition(),
-                    test_start_date=self.test_start_date.date().toString('yyyy-MM-dd'),
+                    test_start_date=start_date_value,
+                    expected_date=expected_date_value,
+                    interim_report_date=interim_report_date_value,
                     test_period_days=self.days_spin.value(),
                     test_period_months=self.months_spin.value(),
                     test_period_years=self.years_spin.value(),
@@ -1893,11 +1958,25 @@ class ScheduleCreateDialog(QDialog):
             elif storage == 'freeze':
                 self.storage_freeze.setChecked(True)
 
+            # 의뢰 예상일 설정
+            expected_date = schedule.get('expected_date', '')
+            if expected_date:
+                self.expected_date.setDate(QDate.fromString(expected_date, 'yyyy-MM-dd'))
+                self.expected_date_check.setChecked(False)
+                self.expected_date.setEnabled(True)
+            else:
+                self.expected_date_check.setChecked(True)
+                self.expected_date.setEnabled(False)
+
             # 실험 시작일 설정
             start_date = schedule.get('start_date', '')
             if start_date:
                 self.test_start_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
-                self.expected_date.setDate(QDate.fromString(start_date, 'yyyy-MM-dd'))
+                self.start_date_check.setChecked(False)
+                self.test_start_date.setEnabled(True)
+            else:
+                self.start_date_check.setChecked(True)
+                self.test_start_date.setEnabled(False)
 
             # 견적일자 설정
             estimate_date = schedule.get('estimate_date', '')
@@ -1908,6 +1987,16 @@ class ScheduleCreateDialog(QDialog):
             else:
                 self.estimate_date_check.setChecked(True)
                 self.estimate_date.setEnabled(False)
+
+            # 중간 보고일자 설정
+            interim_report_date = schedule.get('interim_report_date', '')
+            if interim_report_date:
+                self.interim_report_date.setDate(QDate.fromString(interim_report_date, 'yyyy-MM-dd'))
+                self.interim_report_date_check.setChecked(False)
+                self.interim_report_date.setEnabled(True)
+            else:
+                self.interim_report_date_check.setChecked(True)
+                self.interim_report_date.setEnabled(False)
 
             # 소비기한 설정
             self.days_spin.setValue(schedule.get('test_period_days', 0) or 0)
