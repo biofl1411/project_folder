@@ -464,8 +464,8 @@ class ScheduleCreateDialog(QDialog):
         self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
         self.is_edit_mode = schedule_id is not None
         self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
-        self.resize(750, 900)
-        self.setMinimumSize(700, 700)
+        self.resize(750, 600)  # 높이를 2/3로 줄임
+        self.setMinimumSize(700, 500)  # 최소 높이도 줄임
         
         # 온도 상수 정의 - 인스턴스 변수로 추가
         # 실측실험 온도
@@ -497,7 +497,7 @@ class ScheduleCreateDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("QScrollArea { border: none; }")
         scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scroll_area.setMinimumHeight(500)
+        scroll_area.setMinimumHeight(350)  # 팝업 크기에 맞게 조정
 
         # 스크롤 내용 위젯
         scroll_widget = QWidget()
@@ -899,7 +899,9 @@ class ScheduleCreateDialog(QDialog):
         """샘플링 기본값 사용 여부에 따라 입력 필드 활성화/비활성화"""
         self.sampling_spin.setEnabled(not state)
         if state:
-            self.sampling_spin.setValue(6)  # 기본값으로 복원
+            # 설정에서 저장된 기본 샘플링 횟수 사용
+            default_sampling = self.get_default_sampling_count()
+            self.sampling_spin.setValue(default_sampling)
 
     def toggle_estimate_date(self, state):
         """견적일자 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
@@ -1541,7 +1543,7 @@ class ScheduleCreateDialog(QDialog):
                 'test_period_days': self.days_spin.value(),
                 'test_period_months': self.months_spin.value(),
                 'test_period_years': self.years_spin.value(),
-                'sampling_count': 6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
+                'sampling_count': self.get_default_sampling_count() if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
                 'report_interim': 1 if self.report_type_interim.isChecked() else 0,
                 'report_korean': 1 if self.report_type_korean.isChecked() else 0,
                 'report_english': 1 if self.report_type_english.isChecked() else 0,
@@ -1573,7 +1575,7 @@ class ScheduleCreateDialog(QDialog):
                     test_period_days=self.days_spin.value(),
                     test_period_months=self.months_spin.value(),
                     test_period_years=self.years_spin.value(),
-                    sampling_count=6 if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
+                    sampling_count=self.get_default_sampling_count() if self.default_sampling_check.isChecked() else self.sampling_spin.value(),
                     report_interim=self.report_type_interim.isChecked(),
                     report_korean=self.report_type_korean.isChecked(),
                     report_english=self.report_type_english.isChecked(),
@@ -1626,7 +1628,7 @@ class ScheduleCreateDialog(QDialog):
             test_method = '가속실험' if self.test_method_acceleration.isChecked() else '실측실험'
             storage_condition = self.storage_temp_label.text()
             test_period = f"{self.days_spin.value()}일 {self.months_spin.value()}개월 {self.years_spin.value()}년"
-            sampling_count = 6 if self.default_sampling_check.isChecked() else self.sampling_spin.value()
+            sampling_count = self.get_default_sampling_count() if self.default_sampling_check.isChecked() else self.sampling_spin.value()
             
             # 보고서 종류 정보 수집
             report_types = []
