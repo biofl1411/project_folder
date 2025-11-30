@@ -338,7 +338,9 @@ class ScheduleTab(QWidget):
         header = self.schedule_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)  # 사용자가 마우스로 조절 가능
         header.setStretchLastSection(True)  # 마지막 열이 남은 공간을 채움
-        header.setSectionsMovable(True)  # 컬럼 헤더 드래그로 순서 변경 가능
+        header.setSectionsMovable(True)  # 열 드래그 앤 드롭으로 순서 변경 가능
+        header.setFirstSectionMovable(False)  # 첫 번째 열(선택)은 고정
+        header.sectionMoved.connect(self.on_column_moved)  # 열 이동 시 저장
 
         # 체크박스 열(0번) 고정
         header.setSectionResizeMode(0, QHeaderView.Fixed)
@@ -393,6 +395,9 @@ class ScheduleTab(QWidget):
 
         # 초기 컬럼 표시 설정 적용
         self.apply_column_settings()
+
+        # 저장된 열 순서 적용
+        self.apply_column_order()
 
         # 초기 데이터 로드
         self.load_schedules()
@@ -929,6 +934,67 @@ class ScheduleTab(QWidget):
                 # 설정에 따라 표시/숨김
                 is_hidden = col_key not in visible_columns
                 self.schedule_table.setColumnHidden(col_index, is_hidden)
+
+    def on_column_moved(self, logical_index, old_visual_index, new_visual_index):
+        """열이 이동되면 순서 저장"""
+        self.save_column_order()
+
+    def save_column_order(self):
+        """현재 열 순서를 데이터베이스에 저장"""
+        try:
+            from database import get_connection
+            header = self.schedule_table.horizontalHeader()
+
+            # 현재 visual 순서대로 logical index 수집
+            order = []
+            for visual_idx in range(header.count()):
+                logical_idx = header.logicalIndex(visual_idx)
+                order.append(str(logical_idx))
+
+            order_str = ','.join(order)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO settings (key, value)
+                VALUES ('schedule_column_order', ?)
+            """, (order_str,))
+            conn.commit()
+            conn.close()
+            print(f"열 순서 저장됨: {order_str}")
+        except Exception as e:
+            print(f"열 순서 저장 오류: {e}")
+
+    def get_column_order(self):
+        """데이터베이스에서 열 순서 로드"""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_column_order'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return [int(x) for x in result['value'].split(',')]
+            return None
+        except Exception as e:
+            print(f"열 순서 로드 오류: {e}")
+            return None
+
+    def apply_column_order(self):
+        """저장된 열 순서를 테이블에 적용"""
+        order = self.get_column_order()
+        if not order:
+            return
+
+        header = self.schedule_table.horizontalHeader()
+
+        # order 리스트는 각 visual position에 어떤 logical index가 있어야 하는지를 나타냄
+        for visual_idx, logical_idx in enumerate(order):
+            current_visual = header.visualIndex(logical_idx)
+            if current_visual != visual_idx:
+                header.moveSection(current_visual, visual_idx)
 
     def on_header_clicked(self, logical_index):
         """헤더 클릭 시 해당 컬럼으로 정렬"""
