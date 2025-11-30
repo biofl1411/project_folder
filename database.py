@@ -145,7 +145,25 @@ def init_database():
         cursor.execute("ALTER TABLE schedules ADD COLUMN packaging_unit TEXT DEFAULT 'g'")
     except sqlite3.OperationalError:
         pass  # 이미 컬럼이 존재하는 경우
-    
+
+    # 추가된 검사항목 저장 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN additional_test_items TEXT")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
+
+    # 삭제된 기본 검사항목 저장 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN removed_test_items TEXT")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
+
+    # 실험 스케줄 O/X 상태 저장 컬럼 추가 (없는 경우)
+    try:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN experiment_schedule_data TEXT")
+    except sqlite3.OperationalError:
+        pass  # 이미 컬럼이 존재하는 경우
+
     # 스케줄 항목 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS schedule_items (

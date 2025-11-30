@@ -726,7 +726,7 @@ class ScheduleManagementTab(QWidget):
         self.experiment_table.cellClicked.connect(self.on_experiment_cell_clicked)
         layout.addWidget(self.experiment_table)
 
-        # 항목 추가/삭제 버튼
+        # 항목 추가/삭제/저장 버튼
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
@@ -739,6 +739,11 @@ class ScheduleManagementTab(QWidget):
         self.remove_item_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px 15px; font-weight: bold;")
         self.remove_item_btn.clicked.connect(self.remove_test_item)
         btn_layout.addWidget(self.remove_item_btn)
+
+        self.save_schedule_btn = QPushButton("저장")
+        self.save_schedule_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px 15px; font-weight: bold;")
+        self.save_schedule_btn.clicked.connect(self.save_schedule_changes)
+        btn_layout.addWidget(self.save_schedule_btn)
 
         layout.addLayout(btn_layout)
 
@@ -755,14 +760,14 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (2줄 레이아웃) - 위: 항목비용+계산식, 아래: 1회/회차/보고서/중간"""
+        """비용 요약 (3줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간, 3행: 계산식"""
         cost_frame = QFrame()
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(3)
         cost_layout.setContentsMargins(5, 3, 5, 3)
 
-        # 좌측: 2줄 레이아웃
+        # 좌측: 3줄 레이아웃
         left_layout = QVBoxLayout()
         left_layout.setSpacing(3)
 
@@ -772,7 +777,7 @@ class ScheduleManagementTab(QWidget):
         input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 1px;"
         formula_style = "font-size: 12px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
 
-        # 1행: 항목별 비용 내역 + 계산식 (옆으로 배열)
+        # 1행: 항목별 비용 내역
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
@@ -780,11 +785,6 @@ class ScheduleManagementTab(QWidget):
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
         row1.addWidget(self.item_cost_detail)
-
-        # 계산식
-        self.final_cost_formula = QLabel("-")
-        self.final_cost_formula.setStyleSheet(formula_style)
-        row1.addWidget(self.final_cost_formula)
 
         row1.addStretch()
         left_layout.addLayout(row1)
@@ -836,6 +836,17 @@ class ScheduleManagementTab(QWidget):
         row2.addStretch()
         left_layout.addLayout(row2)
 
+        # 3행: 계산식
+        row3 = QHBoxLayout()
+        row3.setSpacing(10)
+
+        self.final_cost_formula = QLabel("-")
+        self.final_cost_formula.setStyleSheet(formula_style)
+        row3.addWidget(self.final_cost_formula)
+
+        row3.addStretch()
+        left_layout.addLayout(row3)
+
         cost_layout.addLayout(left_layout)
 
         # 우측: 공급가 + 세액 = 총계
@@ -871,9 +882,8 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
-            # 추가/삭제 항목 초기화
-            self.additional_test_items = []
-            self.removed_base_items = []
+            # 저장된 추가/삭제 항목 불러오기
+            self._load_saved_test_items(schedule)
             # 사용자 정의 날짜 초기화
             self.custom_dates = {}
             client_name = schedule.get('client_name', '-') or '-'
@@ -882,6 +892,30 @@ class ScheduleManagementTab(QWidget):
             self.update_info_panel(schedule)
             self.update_experiment_schedule(schedule)
             self.load_memo_history()
+
+    def _load_saved_test_items(self, schedule):
+        """저장된 추가/삭제 검사항목 불러오기"""
+        import json
+
+        # 추가된 검사항목 불러오기
+        additional_json = schedule.get('additional_test_items')
+        if additional_json:
+            try:
+                self.additional_test_items = json.loads(additional_json)
+            except (json.JSONDecodeError, TypeError):
+                self.additional_test_items = []
+        else:
+            self.additional_test_items = []
+
+        # 삭제된 기본 검사항목 불러오기
+        removed_json = schedule.get('removed_test_items')
+        if removed_json:
+            try:
+                self.removed_base_items = json.loads(removed_json)
+            except (json.JSONDecodeError, TypeError):
+                self.removed_base_items = []
+        else:
+            self.removed_base_items = []
 
     def update_info_panel(self, schedule):
         """정보 패널 업데이트"""
@@ -1608,6 +1642,85 @@ class ScheduleManagementTab(QWidget):
             self.update_sample_info(self.current_schedule, sampling_count)
 
             QMessageBox.information(self, "삭제 완료", f"'{item}' 항목이 삭제되었습니다.")
+
+    def save_schedule_changes(self):
+        """스케줄 변경사항 저장 (추가/삭제 항목, O/X 상태)"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "저장 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        try:
+            import json
+            from database import get_connection
+
+            schedule_id = self.current_schedule.get('id')
+            if not schedule_id:
+                QMessageBox.warning(self, "저장 실패", "스케줄 ID를 찾을 수 없습니다.")
+                return
+
+            # 추가된 검사항목을 JSON으로 변환
+            additional_items_json = json.dumps(self.additional_test_items, ensure_ascii=False) if self.additional_test_items else None
+
+            # 삭제된 기본 검사항목을 JSON으로 변환
+            removed_items_json = json.dumps(self.removed_base_items, ensure_ascii=False) if self.removed_base_items else None
+
+            # 실험 스케줄 O/X 상태 수집
+            experiment_data = self._collect_experiment_schedule_data()
+            experiment_data_json = json.dumps(experiment_data, ensure_ascii=False) if experiment_data else None
+
+            # 데이터베이스 업데이트
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE schedules SET
+                    additional_test_items = ?,
+                    removed_test_items = ?,
+                    experiment_schedule_data = ?
+                WHERE id = ?
+            """, (additional_items_json, removed_items_json, experiment_data_json, schedule_id))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "스케줄 변경사항이 저장되었습니다.")
+            self.schedule_saved.emit()
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _collect_experiment_schedule_data(self):
+        """실험 스케줄 테이블의 O/X 상태 수집"""
+        if not self.current_schedule:
+            return None
+
+        data = {}
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        row_count = self.experiment_table.rowCount()
+
+        # 검사항목 행 (행 2부터 마지막 가격 행 제외)
+        for row in range(2, row_count - 1):
+            item_cell = self.experiment_table.item(row, 0)
+            if not item_cell:
+                continue
+
+            test_item = item_cell.text()
+            if not test_item:
+                continue
+
+            row_data = []
+            for col in range(1, sampling_count + 1):
+                cell = self.experiment_table.item(row, col)
+                if cell:
+                    row_data.append(cell.text())
+                else:
+                    row_data.append('')
+
+            data[test_item] = row_data
+
+        return data
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
