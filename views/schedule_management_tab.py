@@ -1515,16 +1515,41 @@ class ScheduleManagementTab(QWidget):
             food_type = ProductType.get_by_id(schedule_data['food_type_id'])
             if food_type:
                 schedule_data['food_type_name'] = food_type.get('type_name', '')
-                # 기본 검사항목 + 추가 검사항목
-                base_items = food_type.get('test_items', '')
-                if self.additional_test_items:
-                    additional = ', '.join(self.additional_test_items)
-                    if base_items:
-                        schedule_data['test_items'] = f"{base_items}, {additional}"
-                    else:
-                        schedule_data['test_items'] = additional
+
+                # 기본 검사항목에서 삭제된 항목 제외
+                base_items_str = food_type.get('test_items', '') or ''
+                base_items_list = [item.strip() for item in base_items_str.split(',') if item.strip()]
+
+                # DB에서 저장된 추가/삭제 항목 불러오기
+                import json
+                additional_json = schedule_data.get('additional_test_items')
+                removed_json = schedule_data.get('removed_test_items')
+
+                additional_items = []
+                removed_items = []
+
+                if additional_json:
+                    try:
+                        additional_items = json.loads(additional_json)
+                    except:
+                        additional_items = self.additional_test_items
                 else:
-                    schedule_data['test_items'] = base_items
+                    additional_items = self.additional_test_items
+
+                if removed_json:
+                    try:
+                        removed_items = json.loads(removed_json)
+                    except:
+                        removed_items = self.removed_base_items
+                else:
+                    removed_items = self.removed_base_items
+
+                # 삭제된 항목 제외한 기본 항목
+                filtered_base_items = [item for item in base_items_list if item not in removed_items]
+
+                # 최종 검사항목 = 필터링된 기본항목 + 추가항목
+                all_items = filtered_base_items + additional_items
+                schedule_data['test_items'] = ', '.join(all_items) if all_items else ''
 
         # 업체명 추가
         if schedule_data.get('client_id'):
