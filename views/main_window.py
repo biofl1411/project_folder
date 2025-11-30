@@ -126,6 +126,9 @@ class MainWindow(QMainWindow):
 
         # 스케줄 관리 탭에서 견적서 보기 버튼 연결
         self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
+
+        # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 새로고침
+        self.schedule_management_tab.schedule_saved.connect(self.schedule_create_tab.load_schedules)
         
         # 사용자 관리 탭 (관리자만 접근 가능)
         users_tab = QWidget()

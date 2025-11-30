@@ -551,6 +551,9 @@ class ScheduleCreateDialog(QDialog):
         self.client_memo_label = QLabel("- ")  # 메모
         client_layout.addRow("메모:", self.client_memo_label)
 
+        self.sales_rep_label = QLabel("- ")  # 영업담당
+        client_layout.addRow("영업담당:", self.sales_rep_label)
+
         self.client_group.setContentLayout(client_layout)
         self.main_layout.addWidget(self.client_group)
 
@@ -1071,6 +1074,7 @@ class ScheduleCreateDialog(QDialog):
                     self.client_address_label.setText(client_data.get('address', '-') or '-')
                     self.client_detail_address_label.setText(client_data.get('detail_address', '-') or '-')
                     self.client_memo_label.setText(client_data.get('notes', '-') or '-')
+                    self.sales_rep_label.setText(client_data.get('sales_rep', '-') or '-')
 
                     print(f"업체 검색 완료: {client_data.get('name', '')}")
             else:
@@ -1124,6 +1128,7 @@ class ScheduleCreateDialog(QDialog):
                     self.client_address_label.setText(client_data.get('address', '-') or '-')
                     self.client_detail_address_label.setText(client_data.get('detail_address', '-') or '-')
                     self.client_memo_label.setText(client_data.get('notes', '-') or '-')
+                    self.sales_rep_label.setText(client_data.get('sales_rep', '-') or '-')
 
                     print(f"새 업체 등록 완료: {client_data.get('name', '')}")
             else:
@@ -1847,6 +1852,7 @@ class ScheduleCreateDialog(QDialog):
                     self.client_address_label.setText(client.get('address', '-') or '-')
                     self.client_detail_address_label.setText(client.get('detail_address', '-') or '-')
                     self.client_memo_label.setText(client.get('notes', '-') or '-')
+                    self.sales_rep_label.setText(client.get('sales_rep', '-') or '-')
 
             # 제품명
             self.product_name_input.setText(schedule.get('product_name', '') or '')

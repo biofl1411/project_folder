@@ -455,6 +455,8 @@ class ScheduleManagementTab(QWidget):
 
     # 견적서 보기 요청 시그널
     show_estimate_requested = pyqtSignal(dict)
+    # 스케줄 데이터 저장 완료 시그널
+    schedule_saved = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1184,6 +1186,8 @@ class ScheduleManagementTab(QWidget):
                 self.memo_edit.clear()
                 self.load_memo_history()
                 QMessageBox.information(self, "저장 완료", "메모가 저장되었습니다.")
+                # 스케줄 작성 탭 새로고침을 위해 시그널 발생
+                self.schedule_saved.emit()
             else:
                 QMessageBox.warning(self, "저장 실패", "메모 저장에 실패했습니다.")
         except Exception as e:
