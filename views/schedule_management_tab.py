@@ -771,6 +771,9 @@ class ScheduleManagementTab(QWidget):
         self.additional_test_items = []
         self.removed_base_items = []
 
+        # 저장된 O/X 상태 데이터
+        self.saved_experiment_data = {}
+
         # 사용자 정의 날짜 저장용 딕셔너리 {column_index: datetime}
         self.custom_dates = {}
 
@@ -914,7 +917,7 @@ class ScheduleManagementTab(QWidget):
             self.load_memo_history()
 
     def _load_saved_test_items(self, schedule):
-        """저장된 추가/삭제 검사항목 불러오기"""
+        """저장된 추가/삭제 검사항목 및 O/X 상태 불러오기"""
         import json
 
         # 추가된 검사항목 불러오기
@@ -936,6 +939,16 @@ class ScheduleManagementTab(QWidget):
                 self.removed_base_items = []
         else:
             self.removed_base_items = []
+
+        # O/X 상태 데이터 불러오기
+        experiment_data_json = schedule.get('experiment_schedule_data')
+        if experiment_data_json:
+            try:
+                self.saved_experiment_data = json.loads(experiment_data_json)
+            except (json.JSONDecodeError, TypeError):
+                self.saved_experiment_data = {}
+        else:
+            self.saved_experiment_data = {}
 
     def update_info_panel(self, schedule):
         """정보 패널 업데이트"""
@@ -1379,8 +1392,16 @@ class ScheduleManagementTab(QWidget):
             item_label.setBackground(QColor('#90EE90'))
             table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
 
+            # 저장된 O/X 상태 불러오기
+            saved_row_data = self.saved_experiment_data.get(test_item, [])
+
             for i in range(sampling_count):
-                check_item = QTableWidgetItem("O")
+                # 저장된 상태가 있으면 사용, 없으면 기본값 "O"
+                if i < len(saved_row_data) and saved_row_data[i]:
+                    check_value = saved_row_data[i]
+                else:
+                    check_value = "O"
+                check_item = QTableWidgetItem(check_value)
                 check_item.setTextAlignment(Qt.AlignCenter)
                 table.setItem(row_idx + 2, i + 1, check_item)
 
