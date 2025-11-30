@@ -948,11 +948,18 @@ class ScheduleManagementTab(QWidget):
         else:
             self.saved_experiment_data = {}
 
-        # 사용자 수정 날짜 불러오기
+        # 사용자 수정 날짜 불러오기 (문자열을 datetime으로 변환)
         custom_dates_json = schedule.get('custom_dates')
         if custom_dates_json:
             try:
-                self.custom_dates = json.loads(custom_dates_json)
+                from datetime import datetime
+                loaded_dates = json.loads(custom_dates_json)
+                self.custom_dates = {}
+                for col, date_str in loaded_dates.items():
+                    try:
+                        self.custom_dates[int(col)] = datetime.strptime(date_str, '%Y-%m-%d')
+                    except (ValueError, TypeError):
+                        pass
             except (json.JSONDecodeError, TypeError):
                 self.custom_dates = {}
         else:
@@ -1756,8 +1763,15 @@ class ScheduleManagementTab(QWidget):
             # 시작일 (변경되었을 수 있음)
             start_date = self.current_schedule.get('start_date', '')
 
-            # 사용자 수정 날짜를 JSON으로 변환
-            custom_dates_json = json.dumps(self.custom_dates, ensure_ascii=False) if self.custom_dates else None
+            # 사용자 수정 날짜를 JSON으로 변환 (datetime 객체를 문자열로 변환)
+            custom_dates_serializable = {}
+            if self.custom_dates:
+                for col, date_val in self.custom_dates.items():
+                    if hasattr(date_val, 'strftime'):
+                        custom_dates_serializable[col] = date_val.strftime('%Y-%m-%d')
+                    else:
+                        custom_dates_serializable[col] = str(date_val)
+            custom_dates_json = json.dumps(custom_dates_serializable, ensure_ascii=False) if custom_dates_serializable else None
 
             # 실제 실험일수 (날짜 수정 시 계산된 값)
             actual_experiment_days = self.current_schedule.get('actual_experiment_days')
