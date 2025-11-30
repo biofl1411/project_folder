@@ -905,10 +905,8 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
-            # 저장된 추가/삭제 항목 불러오기
+            # 저장된 추가/삭제 항목 및 사용자 수정 날짜 불러오기
             self._load_saved_test_items(schedule)
-            # 사용자 정의 날짜 초기화
-            self.custom_dates = {}
             client_name = schedule.get('client_name', '-') or '-'
             product_name = schedule.get('product_name', '-') or '-'
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
@@ -917,7 +915,7 @@ class ScheduleManagementTab(QWidget):
             self.load_memo_history()
 
     def _load_saved_test_items(self, schedule):
-        """저장된 추가/삭제 검사항목 및 O/X 상태 불러오기"""
+        """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""
         import json
 
         # 추가된 검사항목 불러오기
@@ -949,6 +947,16 @@ class ScheduleManagementTab(QWidget):
                 self.saved_experiment_data = {}
         else:
             self.saved_experiment_data = {}
+
+        # 사용자 수정 날짜 불러오기
+        custom_dates_json = schedule.get('custom_dates')
+        if custom_dates_json:
+            try:
+                self.custom_dates = json.loads(custom_dates_json)
+            except (json.JSONDecodeError, TypeError):
+                self.custom_dates = {}
+        else:
+            self.custom_dates = {}
 
     def update_info_panel(self, schedule):
         """정보 패널 업데이트"""
@@ -1743,6 +1751,9 @@ class ScheduleManagementTab(QWidget):
             # 시작일 (변경되었을 수 있음)
             start_date = self.current_schedule.get('start_date', '')
 
+            # 사용자 수정 날짜를 JSON으로 변환
+            custom_dates_json = json.dumps(self.custom_dates, ensure_ascii=False) if self.custom_dates else None
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -1754,10 +1765,11 @@ class ScheduleManagementTab(QWidget):
                     experiment_schedule_data = ?,
                     status = ?,
                     report_interim = ?,
-                    start_date = ?
+                    start_date = ?,
+                    custom_dates = ?
                 WHERE id = ?
             """, (additional_items_json, removed_items_json, experiment_data_json,
-                  status, report_interim, start_date, schedule_id))
+                  status, report_interim, start_date, custom_dates_json, schedule_id))
 
             conn.commit()
             conn.close()
