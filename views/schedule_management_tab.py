@@ -738,6 +738,11 @@ class ScheduleManagementTab(QWidget):
         self.remove_item_btn.clicked.connect(self.remove_test_item)
         btn_layout.addWidget(self.remove_item_btn)
 
+        self.save_items_btn = QPushButton("💾 항목 저장")
+        self.save_items_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px 15px; font-weight: bold;")
+        self.save_items_btn.clicked.connect(self.save_test_items)
+        btn_layout.addWidget(self.save_items_btn)
+
         layout.addLayout(btn_layout)
 
         # 추가/삭제된 항목 저장용 리스트
@@ -869,9 +874,8 @@ class ScheduleManagementTab(QWidget):
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
             self.current_schedule = schedule
-            # 추가/삭제 항목 초기화
-            self.additional_test_items = []
-            self.removed_base_items = []
+            # 저장된 추가/삭제 항목 로드
+            self.load_test_items(schedule_id)
             # 사용자 정의 날짜 초기화
             self.custom_dates = {}
             client_name = schedule.get('client_name', '-') or '-'
@@ -1604,6 +1608,98 @@ class ScheduleManagementTab(QWidget):
             self.update_sample_info(self.current_schedule, sampling_count)
 
             QMessageBox.information(self, "삭제 완료", f"'{item}' 항목이 삭제되었습니다.")
+
+    def save_test_items(self):
+        """검사항목 변경사항을 데이터베이스에 저장"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "저장 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        schedule_id = self.current_schedule.get('id')
+        if not schedule_id:
+            QMessageBox.warning(self, "저장 실패", "스케줄 ID를 찾을 수 없습니다.")
+            return
+
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # schedule_test_items 테이블 생성 (없으면)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_test_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    schedule_id INTEGER NOT NULL,
+                    additional_items TEXT,
+                    removed_items TEXT,
+                    UNIQUE(schedule_id)
+                )
+            """)
+
+            # 추가/삭제된 항목을 콤마로 구분하여 저장
+            additional_str = ','.join(self.additional_test_items) if self.additional_test_items else ''
+            removed_str = ','.join(self.removed_base_items) if self.removed_base_items else ''
+
+            # 기존 데이터가 있으면 업데이트, 없으면 삽입
+            cursor.execute("""
+                INSERT OR REPLACE INTO schedule_test_items (schedule_id, additional_items, removed_items)
+                VALUES (?, ?, ?)
+            """, (schedule_id, additional_str, removed_str))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "검사항목 변경사항이 저장되었습니다.")
+            log_message('ScheduleManagementTab', f'검사항목 저장 완료: schedule_id={schedule_id}')
+
+        except Exception as e:
+            log_exception('ScheduleManagementTab', f'검사항목 저장 오류: {str(e)}')
+            QMessageBox.critical(self, "저장 오류", f"저장 중 오류가 발생했습니다:\n{str(e)}")
+
+    def load_test_items(self, schedule_id):
+        """데이터베이스에서 저장된 검사항목 변경사항 로드"""
+        self.additional_test_items = []
+        self.removed_base_items = []
+
+        if not schedule_id:
+            return
+
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 테이블 존재 여부 확인
+            cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='schedule_test_items'
+            """)
+            if not cursor.fetchone():
+                conn.close()
+                return
+
+            # 저장된 항목 로드
+            cursor.execute("""
+                SELECT additional_items, removed_items
+                FROM schedule_test_items
+                WHERE schedule_id = ?
+            """, (schedule_id,))
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                additional_str = result['additional_items'] or ''
+                removed_str = result['removed_items'] or ''
+
+                if additional_str:
+                    self.additional_test_items = [item.strip() for item in additional_str.split(',') if item.strip()]
+                if removed_str:
+                    self.removed_base_items = [item.strip() for item in removed_str.split(',') if item.strip()]
+
+                log_message('ScheduleManagementTab', f'검사항목 로드 완료: 추가={len(self.additional_test_items)}, 삭제={len(self.removed_base_items)}')
+
+        except Exception as e:
+            log_exception('ScheduleManagementTab', f'검사항목 로드 오류: {str(e)}')
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
