@@ -83,7 +83,7 @@ class Schedule:
             print(f"스케줄 생성 중 오류: {str(e)}")
             import traceback
             traceback.print_exc()
-            return None
+            raise  # 예외를 다시 발생시켜 호출자에게 전달
 
     @staticmethod
     def get_by_id(schedule_id):
