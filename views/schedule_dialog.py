@@ -949,6 +949,12 @@ class ScheduleCreateDialog(QDialog):
         """중간 보고일자 미정 체크박스에 따라 날짜 입력 활성화/비활성화"""
         self.interim_report_date.setEnabled(not state)
 
+    def toggle_interim_report(self, state):
+        """중간 보고 체크박스에 따라 중간 보고일자 미정 체크박스 상태 변경"""
+        if state:  # 중간 보고 체크 시
+            self.interim_report_date_check.setChecked(False)  # 미정 체크 해제
+            self.interim_report_date.setEnabled(True)  # 날짜 입력 활성화
+
     def connect_signals(self):
         """모든 시그널 연결을 한 곳에서 처리"""
         # 클라이언트 관련
@@ -995,7 +1001,8 @@ class ScheduleCreateDialog(QDialog):
         self.expected_date_check.stateChanged.connect(self.toggle_expected_date)
         self.start_date_check.stateChanged.connect(self.toggle_start_date)
 
-        # 중간 보고일자 관련
+        # 중간 보고 관련
+        self.report_type_interim.stateChanged.connect(self.toggle_interim_report)
         self.interim_report_date_check.stateChanged.connect(self.toggle_interim_report_date)
 
         # 버튼 관련
