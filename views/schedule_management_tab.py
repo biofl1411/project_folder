@@ -11,9 +11,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QDialog, QFormLayout, QTextEdit, QCheckBox, QGroupBox,
                              QFileDialog, QGridLayout, QSpinBox, QSplitter,
                              QScrollArea, QTabWidget, QListWidget, QListWidgetItem,
-                             QDialogButtonBox, QCalendarWidget)
+                             QDialogButtonBox, QCalendarWidget, QMenu, QAction)
 from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QBrush
+from PyQt5.QtGui import QColor, QFont, QBrush, QCursor
 import pandas as pd
 from datetime import datetime
 
@@ -21,6 +21,20 @@ from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
 from utils.logger import log_message, log_error, log_exception, safe_get
+
+
+class ClickableLabel(QLabel):
+    """클릭 가능한 라벨 - 클릭 시 시그널 발생"""
+    clicked = pyqtSignal()
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class DisplaySettingsDialog(QDialog):
@@ -580,7 +594,10 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.test_method_value, 1, 1)
         self.interim_report_label = self._create_label("중간보고서", label_style)
         grid.addWidget(self.interim_report_label, 1, 2)
-        self.interim_report_value = self._create_value_label("-", value_style)
+        self.interim_report_value = ClickableLabel("-")
+        self.interim_report_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.interim_report_value.setAlignment(Qt.AlignCenter)
+        self.interim_report_value.clicked.connect(self.toggle_interim_report)
         grid.addWidget(self.interim_report_value, 1, 3)
         self.extension_label = self._create_label("연장실험", label_style)
         grid.addWidget(self.extension_label, 1, 4)
@@ -634,7 +651,10 @@ class ScheduleManagementTab(QWidget):
         # 행 5: 상태, 보관온도 (1구간, 2구간, 3구간)
         self.status_label = self._create_label("상    태", label_style)
         grid.addWidget(self.status_label, 4, 0)
-        self.status_value = self._create_value_label("-", value_style)
+        self.status_value = ClickableLabel("-")
+        self.status_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.status_value.setAlignment(Qt.AlignCenter)
+        self.status_value.clicked.connect(self.change_status)
         grid.addWidget(self.status_value, 4, 1)
         self.temp_zone1_label = self._create_label("1 구 간", temp_label_style)
         grid.addWidget(self.temp_zone1_label, 4, 2)
@@ -1297,7 +1317,7 @@ class ScheduleManagementTab(QWidget):
             # 사용자 정의 날짜가 있으면 우선 사용
             if col_idx in self.custom_dates:
                 sample_date = self.custom_dates[col_idx]
-                date_value = sample_date.strftime('%m-%d')
+                date_value = sample_date.strftime('%Y-%m-%d')  # 연-월-일 형식
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
@@ -1310,7 +1330,7 @@ class ScheduleManagementTab(QWidget):
                 else:
                     days_offset = round(i * interval_days)
                 sample_date = start_date + timedelta(days=days_offset)
-                date_value = sample_date.strftime('%m-%d')  # 짧은 날짜 형식
+                date_value = sample_date.strftime('%Y-%m-%d')  # 연-월-일 형식
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
@@ -1644,7 +1664,7 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.information(self, "삭제 완료", f"'{item}' 항목이 삭제되었습니다.")
 
     def save_schedule_changes(self):
-        """스케줄 변경사항 저장 (추가/삭제 항목, O/X 상태)"""
+        """스케줄 변경사항 저장 (상태, 중간보고서, 추가/삭제 항목, O/X 상태, 시작일 등)"""
         if not self.current_schedule:
             QMessageBox.warning(self, "저장 실패", "먼저 스케줄을 선택하세요.")
             return
@@ -1668,6 +1688,15 @@ class ScheduleManagementTab(QWidget):
             experiment_data = self._collect_experiment_schedule_data()
             experiment_data_json = json.dumps(experiment_data, ensure_ascii=False) if experiment_data else None
 
+            # 상태 코드 가져오기
+            status = self.current_schedule.get('status', 'pending')
+
+            # 중간보고서 여부
+            report_interim = self.current_schedule.get('report_interim', 0)
+
+            # 시작일 (변경되었을 수 있음)
+            start_date = self.current_schedule.get('start_date', '')
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -1676,9 +1705,13 @@ class ScheduleManagementTab(QWidget):
                 UPDATE schedules SET
                     additional_test_items = ?,
                     removed_test_items = ?,
-                    experiment_schedule_data = ?
+                    experiment_schedule_data = ?,
+                    status = ?,
+                    report_interim = ?,
+                    start_date = ?
                 WHERE id = ?
-            """, (additional_items_json, removed_items_json, experiment_data_json, schedule_id))
+            """, (additional_items_json, removed_items_json, experiment_data_json,
+                  status, report_interim, start_date, schedule_id))
 
             conn.commit()
             conn.close()
@@ -1721,6 +1754,140 @@ class ScheduleManagementTab(QWidget):
             data[test_item] = row_data
 
         return data
+
+    def change_status(self):
+        """상태 클릭 시 변경 가능하도록 (입고예정, 입고, 종료)"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        from PyQt5.QtWidgets import QInputDialog
+
+        status_options = ["입고예정", "입고", "종료"]
+        current_status = self.status_value.text()
+
+        # 현재 상태의 인덱스 찾기
+        try:
+            current_index = status_options.index(current_status)
+        except ValueError:
+            current_index = 0
+
+        new_status, ok = QInputDialog.getItem(
+            self, "상태 변경", "새 상태를 선택하세요:",
+            status_options, current_index, False
+        )
+
+        if ok and new_status:
+            # 상태 코드로 변환
+            status_code_map = {
+                "입고예정": "pending",
+                "입고": "in_progress",
+                "종료": "completed"
+            }
+            status_code = status_code_map.get(new_status, "pending")
+
+            # 현재 스케줄 정보 업데이트
+            self.current_schedule['status'] = status_code
+            self.status_value.setText(new_status)
+
+            # 스타일 변경 (상태에 따른 색상)
+            if new_status == "입고예정":
+                self.status_value.setStyleSheet("color: #f39c12; text-decoration: underline; font-weight: bold;")
+            elif new_status == "입고":
+                self.status_value.setStyleSheet("color: #27ae60; text-decoration: underline; font-weight: bold;")
+            else:  # 종료
+                self.status_value.setStyleSheet("color: #7f8c8d; text-decoration: underline; font-weight: bold;")
+
+    def toggle_interim_report(self):
+        """중간보고서 요청/미요청 토글"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        from PyQt5.QtWidgets import QInputDialog
+
+        options = ["요청", "미요청"]
+        current_value = self.interim_report_value.text()
+
+        try:
+            current_index = options.index(current_value)
+        except ValueError:
+            current_index = 1
+
+        new_value, ok = QInputDialog.getItem(
+            self, "중간보고서 설정", "중간보고서 요청 여부:",
+            options, current_index, False
+        )
+
+        if ok and new_value:
+            is_requested = (new_value == "요청")
+            self.current_schedule['report_interim'] = 1 if is_requested else 0
+            self.interim_report_value.setText(new_value)
+
+            # 중간보고일 업데이트
+            self._update_interim_date()
+
+            # 비용 요약 업데이트
+            self._update_cost_after_interim_change()
+
+    def _update_interim_date(self):
+        """중간보고일 계산 및 업데이트"""
+        if not self.current_schedule:
+            self.interim_date_value.setText('-')
+            return
+
+        report_interim = self.current_schedule.get('report_interim', 0)
+        if not report_interim:
+            self.interim_date_value.setText('-')
+            return
+
+        start_date_str = self.current_schedule.get('start_date', '')
+        if not start_date_str:
+            self.interim_date_value.setText('-')
+            return
+
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        if sampling_count < 6:
+            self.interim_date_value.setText('-')
+            return
+
+        try:
+            from datetime import datetime, timedelta
+            start = datetime.strptime(start_date_str, '%Y-%m-%d')
+
+            days = self.current_schedule.get('test_period_days', 0) or 0
+            months = self.current_schedule.get('test_period_months', 0) or 0
+            years = self.current_schedule.get('test_period_years', 0) or 0
+            experiment_days = days + (months * 30) + (years * 365)
+
+            if experiment_days > 0 and sampling_count > 0:
+                interval = experiment_days // sampling_count
+                # 6회차 날짜를 중간보고일로 설정
+                interim_date = start + timedelta(days=interval * 6)
+                self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
+            else:
+                self.interim_date_value.setText('-')
+        except Exception as e:
+            print(f"중간보고일 계산 오류: {e}")
+            self.interim_date_value.setText('-')
+
+    def _update_cost_after_interim_change(self):
+        """중간보고서 변경 후 비용 업데이트"""
+        if not self.current_schedule:
+            return
+
+        report_interim = self.current_schedule.get('report_interim', 0)
+
+        if report_interim:
+            self.interim_cost_label.show()
+            self.interim_report_cost_input.show()
+            self.interim_report_cost_input.setText("200,000")
+        else:
+            self.interim_cost_label.hide()
+            self.interim_report_cost_input.hide()
+
+        # 비용 재계산
+        self.recalculate_costs()
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
@@ -1766,7 +1933,7 @@ class ScheduleManagementTab(QWidget):
         self.recalculate_costs()
 
     def edit_date_with_calendar(self, col):
-        """달력을 통해 날짜 수정"""
+        """달력을 통해 날짜 수정 - 1회차 날짜 변경 시 시작일도 연동"""
         table = self.experiment_table
         current_date_text = table.item(0, col).text() if table.item(0, col) else "-"
 
@@ -1783,17 +1950,18 @@ class ScheduleManagementTab(QWidget):
         current_date = None
         if current_date_text != "-":
             try:
-                # MM-DD 형식이면 현재 연도 추가
-                if len(current_date_text) == 5:
-                    year = datetime.now().year
-                    # 시작일이 있으면 그 연도 사용
-                    if start_date:
-                        year = start_date.year
-                    current_date = datetime.strptime(f"{year}-{current_date_text}", '%Y-%m-%d')
-                else:
-                    current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
+                # YYYY-MM-DD 형식 파싱
+                current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
             except:
-                current_date = start_date
+                try:
+                    # MM-DD 형식이면 현재 연도 추가
+                    if len(current_date_text) == 5:
+                        year = datetime.now().year
+                        if start_date:
+                            year = start_date.year
+                        current_date = datetime.strptime(f"{year}-{current_date_text}", '%Y-%m-%d')
+                except:
+                    current_date = start_date
 
         # 날짜 선택 다이얼로그 표시
         dialog = DateSelectDialog(self, current_date=current_date, title=f"{col}회차 날짜 선택")
@@ -1801,19 +1969,81 @@ class ScheduleManagementTab(QWidget):
             # 선택된 날짜 저장
             self.custom_dates[col] = dialog.selected_date
 
-            # 테이블 날짜 업데이트
+            # 테이블 날짜 업데이트 (연-월-일 형식)
             date_item = table.item(0, col)
             if date_item:
-                date_item.setText(dialog.selected_date.strftime('%m-%d'))
+                date_item.setText(dialog.selected_date.strftime('%Y-%m-%d'))
                 date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
 
-            # 제조후 일수 업데이트
-            if start_date:
-                days_elapsed = (dialog.selected_date - start_date).days
-                time_item = table.item(1, col)
+            # 1회차(col=1) 날짜 변경 시 시작일 연동
+            if col == 1:
+                new_start_date = dialog.selected_date
+                self.current_schedule['start_date'] = new_start_date.strftime('%Y-%m-%d')
+                self.start_date_value.setText(new_start_date.strftime('%Y-%m-%d'))
+
+                # 전체 실험 스케줄 재계산
+                self._recalculate_all_dates(new_start_date)
+            else:
+                # 제조후 일수 업데이트 (1회차가 아닌 경우)
+                if start_date:
+                    days_elapsed = (dialog.selected_date - start_date).days
+                    time_item = table.item(1, col)
+                    if time_item:
+                        time_item.setText(f"{days_elapsed}일")
+                        time_item.setBackground(QColor('#FFE4B5'))
+
+    def _recalculate_all_dates(self, new_start_date):
+        """시작일 변경 시 모든 날짜 재계산"""
+        if not self.current_schedule:
+            return
+
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        days = self.current_schedule.get('test_period_days', 0) or 0
+        months = self.current_schedule.get('test_period_months', 0) or 0
+        years = self.current_schedule.get('test_period_years', 0) or 0
+        experiment_days = days + (months * 30) + (years * 365)
+
+        table = self.experiment_table
+
+        # 각 회차별 날짜 재계산
+        for i in range(sampling_count):
+            col_idx = i + 1
+
+            # 사용자가 직접 수정한 날짜가 아닌 경우에만 재계산
+            if col_idx not in self.custom_dates or col_idx == 1:
+                from datetime import timedelta
+                if i == sampling_count - 1:
+                    days_offset = experiment_days
+                elif sampling_count > 1:
+                    interval_days = experiment_days / (sampling_count - 1)
+                    days_offset = round(i * interval_days)
+                else:
+                    days_offset = 0
+
+                sample_date = new_start_date + timedelta(days=days_offset)
+
+                # 테이블 업데이트
+                date_item = table.item(0, col_idx)
+                if date_item:
+                    date_item.setText(sample_date.strftime('%Y-%m-%d'))
+                    if col_idx == 1:
+                        date_item.setBackground(QColor('#FFE4B5'))  # 변경된 시작일 강조
+                    else:
+                        date_item.setBackground(QColor('#E6F3FF'))
+
+                # 제조후 일수 업데이트
+                time_item = table.item(1, col_idx)
                 if time_item:
-                    time_item.setText(f"{days_elapsed}일")
-                    time_item.setBackground(QColor('#FFE4B5'))  # 수정된 값 강조
+                    time_item.setText(f"{days_offset}일")
+                    time_item.setBackground(QColor('#90EE90'))
+
+        # 마지막 실험일 업데이트
+        from datetime import timedelta
+        last_date = new_start_date + timedelta(days=experiment_days)
+        self.last_test_date_value.setText(last_date.strftime('%Y-%m-%d'))
+
+        # 중간보고일 재계산
+        self._update_interim_date()
 
     def recalculate_costs(self):
         """셀 변경 시 비용 재계산"""
