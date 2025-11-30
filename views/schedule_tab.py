@@ -338,6 +338,7 @@ class ScheduleTab(QWidget):
         header = self.schedule_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)  # 사용자가 마우스로 조절 가능
         header.setStretchLastSection(True)  # 마지막 열이 남은 공간을 채움
+        header.setSectionsMovable(True)  # 컬럼 헤더 드래그로 순서 변경 가능
 
         # 체크박스 열(0번) 고정
         header.setSectionResizeMode(0, QHeaderView.Fixed)
