@@ -1446,9 +1446,11 @@ class ScheduleManagementTab(QWidget):
         total_item.setBackground(QColor('#FFFF99'))
         table.setItem(row_count - 1, col_count - 1, total_item)
 
-        # 모든 열 균등 배분
+        # 구분 열은 내용에 맞게 자동 조정, 나머지 열은 균등 배분
         header = table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 구분 열
+        for col in range(1, col_count):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
 
         self.update_cost_summary(schedule, test_items, fees, sampling_count)
 
