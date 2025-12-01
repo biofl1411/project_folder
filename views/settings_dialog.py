@@ -59,10 +59,19 @@ class SettingsDialog(QDialog):
         company_group = QGroupBox("회사 정보")
         company_layout = QFormLayout()
 
+        # 고정값 스타일
+        fixed_style = "background-color: #f0f0f0; color: #333;"
+
         self.company_name_input = QLineEdit()
+        self.company_name_input.setText("(주)바이오푸드랩")
+        self.company_name_input.setReadOnly(True)
+        self.company_name_input.setStyleSheet(fixed_style)
         company_layout.addRow("회사명:", self.company_name_input)
 
         self.company_ceo_input = QLineEdit()
+        self.company_ceo_input.setText("이용표")
+        self.company_ceo_input.setReadOnly(True)
+        self.company_ceo_input.setStyleSheet(fixed_style)
         company_layout.addRow("대표자:", self.company_ceo_input)
 
         self.company_manager_input = QLineEdit()
@@ -75,9 +84,15 @@ class SettingsDialog(QDialog):
         company_layout.addRow("핸드폰:", self.company_mobile_input)
 
         self.company_fax_input = QLineEdit()
+        self.company_fax_input.setText("070-7410-1430")
+        self.company_fax_input.setReadOnly(True)
+        self.company_fax_input.setStyleSheet(fixed_style)
         company_layout.addRow("팩스:", self.company_fax_input)
 
         self.company_address_input = QLineEdit()
+        self.company_address_input.setText("서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호")
+        self.company_address_input.setReadOnly(True)
+        self.company_address_input.setStyleSheet(fixed_style)
         company_layout.addRow("주소:", self.company_address_input)
 
         company_group.setLayout(company_layout)
@@ -89,7 +104,7 @@ class SettingsDialog(QDialog):
 
         self.default_sampling_spin = QSpinBox()
         self.default_sampling_spin.setRange(1, 30)
-        self.default_sampling_spin.setValue(6)
+        self.default_sampling_spin.setValue(13)  # 기본값 13회
         default_layout.addRow("기본 샘플링 횟수:", self.default_sampling_spin)
 
         default_group.setLayout(default_layout)
@@ -159,29 +174,34 @@ class SettingsDialog(QDialog):
             cursor = conn.cursor()
             cursor.execute("SELECT key, value FROM settings")
             settings = cursor.fetchall()
-            conn.close()
 
             settings_dict = {s['key']: s['value'] for s in settings}
 
-            # 회사 정보
-            if 'company_name' in settings_dict:
-                self.company_name_input.setText(settings_dict['company_name'])
-            if 'company_ceo' in settings_dict:
-                self.company_ceo_input.setText(settings_dict['company_ceo'])
-            if 'company_manager' in settings_dict:
-                self.company_manager_input.setText(settings_dict['company_manager'])
+            # 담당자: 로그인한 사용자 이름 가져오기
+            try:
+                cursor.execute("SELECT name FROM users ORDER BY last_login DESC LIMIT 1")
+                user = cursor.fetchone()
+                if user and user['name']:
+                    self.company_manager_input.setText(user['name'])
+                elif 'company_manager' in settings_dict:
+                    self.company_manager_input.setText(settings_dict['company_manager'])
+            except:
+                if 'company_manager' in settings_dict:
+                    self.company_manager_input.setText(settings_dict['company_manager'])
+
+            conn.close()
+
+            # 연락처, 핸드폰 (입력 가능 필드만 DB에서 로드)
             if 'company_phone' in settings_dict:
                 self.company_phone_input.setText(settings_dict['company_phone'])
             if 'company_mobile' in settings_dict:
                 self.company_mobile_input.setText(settings_dict['company_mobile'])
-            if 'company_fax' in settings_dict:
-                self.company_fax_input.setText(settings_dict['company_fax'])
-            if 'company_address' in settings_dict:
-                self.company_address_input.setText(settings_dict['company_address'])
 
-            # 기본 샘플링 횟수
+            # 기본 샘플링 횟수 (DB에 값이 없으면 기본값 13 사용)
             if 'default_sampling_count' in settings_dict:
                 self.default_sampling_spin.setValue(int(settings_dict['default_sampling_count']))
+            else:
+                self.default_sampling_spin.setValue(13)
 
             # 부가세율
             if 'tax_rate' in settings_dict:
