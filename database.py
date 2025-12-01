@@ -176,6 +176,89 @@ def init_database():
     except sqlite3.OperationalError:
         pass  # 이미 컬럼이 존재하는 경우
 
+    # start_date, end_date NOT NULL 제약 조건 제거 마이그레이션
+    # 기존 테이블이 NOT NULL 제약이 있는 경우 NULL 허용하도록 재생성
+    try:
+        # 현재 테이블 구조 확인
+        cursor.execute("PRAGMA table_info(schedules)")
+        columns_info = cursor.fetchall()
+
+        # start_date 컬럼의 NOT NULL 여부 확인 (notnull = 1이면 NOT NULL)
+        start_date_notnull = False
+        for col in columns_info:
+            if col[1] == 'start_date' and col[3] == 1:  # col[3]이 notnull 플래그
+                start_date_notnull = True
+                break
+
+        if start_date_notnull:
+            print("schedules 테이블 마이그레이션 시작: start_date, end_date NULL 허용")
+
+            # 기존 컬럼 목록 가져오기
+            column_names = [col[1] for col in columns_info]
+            columns_str = ', '.join(column_names)
+
+            # 임시 테이블로 데이터 백업
+            cursor.execute(f"CREATE TABLE schedules_backup AS SELECT * FROM schedules")
+
+            # 기존 테이블 삭제
+            cursor.execute("DROP TABLE schedules")
+
+            # 새 테이블 생성 (start_date, end_date NULL 허용, 모든 추가 컬럼 포함)
+            cursor.execute('''
+            CREATE TABLE schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                title TEXT NOT NULL,
+                start_date TEXT,
+                end_date TEXT,
+                status TEXT DEFAULT 'pending',
+                total_price REAL,
+                product_name TEXT,
+                food_type_id INTEGER,
+                test_method TEXT,
+                storage_condition TEXT,
+                test_period_days INTEGER DEFAULT 0,
+                test_period_months INTEGER DEFAULT 0,
+                test_period_years INTEGER DEFAULT 0,
+                sampling_count INTEGER DEFAULT 6,
+                report_interim INTEGER DEFAULT 0,
+                report_korean INTEGER DEFAULT 1,
+                report_english INTEGER DEFAULT 0,
+                extension_test INTEGER DEFAULT 0,
+                custom_temperatures TEXT,
+                memo TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                packaging_weight INTEGER DEFAULT 0,
+                packaging_unit TEXT DEFAULT 'g',
+                additional_test_items TEXT,
+                removed_test_items TEXT,
+                experiment_schedule_data TEXT,
+                custom_dates TEXT,
+                actual_experiment_days INTEGER,
+                estimate_date TEXT,
+                expected_date TEXT,
+                interim_report_date TEXT,
+                FOREIGN KEY (client_id) REFERENCES clients (id)
+            )
+            ''')
+
+            # 백업 테이블의 컬럼 중 새 테이블에 있는 컬럼만 복사
+            cursor.execute("PRAGMA table_info(schedules)")
+            new_columns = [col[1] for col in cursor.fetchall()]
+            common_columns = [col for col in column_names if col in new_columns]
+            common_columns_str = ', '.join(common_columns)
+
+            # 데이터 복원
+            cursor.execute(f"INSERT INTO schedules ({common_columns_str}) SELECT {common_columns_str} FROM schedules_backup")
+
+            # 백업 테이블 삭제
+            cursor.execute("DROP TABLE schedules_backup")
+
+            conn.commit()
+            print("schedules 테이블 마이그레이션 완료")
+    except Exception as e:
+        print(f"마이그레이션 중 오류 (무시됨): {e}")
+
     # 스케줄 항목 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS schedule_items (
