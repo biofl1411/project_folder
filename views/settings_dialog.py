@@ -402,8 +402,8 @@ class SettingsDialog(QDialog):
         # 예시 설명
         example_label = QLabel(
             "예시: 6회 실험일이 2026-05-02(토)이고 +15영업일로 설정하면\n"
-            "      중간보고일은 2026-05-25(월)로 자동 계산됩니다.\n"
-            "      (주말 및 5/5 어린이날 제외)"
+            "      중간보고일은 2026-05-26(화)로 자동 계산됩니다.\n"
+            "      (주말, 5/5 어린이날, 5/24 부처님오신날, 5/25 대체공휴일 제외)"
         )
         example_label.setStyleSheet("color: #27ae60; font-size: 10px; margin-top: 5px;")
         interim_layout.addRow(example_label)
