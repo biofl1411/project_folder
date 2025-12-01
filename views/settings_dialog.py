@@ -1,7 +1,8 @@
 # views/settings_dialog.py
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
                             QWidget, QFormLayout, QLineEdit, QPushButton,
-                            QLabel, QMessageBox, QSpinBox, QGroupBox)
+                            QLabel, QMessageBox, QSpinBox, QGroupBox, QCheckBox,
+                            QComboBox)
 from PyQt5.QtCore import Qt
 
 
@@ -11,7 +12,7 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("설정")
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(550, 500)
         self.initUI()
         self.load_settings()
 
@@ -31,6 +32,11 @@ class SettingsDialog(QDialog):
         tax_tab = QWidget()
         self.setup_tax_tab(tax_tab)
         self.tab_widget.addTab(tax_tab, "부가세/할인")
+
+        # 이메일 설정 탭
+        email_tab = QWidget()
+        self.setup_email_tab(email_tab)
+        self.tab_widget.addTab(email_tab, "이메일")
 
         # 경로 설정 탭
         path_tab = QWidget()
@@ -95,6 +101,10 @@ class SettingsDialog(QDialog):
         self.company_address_input.setStyleSheet(fixed_style)
         company_layout.addRow("주소:", self.company_address_input)
 
+        self.company_email_input = QLineEdit()
+        self.company_email_input.setPlaceholderText("example@biofoodlab.co.kr")
+        company_layout.addRow("이메일:", self.company_email_input)
+
         company_group.setLayout(company_layout)
         layout.addWidget(company_group)
 
@@ -143,6 +153,103 @@ class SettingsDialog(QDialog):
         layout.addWidget(discount_group)
 
         layout.addStretch()
+
+    def setup_email_tab(self, tab):
+        """이메일 설정 탭"""
+        layout = QVBoxLayout(tab)
+
+        # SMTP 서버 설정 그룹
+        smtp_group = QGroupBox("SMTP 서버 설정")
+        smtp_layout = QFormLayout()
+
+        # SMTP 서버
+        self.smtp_server_input = QLineEdit()
+        self.smtp_server_input.setPlaceholderText("smtp.gmail.com")
+        smtp_layout.addRow("SMTP 서버:", self.smtp_server_input)
+
+        # SMTP 포트
+        self.smtp_port_spin = QSpinBox()
+        self.smtp_port_spin.setRange(1, 65535)
+        self.smtp_port_spin.setValue(587)
+        smtp_layout.addRow("포트:", self.smtp_port_spin)
+
+        # 보안 연결
+        self.smtp_security_combo = QComboBox()
+        self.smtp_security_combo.addItems(["TLS", "SSL", "없음"])
+        smtp_layout.addRow("보안:", self.smtp_security_combo)
+
+        smtp_group.setLayout(smtp_layout)
+        layout.addWidget(smtp_group)
+
+        # 계정 설정 그룹
+        account_group = QGroupBox("계정 설정")
+        account_layout = QFormLayout()
+
+        # 발신자 이메일
+        self.smtp_email_input = QLineEdit()
+        self.smtp_email_input.setPlaceholderText("sender@biofoodlab.co.kr")
+        account_layout.addRow("발신 이메일:", self.smtp_email_input)
+
+        # 비밀번호 (앱 비밀번호)
+        self.smtp_password_input = QLineEdit()
+        self.smtp_password_input.setEchoMode(QLineEdit.Password)
+        self.smtp_password_input.setPlaceholderText("앱 비밀번호 입력")
+        account_layout.addRow("비밀번호:", self.smtp_password_input)
+
+        # 발신자 이름
+        self.smtp_sender_name_input = QLineEdit()
+        self.smtp_sender_name_input.setText("(주)바이오푸드랩")
+        account_layout.addRow("발신자 이름:", self.smtp_sender_name_input)
+
+        account_group.setLayout(account_layout)
+        layout.addWidget(account_group)
+
+        # 테스트 버튼
+        test_layout = QHBoxLayout()
+        test_layout.addStretch()
+        self.test_email_btn = QPushButton("연결 테스트")
+        self.test_email_btn.clicked.connect(self.test_email_connection)
+        test_layout.addWidget(self.test_email_btn)
+        layout.addLayout(test_layout)
+
+        # 안내 문구
+        info_label = QLabel("※ Gmail 사용 시 '앱 비밀번호'를 생성하여 입력하세요.\n"
+                           "※ 네이버, 다음 등도 SMTP 설정 후 사용 가능합니다.")
+        info_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+
+    def test_email_connection(self):
+        """이메일 연결 테스트"""
+        try:
+            import smtplib
+
+            server = self.smtp_server_input.text().strip()
+            port = self.smtp_port_spin.value()
+            email = self.smtp_email_input.text().strip()
+            password = self.smtp_password_input.text()
+            security = self.smtp_security_combo.currentText()
+
+            if not server or not email or not password:
+                QMessageBox.warning(self, "입력 오류", "SMTP 서버, 이메일, 비밀번호를 모두 입력해주세요.")
+                return
+
+            # SMTP 연결 테스트
+            if security == "SSL":
+                smtp = smtplib.SMTP_SSL(server, port, timeout=10)
+            else:
+                smtp = smtplib.SMTP(server, port, timeout=10)
+                if security == "TLS":
+                    smtp.starttls()
+
+            smtp.login(email, password)
+            smtp.quit()
+
+            QMessageBox.information(self, "연결 성공", "SMTP 서버에 성공적으로 연결되었습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "연결 실패", f"SMTP 연결에 실패했습니다.\n\n오류: {str(e)}")
 
     def setup_path_tab(self, tab):
         """파일 경로 설정 탭"""
@@ -219,6 +326,26 @@ class SettingsDialog(QDialog):
             if 'template_path' in settings_dict:
                 self.template_path_input.setText(settings_dict['template_path'])
 
+            # 회사 이메일
+            if 'company_email' in settings_dict:
+                self.company_email_input.setText(settings_dict['company_email'])
+
+            # 이메일 설정
+            if 'smtp_server' in settings_dict:
+                self.smtp_server_input.setText(settings_dict['smtp_server'])
+            if 'smtp_port' in settings_dict:
+                self.smtp_port_spin.setValue(int(settings_dict['smtp_port']))
+            if 'smtp_security' in settings_dict:
+                index = self.smtp_security_combo.findText(settings_dict['smtp_security'])
+                if index >= 0:
+                    self.smtp_security_combo.setCurrentIndex(index)
+            if 'smtp_email' in settings_dict:
+                self.smtp_email_input.setText(settings_dict['smtp_email'])
+            if 'smtp_password' in settings_dict:
+                self.smtp_password_input.setText(settings_dict['smtp_password'])
+            if 'smtp_sender_name' in settings_dict:
+                self.smtp_sender_name_input.setText(settings_dict['smtp_sender_name'])
+
         except Exception as e:
             print(f"설정 로드 중 오류: {str(e)}")
 
@@ -240,12 +367,20 @@ class SettingsDialog(QDialog):
                 ('company_mobile', self.company_mobile_input.text()),
                 ('company_fax', self.company_fax_input.text()),
                 ('company_address', self.company_address_input.text()),
+                ('company_email', self.company_email_input.text()),
                 # 기본 설정
                 ('default_sampling_count', str(self.default_sampling_spin.value())),
                 ('tax_rate', str(self.tax_rate_spin.value())),
                 ('default_discount', str(self.default_discount_spin.value())),
                 ('output_path', self.output_path_input.text()),
-                ('template_path', self.template_path_input.text())
+                ('template_path', self.template_path_input.text()),
+                # 이메일 설정
+                ('smtp_server', self.smtp_server_input.text()),
+                ('smtp_port', str(self.smtp_port_spin.value())),
+                ('smtp_security', self.smtp_security_combo.currentText()),
+                ('smtp_email', self.smtp_email_input.text()),
+                ('smtp_password', self.smtp_password_input.text()),
+                ('smtp_sender_name', self.smtp_sender_name_input.text())
             ]
 
             for key, value in settings:
