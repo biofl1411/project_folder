@@ -261,6 +261,12 @@ class ScheduleTab(QWidget):
 
         button_layout.addStretch()
 
+        # 엑셀 불러오기 버튼
+        import_btn = QPushButton("엑셀 불러오기")
+        import_btn.setStyleSheet("background-color: #2e7d32; color: white;")
+        import_btn.clicked.connect(self.import_from_excel)
+        button_layout.addWidget(import_btn)
+
         # 엑셀 내보내기 버튼
         export_btn = QPushButton("엑셀 내보내기")
         export_btn.setStyleSheet("background-color: #217346; color: white;")
@@ -1067,5 +1073,186 @@ class ScheduleTab(QWidget):
         except Exception as e:
             import traceback
             error_msg = f"엑셀 내보내기 중 오류 발생:\n{str(e)}"
+            log_exception('ScheduleTab', error_msg)
+            QMessageBox.critical(self, "오류", error_msg)
+
+    def import_from_excel(self):
+        """엑셀 파일에서 스케줄 목록 불러오기"""
+        try:
+            import pandas as pd
+            from models.schedules import Schedule
+
+            # 파일 선택
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "엑셀 파일 열기",
+                "",
+                "Excel Files (*.xlsx *.xls);;All Files (*)"
+            )
+
+            if not file_path:
+                return
+
+            # 엑셀 파일 읽기
+            df = pd.read_excel(file_path, engine='openpyxl')
+
+            if df.empty:
+                QMessageBox.warning(self, "불러오기 실패", "엑셀 파일에 데이터가 없습니다.")
+                return
+
+            # 컬럼 매핑 (한글 헤더 -> 영문 필드명)
+            column_mapping = {
+                '업체명': 'client_name',
+                '대표자': 'client_ceo',
+                '담당자': 'client_contact',
+                '이메일': 'client_email',
+                '전화번호': 'client_phone',
+                '영업담당': 'sales_rep',
+                '샘플명': 'product_name',
+                '제품명': 'product_name',
+                '식품유형': 'food_type_name',
+                '실험방법': 'test_method_name',
+                '보관조건': 'storage_condition_name',
+                '소비기한': 'expiry_period',
+                '실험기간': 'test_period',
+                '샘플링횟수': 'sampling_count',
+                '시작일': 'start_date',
+                '종료일': 'end_date',
+                '상태': 'status_name',
+                '메모': 'memo',
+            }
+
+            # 실험방법 매핑
+            test_method_map = {
+                '실측': 'real',
+                '가속': 'acceleration',
+                '의뢰자(실측)': 'custom_real',
+                '의뢰자(가속)': 'custom_acceleration',
+            }
+
+            # 보관조건 매핑
+            storage_map = {
+                '상온': 'room_temp',
+                '실온': 'warm',
+                '냉장': 'cool',
+                '냉동': 'freeze',
+            }
+
+            # 상태 매핑
+            status_map = get_status_map()
+            reverse_status_map = {v: k for k, v in status_map.items()}
+
+            # 데이터 처리
+            imported_count = 0
+            error_count = 0
+            errors = []
+
+            for idx, row in df.iterrows():
+                try:
+                    schedule_data = {}
+
+                    for excel_col, field_name in column_mapping.items():
+                        if excel_col in df.columns:
+                            value = row[excel_col]
+                            if pd.notna(value):
+                                schedule_data[field_name] = str(value).strip()
+
+                    # 필수 필드 확인
+                    if not schedule_data.get('client_name') and not schedule_data.get('product_name'):
+                        continue
+
+                    # 실험방법 변환
+                    if 'test_method_name' in schedule_data:
+                        schedule_data['test_method'] = test_method_map.get(
+                            schedule_data.pop('test_method_name'), 'real'
+                        )
+
+                    # 보관조건 변환
+                    if 'storage_condition_name' in schedule_data:
+                        schedule_data['storage_condition'] = storage_map.get(
+                            schedule_data.pop('storage_condition_name'), 'room_temp'
+                        )
+
+                    # 상태 변환
+                    if 'status_name' in schedule_data:
+                        status_name = schedule_data.pop('status_name')
+                        schedule_data['status'] = reverse_status_map.get(status_name, 'pending')
+
+                    # 소비기한 파싱 (예: "1년 6개월" -> days, months, years)
+                    if 'expiry_period' in schedule_data:
+                        expiry_str = schedule_data.pop('expiry_period')
+                        years, months, days = 0, 0, 0
+                        import re
+                        year_match = re.search(r'(\d+)\s*년', expiry_str)
+                        month_match = re.search(r'(\d+)\s*개월', expiry_str)
+                        day_match = re.search(r'(\d+)\s*일', expiry_str)
+                        if year_match:
+                            years = int(year_match.group(1))
+                        if month_match:
+                            months = int(month_match.group(1))
+                        if day_match:
+                            days = int(day_match.group(1))
+                        schedule_data['test_period_years'] = years
+                        schedule_data['test_period_months'] = months
+                        schedule_data['test_period_days'] = days
+
+                    # 샘플링횟수 처리
+                    if 'sampling_count' in schedule_data:
+                        try:
+                            schedule_data['sampling_count'] = int(float(schedule_data['sampling_count']))
+                        except:
+                            schedule_data['sampling_count'] = 6
+
+                    # 날짜 형식 처리
+                    for date_field in ['start_date', 'end_date']:
+                        if date_field in schedule_data:
+                            try:
+                                date_val = pd.to_datetime(schedule_data[date_field])
+                                schedule_data[date_field] = date_val.strftime('%Y-%m-%d')
+                            except:
+                                del schedule_data[date_field]
+
+                    # 식품유형 처리 (이름으로 ID 조회)
+                    if 'food_type_name' in schedule_data:
+                        food_type_name = schedule_data.pop('food_type_name')
+                        # TODO: 식품유형 ID 조회 로직 추가 가능
+
+                    # 기본값 설정
+                    if 'status' not in schedule_data:
+                        schedule_data['status'] = 'pending'
+                    if 'sampling_count' not in schedule_data:
+                        schedule_data['sampling_count'] = 6
+
+                    # DB에 저장
+                    Schedule.create(schedule_data)
+                    imported_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f"행 {idx + 2}: {str(e)}")
+
+            # 결과 메시지
+            result_msg = f"불러오기 완료!\n\n성공: {imported_count}개\n실패: {error_count}개"
+            if errors and len(errors) <= 5:
+                result_msg += f"\n\n오류 내용:\n" + "\n".join(errors)
+            elif errors:
+                result_msg += f"\n\n오류 내용:\n" + "\n".join(errors[:5]) + f"\n...외 {len(errors) - 5}개"
+
+            QMessageBox.information(self, "불러오기 결과", result_msg)
+
+            # 목록 새로고침
+            if imported_count > 0:
+                self.load_schedules()
+
+            log_message('ScheduleTab', f'엑셀 불러오기 완료: 성공 {imported_count}개, 실패 {error_count}개')
+
+        except ImportError:
+            QMessageBox.critical(
+                self, "라이브러리 오류",
+                "엑셀 불러오기를 위해 pandas와 openpyxl 라이브러리가 필요합니다.\n"
+                "pip install pandas openpyxl 명령으로 설치하세요."
+            )
+        except Exception as e:
+            import traceback
+            error_msg = f"엑셀 불러오기 중 오류 발생:\n{str(e)}"
             log_exception('ScheduleTab', error_msg)
             QMessageBox.critical(self, "오류", error_msg)
