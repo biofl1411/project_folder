@@ -1218,18 +1218,57 @@ class ScheduleTab(QWidget):
                                 del schedule_data[date_field]
 
                     # 식품유형 처리 (이름으로 ID 조회)
+                    food_type_id = None
                     if 'food_type_name' in schedule_data:
                         food_type_name = schedule_data.pop('food_type_name')
-                        # TODO: 식품유형 ID 조회 로직 추가 가능
+                        try:
+                            from models.product_types import ProductType
+                            food_types = ProductType.get_all()
+                            for ft in food_types:
+                                if ft.get('type_name') == food_type_name:
+                                    food_type_id = ft.get('id')
+                                    break
+                        except:
+                            pass
+
+                    # client_name으로 client_id 조회
+                    client_id = None
+                    client_name = schedule_data.pop('client_name', '')
+                    if client_name:
+                        try:
+                            from models.clients import Client
+                            clients = Client.get_all()
+                            for c in clients:
+                                if c.get('company_name') == client_name:
+                                    client_id = c.get('id')
+                                    break
+                        except:
+                            pass
+
+                    # 필드명 매핑
+                    test_start_date = schedule_data.pop('start_date', None)
+                    expected_date = schedule_data.pop('end_date', None)
 
                     # 기본값 설정
-                    if 'status' not in schedule_data:
-                        schedule_data['status'] = 'pending'
-                    if 'sampling_count' not in schedule_data:
-                        schedule_data['sampling_count'] = 6
+                    status = schedule_data.get('status', 'pending')
+                    sampling_count = schedule_data.get('sampling_count', 6)
+                    product_name = schedule_data.get('product_name', '')
 
                     # DB에 저장
-                    Schedule.create(schedule_data)
+                    Schedule.create(
+                        client_id=client_id,
+                        product_name=product_name,
+                        food_type_id=food_type_id,
+                        test_method=schedule_data.get('test_method'),
+                        storage_condition=schedule_data.get('storage_condition'),
+                        test_start_date=test_start_date,
+                        expected_date=expected_date,
+                        test_period_days=schedule_data.get('test_period_days', 0),
+                        test_period_months=schedule_data.get('test_period_months', 0),
+                        test_period_years=schedule_data.get('test_period_years', 0),
+                        sampling_count=sampling_count,
+                        status=status
+                    )
                     imported_count += 1
 
                 except Exception as e:
