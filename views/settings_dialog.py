@@ -380,7 +380,8 @@ class SettingsDialog(QDialog):
         # 설명 라벨
         description_label = QLabel(
             "중간보고일은 '3. 온도조건별 실험 스케줄'의 6회 실험일을 기준으로\n"
-            "아래 설정한 일수를 더하여 자동 계산됩니다."
+            "아래 설정한 영업일수를 더하여 자동 계산됩니다.\n"
+            "(토요일, 일요일, 공휴일, 대체공휴일 제외)"
         )
         description_label.setStyleSheet("color: #666; font-size: 11px; margin-bottom: 10px;")
         interim_layout.addRow(description_label)
@@ -391,7 +392,7 @@ class SettingsDialog(QDialog):
         self.interim_report_offset_spin = QSpinBox()
         self.interim_report_offset_spin.setRange(0, 90)
         self.interim_report_offset_spin.setValue(0)
-        self.interim_report_offset_spin.setSuffix(" 일")
+        self.interim_report_offset_spin.setSuffix(" 영업일")
         self.interim_report_offset_spin.setMinimumWidth(100)
         offset_layout.addWidget(offset_label)
         offset_layout.addWidget(self.interim_report_offset_spin)
@@ -400,8 +401,9 @@ class SettingsDialog(QDialog):
 
         # 예시 설명
         example_label = QLabel(
-            "예시: 6회 실험일이 2026-01-30이고 +15일로 설정하면\n"
-            "      중간보고일은 2026-02-14로 자동 계산됩니다."
+            "예시: 6회 실험일이 2026-05-02(토)이고 +15영업일로 설정하면\n"
+            "      중간보고일은 2026-05-26(화)로 자동 계산됩니다.\n"
+            "      (주말, 5/5 어린이날, 5/24 부처님오신날, 5/25 대체공휴일 제외)"
         )
         example_label.setStyleSheet("color: #27ae60; font-size: 10px; margin-top: 5px;")
         interim_layout.addRow(example_label)
@@ -412,7 +414,8 @@ class SettingsDialog(QDialog):
         # 안내 문구
         info_label = QLabel(
             "※ 이 설정은 스케줄 관리 탭의 중간보고일 자동 계산에 적용됩니다.\n"
-            "※ 중간보고일은 스케줄 관리 탭에서 달력을 통해 직접 수정할 수도 있습니다."
+            "※ 중간보고일은 스케줄 관리 탭에서 달력을 통해 직접 수정할 수도 있습니다.\n"
+            "※ 공휴일: 설날, 추석, 어린이날, 광복절, 한글날, 크리스마스 등 + 대체공휴일"
         )
         info_label.setStyleSheet("color: #666; font-size: 11px;")
         layout.addWidget(info_label)

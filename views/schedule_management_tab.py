@@ -24,6 +24,199 @@ from models.product_types import ProductType
 from utils.logger import log_message, log_error, log_exception, safe_get
 
 
+def get_korean_holidays(year):
+    """한국 공휴일 목록 반환 (고정 공휴일 + 음력 공휴일 + 대체공휴일)
+
+    대체공휴일 적용 기준:
+    - 설날/추석 연휴: 일요일과 겹치면 연휴 다음 첫 평일 (2014년~)
+    - 어린이날: 토요일 또는 일요일과 겹치면 다음 평일 (2014년~)
+    - 삼일절, 광복절, 개천절, 한글날: 일요일과 겹치면 다음 월요일 (2021년~)
+    - 부처님오신날, 크리스마스: 일요일과 겹치면 다음 월요일 (2023년~)
+    """
+    from datetime import date, timedelta
+
+    holidays = set()
+
+    # 고정 공휴일 처리
+    # substitute_type: 'none'=미적용, 'sunday'=일요일만, 'weekend'=토/일 모두
+    fixed_holidays = [
+        (1, 1, '신정', 'none'),           # 신정 - 대체공휴일 미적용
+        (3, 1, '삼일절', 'sunday'),       # 삼일절 - 일요일만 대체공휴일
+        (5, 5, '어린이날', 'weekend'),    # 어린이날 - 토/일 모두 대체공휴일
+        (6, 6, '현충일', 'none'),         # 현충일 - 대체공휴일 미적용
+        (8, 15, '광복절', 'sunday'),      # 광복절 - 일요일만 대체공휴일
+        (10, 3, '개천절', 'sunday'),      # 개천절 - 일요일만 대체공휴일
+        (10, 9, '한글날', 'sunday'),      # 한글날 - 일요일만 대체공휴일
+        (12, 25, '크리스마스', 'sunday'), # 크리스마스 - 일요일만 대체공휴일
+    ]
+
+    for month, day, name, substitute_type in fixed_holidays:
+        try:
+            holiday_date = date(year, month, day)
+            holidays.add(holiday_date)
+
+            # 대체공휴일 계산
+            if substitute_type == 'weekend':
+                # 토요일(5) 또는 일요일(6)이면 다음 월요일
+                if holiday_date.weekday() == 5:  # 토요일
+                    substitute = holiday_date + timedelta(days=2)
+                    holidays.add(substitute)
+                elif holiday_date.weekday() == 6:  # 일요일
+                    substitute = holiday_date + timedelta(days=1)
+                    holidays.add(substitute)
+            elif substitute_type == 'sunday':
+                # 일요일이면 다음 월요일
+                if holiday_date.weekday() == 6:
+                    substitute = holiday_date + timedelta(days=1)
+                    holidays.add(substitute)
+        except:
+            pass
+
+    # 음력 공휴일 (양력 변환 - 연도별 정확한 날짜)
+    # 설날 연휴 (전날, 당일, 다음날), 추석 연휴 (전날, 당일, 다음날)
+    lunar_holidays = {
+        # 2025-2030년
+        2025: {
+            'seollal': [(1, 28), (1, 29), (1, 30)],
+            'chuseok': [(10, 5), (10, 6), (10, 7)],
+        },
+        2026: {
+            'seollal': [(2, 16), (2, 17), (2, 18)],
+            'chuseok': [(9, 24), (9, 25), (9, 26)],
+        },
+        2027: {
+            'seollal': [(2, 5), (2, 6), (2, 7)],
+            'chuseok': [(10, 13), (10, 14), (10, 15)],
+        },
+        2028: {
+            'seollal': [(1, 25), (1, 26), (1, 27)],
+            'chuseok': [(10, 1), (10, 2), (10, 3)],
+        },
+        2029: {
+            'seollal': [(2, 12), (2, 13), (2, 14)],
+            'chuseok': [(9, 21), (9, 22), (9, 23)],
+        },
+        2030: {
+            'seollal': [(2, 2), (2, 3), (2, 4)],
+            'chuseok': [(10, 11), (10, 12), (10, 13)],
+        },
+        # 2031-2035년
+        2031: {
+            'seollal': [(1, 22), (1, 23), (1, 24)],
+            'chuseok': [(9, 27), (9, 28), (9, 29)],  # 9/28 일요일 → 대체공휴일
+        },
+        2032: {
+            'seollal': [(2, 10), (2, 11), (2, 12)],
+            'chuseok': [(9, 18), (9, 19), (9, 20)],  # 9/19 일요일 → 대체공휴일
+        },
+        2033: {
+            'seollal': [(1, 30), (1, 31), (2, 1)],   # 1/30 일요일 → 대체공휴일
+            'chuseok': [(9, 7), (9, 8), (9, 9)],
+        },
+        2034: {
+            'seollal': [(2, 18), (2, 19), (2, 20)],  # 2/19 일요일 → 대체공휴일
+            'chuseok': [(9, 26), (9, 27), (9, 28)],
+        },
+        2035: {
+            'seollal': [(2, 7), (2, 8), (2, 9)],
+            'chuseok': [(9, 15), (9, 16), (9, 17)],  # 9/16 일요일 → 대체공휴일
+        },
+    }
+
+    if year in lunar_holidays:
+        # 설날과 추석 연휴 처리
+        for holiday_type in ['seollal', 'chuseok']:
+            dates = lunar_holidays[year].get(holiday_type, [])
+            holiday_dates = []
+
+            for month, day in dates:
+                try:
+                    hdate = date(year, month, day)
+                    holidays.add(hdate)
+                    holiday_dates.append(hdate)
+                except:
+                    pass
+
+            # 대체공휴일 계산: 연휴 중 일요일이 있으면 연휴 다음 첫 평일
+            if holiday_dates:
+                has_sunday = any(d.weekday() == 6 for d in holiday_dates)
+                if has_sunday:
+                    last_holiday = max(holiday_dates)
+                    substitute = last_holiday + timedelta(days=1)
+                    # 이미 공휴일이면 다음날로
+                    while substitute in holidays or substitute.weekday() >= 5:
+                        substitute += timedelta(days=1)
+                    holidays.add(substitute)
+
+    # 부처님오신날 (음력 4월 8일 - 대체공휴일 적용 2024년~)
+    buddha_birthday = {
+        2025: (5, 5),
+        2026: (5, 24),   # 일요일 → 5/25 대체공휴일
+        2027: (5, 13),
+        2028: (5, 2),
+        2029: (5, 20),
+        2030: (5, 9),
+        2031: (5, 28),
+        2032: (5, 16),   # 일요일 → 5/17 대체공휴일
+        2033: (5, 6),
+        2034: (5, 25),
+        2035: (5, 15),
+    }
+
+    if year in buddha_birthday:
+        month, day = buddha_birthday[year]
+        try:
+            hdate = date(year, month, day)
+            holidays.add(hdate)
+
+            # 대체공휴일: 일요일이면 다음 월요일
+            if hdate.weekday() == 6:
+                substitute = hdate + timedelta(days=1)
+                holidays.add(substitute)
+        except:
+            pass
+
+    return holidays
+
+
+def add_business_days(start_date, business_days):
+    """시작일로부터 영업일(주말, 공휴일 제외) 기준 날짜 계산
+
+    Args:
+        start_date: 시작일 (datetime 또는 date 객체)
+        business_days: 추가할 영업일 수
+
+    Returns:
+        영업일 기준 계산된 날짜 (datetime 객체)
+    """
+    from datetime import timedelta, date
+
+    if business_days <= 0:
+        return start_date
+
+    # datetime을 date로 변환
+    if hasattr(start_date, 'date'):
+        current_date = start_date.date()
+    else:
+        current_date = start_date
+
+    # 해당 연도와 다음 연도의 공휴일 가져오기
+    holidays = get_korean_holidays(current_date.year)
+    holidays.update(get_korean_holidays(current_date.year + 1))
+
+    days_added = 0
+
+    while days_added < business_days:
+        current_date += timedelta(days=1)
+
+        # 토요일(5), 일요일(6) 또는 공휴일이면 건너뛰기
+        if current_date.weekday() < 5 and current_date not in holidays:
+            days_added += 1
+
+    # datetime으로 반환
+    return datetime(current_date.year, current_date.month, current_date.day)
+
+
 class ClickableLabel(QLabel):
     """클릭 가능한 라벨 - 클릭 시 시그널 발생"""
     clicked = pyqtSignal()
@@ -1051,9 +1244,18 @@ class ScheduleManagementTab(QWidget):
                 from datetime import datetime, timedelta
                 from database import get_connection
                 start = datetime.strptime(start_date, '%Y-%m-%d')
-                interval = experiment_days // sampling_count
 
-                # 설정에서 중간보고일 오프셋 가져오기
+                # 6회차 날짜 계산 (0-based index, 6회차는 index 5)
+                # 샘플링 간격 계산
+                if sampling_count > 1:
+                    interval_days = experiment_days / (sampling_count - 1)
+                    sixth_sample_days = round(5 * interval_days)  # 6회차 (index 5)
+                else:
+                    sixth_sample_days = 0
+
+                sixth_sample_date = start + timedelta(days=sixth_sample_days)
+
+                # 설정에서 중간보고일 오프셋 가져오기 (영업일 기준)
                 interim_offset = 0
                 try:
                     conn = get_connection()
@@ -1066,8 +1268,11 @@ class ScheduleManagementTab(QWidget):
                 except:
                     interim_offset = 0
 
-                # 6회차 날짜 + 설정된 오프셋을 중간보고일로 설정
-                interim_date = start + timedelta(days=interval * 6 + interim_offset)
+                # 6회차 날짜 + 설정된 오프셋(영업일 기준)을 중간보고일로 설정
+                if interim_offset > 0:
+                    interim_date = add_business_days(sixth_sample_date, interim_offset)
+                else:
+                    interim_date = sixth_sample_date
                 self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
             except:
                 self.interim_date_value.setText('-')
@@ -1359,6 +1564,12 @@ class ScheduleManagementTab(QWidget):
         # 각 회차별 날짜 저장 (제조후 일수 계산용)
         sample_dates = {}
 
+        # 공휴일 목록 가져오기 (날짜 색상 결정용)
+        holidays = set()
+        if start_date:
+            holidays = get_korean_holidays(start_date.year)
+            holidays.update(get_korean_holidays(start_date.year + 1))
+
         for i in range(sampling_count):
             col_idx = i + 1
 
@@ -1369,7 +1580,16 @@ class ScheduleManagementTab(QWidget):
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
-                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+
+                # 사용자 정의 날짜도 주말/공휴일 체크
+                sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                is_weekend = sample_date.weekday() >= 5
+                is_holiday = sample_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (수정됨 + 검토 필요)
+                    date_item.setToolTip("수정됨 - 주말 또는 공휴일 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조 (평일)
             elif start_date:
                 from datetime import timedelta
                 # 마지막 회차는 정확히 experiment_days, 그 외는 균등 분배
@@ -1382,7 +1602,16 @@ class ScheduleManagementTab(QWidget):
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
-                date_item.setBackground(QColor('#E6F3FF'))
+
+                # 토요일(5), 일요일(6), 공휴일이면 주황색으로 표시
+                sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                is_weekend = sample_date.weekday() >= 5  # 토요일(5) 또는 일요일(6)
+                is_holiday = sample_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FFA500'))  # 주황색 (검토 필요)
+                    date_item.setToolTip("주말 또는 공휴일 - 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#E6F3FF'))  # 평일 - 기존 연한 파란색
             else:
                 date_value = "-"
                 date_item = QTableWidgetItem(date_value)
@@ -1960,7 +2189,16 @@ class ScheduleManagementTab(QWidget):
             years = self.current_schedule.get('test_period_years', 0) or 0
             experiment_days = days + (months * 30) + (years * 365)
 
-            # 설정에서 중간보고일 오프셋 가져오기
+            # 6회차 날짜 계산 (0-based index, 6회차는 index 5)
+            if sampling_count > 1:
+                interval_days = experiment_days / (sampling_count - 1)
+                sixth_sample_days = round(5 * interval_days)  # 6회차 (index 5)
+            else:
+                sixth_sample_days = 0
+
+            sixth_sample_date = start + timedelta(days=sixth_sample_days)
+
+            # 설정에서 중간보고일 오프셋 가져오기 (영업일 기준)
             interim_offset = 0
             try:
                 conn = get_connection()
@@ -1974,9 +2212,11 @@ class ScheduleManagementTab(QWidget):
                 interim_offset = 0
 
             if experiment_days > 0 and sampling_count > 0:
-                interval = experiment_days // sampling_count
-                # 6회차 날짜 + 설정된 오프셋을 중간보고일로 설정
-                interim_date = start + timedelta(days=interval * 6 + interim_offset)
+                # 6회차 날짜 + 설정된 오프셋(영업일 기준)을 중간보고일로 설정
+                if interim_offset > 0:
+                    interim_date = add_business_days(sixth_sample_date, interim_offset)
+                else:
+                    interim_date = sixth_sample_date
                 self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
             else:
                 self.interim_date_value.setText('-')
@@ -2123,7 +2363,18 @@ class ScheduleManagementTab(QWidget):
             date_item = table.item(0, col)
             if date_item:
                 date_item.setText(dialog.selected_date.strftime('%Y-%m-%d'))
-                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+
+                # 주말/공휴일 체크하여 배경색 결정
+                selected_date = dialog.selected_date
+                selected_date_only = selected_date.date() if hasattr(selected_date, 'date') else selected_date
+                holidays = get_korean_holidays(selected_date.year)
+                is_weekend = selected_date.weekday() >= 5
+                is_holiday = selected_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (수정됨 + 검토 필요)
+                    date_item.setToolTip("수정됨 - 주말 또는 공휴일 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조 (평일)
 
             # 1회차(col=1) 날짜 변경 시 시작일 연동
             if col == 1:
@@ -2158,6 +2409,10 @@ class ScheduleManagementTab(QWidget):
 
         table = self.experiment_table
 
+        # 공휴일 목록 가져오기
+        holidays = get_korean_holidays(new_start_date.year)
+        holidays.update(get_korean_holidays(new_start_date.year + 1))
+
         # 각 회차별 날짜 재계산
         for i in range(sampling_count):
             col_idx = i + 1
@@ -2179,10 +2434,22 @@ class ScheduleManagementTab(QWidget):
                 date_item = table.item(0, col_idx)
                 if date_item:
                     date_item.setText(sample_date.strftime('%Y-%m-%d'))
-                    if col_idx == 1:
-                        date_item.setBackground(QColor('#FFE4B5'))  # 변경된 시작일 강조
+
+                    # 주말/공휴일 체크하여 배경색 결정
+                    sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                    is_weekend = sample_date.weekday() >= 5
+                    is_holiday = sample_date_only in holidays
+                    if is_weekend or is_holiday:
+                        if col_idx == 1:
+                            date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (시작일 + 검토 필요)
+                        else:
+                            date_item.setBackground(QColor('#FFA500'))  # 주황색 (검토 필요)
+                        date_item.setToolTip("주말 또는 공휴일 - 검토 필요")
                     else:
-                        date_item.setBackground(QColor('#E6F3FF'))
+                        if col_idx == 1:
+                            date_item.setBackground(QColor('#FFE4B5'))  # 변경된 시작일 강조
+                        else:
+                            date_item.setBackground(QColor('#E6F3FF'))  # 평일 - 기존 색상
 
                 # 제조후 일수 업데이트
                 time_item = table.item(1, col_idx)
