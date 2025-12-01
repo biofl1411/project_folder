@@ -1564,6 +1564,12 @@ class ScheduleManagementTab(QWidget):
         # 각 회차별 날짜 저장 (제조후 일수 계산용)
         sample_dates = {}
 
+        # 공휴일 목록 가져오기 (날짜 색상 결정용)
+        holidays = set()
+        if start_date:
+            holidays = get_korean_holidays(start_date.year)
+            holidays.update(get_korean_holidays(start_date.year + 1))
+
         for i in range(sampling_count):
             col_idx = i + 1
 
@@ -1574,7 +1580,16 @@ class ScheduleManagementTab(QWidget):
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
-                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+
+                # 사용자 정의 날짜도 주말/공휴일 체크
+                sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                is_weekend = sample_date.weekday() >= 5
+                is_holiday = sample_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (수정됨 + 검토 필요)
+                    date_item.setToolTip("수정됨 - 주말 또는 공휴일 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조 (평일)
             elif start_date:
                 from datetime import timedelta
                 # 마지막 회차는 정확히 experiment_days, 그 외는 균등 분배
@@ -1587,7 +1602,16 @@ class ScheduleManagementTab(QWidget):
                 sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
-                date_item.setBackground(QColor('#E6F3FF'))
+
+                # 토요일(5), 일요일(6), 공휴일이면 주황색으로 표시
+                sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                is_weekend = sample_date.weekday() >= 5  # 토요일(5) 또는 일요일(6)
+                is_holiday = sample_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FFA500'))  # 주황색 (검토 필요)
+                    date_item.setToolTip("주말 또는 공휴일 - 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#E6F3FF'))  # 평일 - 기존 연한 파란색
             else:
                 date_value = "-"
                 date_item = QTableWidgetItem(date_value)
@@ -2339,7 +2363,18 @@ class ScheduleManagementTab(QWidget):
             date_item = table.item(0, col)
             if date_item:
                 date_item.setText(dialog.selected_date.strftime('%Y-%m-%d'))
-                date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조
+
+                # 주말/공휴일 체크하여 배경색 결정
+                selected_date = dialog.selected_date
+                selected_date_only = selected_date.date() if hasattr(selected_date, 'date') else selected_date
+                holidays = get_korean_holidays(selected_date.year)
+                is_weekend = selected_date.weekday() >= 5
+                is_holiday = selected_date_only in holidays
+                if is_weekend or is_holiday:
+                    date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (수정됨 + 검토 필요)
+                    date_item.setToolTip("수정됨 - 주말 또는 공휴일 검토 필요")
+                else:
+                    date_item.setBackground(QColor('#FFE4B5'))  # 수정된 날짜 강조 (평일)
 
             # 1회차(col=1) 날짜 변경 시 시작일 연동
             if col == 1:
@@ -2374,6 +2409,10 @@ class ScheduleManagementTab(QWidget):
 
         table = self.experiment_table
 
+        # 공휴일 목록 가져오기
+        holidays = get_korean_holidays(new_start_date.year)
+        holidays.update(get_korean_holidays(new_start_date.year + 1))
+
         # 각 회차별 날짜 재계산
         for i in range(sampling_count):
             col_idx = i + 1
@@ -2395,10 +2434,22 @@ class ScheduleManagementTab(QWidget):
                 date_item = table.item(0, col_idx)
                 if date_item:
                     date_item.setText(sample_date.strftime('%Y-%m-%d'))
-                    if col_idx == 1:
-                        date_item.setBackground(QColor('#FFE4B5'))  # 변경된 시작일 강조
+
+                    # 주말/공휴일 체크하여 배경색 결정
+                    sample_date_only = sample_date.date() if hasattr(sample_date, 'date') else sample_date
+                    is_weekend = sample_date.weekday() >= 5
+                    is_holiday = sample_date_only in holidays
+                    if is_weekend or is_holiday:
+                        if col_idx == 1:
+                            date_item.setBackground(QColor('#FF8C00'))  # 진한 주황색 (시작일 + 검토 필요)
+                        else:
+                            date_item.setBackground(QColor('#FFA500'))  # 주황색 (검토 필요)
+                        date_item.setToolTip("주말 또는 공휴일 - 검토 필요")
                     else:
-                        date_item.setBackground(QColor('#E6F3FF'))
+                        if col_idx == 1:
+                            date_item.setBackground(QColor('#FFE4B5'))  # 변경된 시작일 강조
+                        else:
+                            date_item.setBackground(QColor('#E6F3FF'))  # 평일 - 기존 색상
 
                 # 제조후 일수 업데이트
                 time_item = table.item(1, col_idx)
