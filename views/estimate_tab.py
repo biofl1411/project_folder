@@ -1176,6 +1176,26 @@ class EstimateTab(QWidget):
             self.email_body_input.setPlainText("스케줄을 먼저 선택해주세요.")
             return
 
+        # 설정에서 회사 정보 가져오기
+        company_name = "(주)바이오푸드랩"
+        company_phone = ""
+        company_mobile = ""
+        company_email = ""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            settings = cursor.fetchall()
+            conn.close()
+            settings_dict = {s['key']: s['value'] for s in settings}
+            company_name = settings_dict.get('company_name', '(주)바이오푸드랩') or '(주)바이오푸드랩'
+            company_phone = settings_dict.get('company_phone', '') or ''
+            company_mobile = settings_dict.get('company_mobile', '') or ''
+            company_email = settings_dict.get('company_email', '') or settings_dict.get('smtp_email', '') or ''
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
         # 동적 데이터 추출
         client_name = self.current_schedule.get('client_name', '') or ''
         food_type = self.current_schedule.get('food_type_name', '') or ''
@@ -1243,8 +1263,18 @@ class EstimateTab(QWidget):
         # 제목 설정
         self.email_subject_input.setText(f"[바이오푸드랩] {client_name} 견적서 송부의 건")
 
+        # 서명 정보 구성
+        signature_lines = [company_name]
+        if company_phone:
+            signature_lines.append(f"Tel: {company_phone}")
+        if company_mobile:
+            signature_lines.append(f"Mobile: {company_mobile}")
+        if company_email:
+            signature_lines.append(f"Email: {company_email}")
+        signature = '\n'.join(signature_lines)
+
         # 본문 템플릿
-        body_template = f"""안녕하세요, (주)바이오푸드랩입니다.
+        body_template = f"""안녕하세요, {company_name}입니다.
 
 {client_name} 귀하
 
@@ -1265,9 +1295,7 @@ class EstimateTab(QWidget):
 감사합니다.
 
 ─────────────────────────
-(주)바이오푸드랩
-Tel: 02-xxx-xxxx
-Email: info@biofoodlab.co.kr
+{signature}
 ─────────────────────────"""
 
         self.email_body_input.setPlainText(body_template)
@@ -1280,6 +1308,7 @@ Email: info@biofoodlab.co.kr
         from email.mime.text import MIMEText
         from email.mime.base import MIMEBase
         from email import encoders
+        from email.header import Header
         from datetime import datetime
 
         # 입력 검증
@@ -1347,15 +1376,21 @@ Email: info@biofoodlab.co.kr
             body = self.email_body_input.toPlainText()
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-            # PDF 첨부
+            # PDF 첨부 (한글 파일명 인코딩 처리)
             with open(pdf_path, 'rb') as attachment:
-                part = MIMEBase('application', 'octet-stream')
+                part = MIMEBase('application', 'pdf')
                 part.set_payload(attachment.read())
                 encoders.encode_base64(part)
+
+                # 한글 파일명을 위한 RFC 2231 인코딩
+                filename = os.path.basename(pdf_path)
+                encoded_filename = Header(filename, 'utf-8').encode()
                 part.add_header(
                     'Content-Disposition',
-                    f'attachment; filename="{os.path.basename(pdf_path)}"'
+                    'attachment',
+                    filename=('utf-8', '', filename)
                 )
+                part.add_header('Content-Type', 'application/pdf', name=encoded_filename)
                 msg.attach(part)
 
             # SMTP 연결 및 발송
