@@ -349,45 +349,49 @@ class EstimateTab(QWidget):
             self.sender_input.setText(company_name)
 
             # 주소
-            address = settings_dict.get('company_address', '')
+            address = settings_dict.get('company_address', '서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호')
             self.header_address_label.setText(address)
 
-            # 오른쪽 회사 정보 구성
-            ceo = settings_dict.get('company_ceo', '')
+            # 오른쪽 회사 정보 구성 (제목열 맞춤)
+            ceo = settings_dict.get('company_ceo', '이용표')
             manager = settings_dict.get('company_manager', '')
             phone = settings_dict.get('company_phone', '')
             mobile = settings_dict.get('company_mobile', '')
-            fax = settings_dict.get('company_fax', '')
+            fax = settings_dict.get('company_fax', '070-7410-1430')
+
+            # 고정값 사용
+            company_name = '(주)바이오푸드랩'
+            ceo = '이용표'
+            fax = '070-7410-1430'
+            address_line1 = '서울특별시 구로구 디지털로 30길 28,'
+            address_line2 = '마리오타워 1410~1414호'
 
             info_lines = []
-            if company_name:
-                info_lines.append(company_name)
-            if ceo:
-                info_lines.append(f"대표이사 {ceo}")
+            info_lines.append(f"회사명 : {company_name}")
+            info_lines.append(f"대표자 : {ceo}")
             if manager:
-                info_lines.append(f"담당자: {manager}")
-            if address:
-                info_lines.append(address)
-            info_lines.append("")  # 빈 줄
+                info_lines.append(f"담당자 : {manager}")
             if phone:
-                info_lines.append(f"TEL: {phone}")
+                info_lines.append(f"연락처 : {phone}")
             if mobile:
-                info_lines.append(f"HP: {mobile}")
-            if fax:
-                info_lines.append(f"FAX: {fax}")
+                info_lines.append(f"핸드폰 : {mobile}")
+            info_lines.append(f"팩  스 : {fax}")
+            info_lines.append(f"주  소 : {address_line1}")
+            info_lines.append(f"          {address_line2}")
 
             self.right_company_info.setText('\n'.join(info_lines))
 
         except Exception as e:
             print(f"회사 정보 로드 오류: {e}")
             # 기본값 설정
-            self.right_company_info.setText("""(주)바이오푸드랩
-대표이사 이 용 표
-서울특별시 구로구 디지털로30길 28
-1410호~1414호(구로동,마리오타워)
-
-TEL: (070) 7410-1400
-FAX: (070) 7410-1430""")
+            self.right_company_info.setText("""회사명 : (주)바이오푸드랩
+대표자 : 이용표
+담당자 :
+연락처 :
+핸드폰 :
+팩  스 : 070-7410-1430
+주  소 : 서울특별시 구로구 디지털로 30길 28,
+          마리오타워 1410~1414호""")
 
     def load_schedule_data(self, schedule):
         """스케줄 데이터로 견적서 로드"""

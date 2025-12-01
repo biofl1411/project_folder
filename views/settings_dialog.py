@@ -270,7 +270,99 @@ class SettingsDialog(QDialog):
         path_group.setLayout(path_layout)
         layout.addWidget(path_group)
 
+        # 로고/직인 그룹
+        image_group = QGroupBox("로고 및 직인 이미지")
+        image_layout = QFormLayout()
+
+        # 로고 파일
+        logo_layout = QHBoxLayout()
+        self.logo_path_input = QLineEdit()
+        self.logo_path_input.setPlaceholderText("로고 이미지 파일 경로")
+        self.logo_path_input.setReadOnly(True)
+        logo_btn = QPushButton("찾기")
+        logo_btn.setFixedWidth(60)
+        logo_btn.clicked.connect(lambda: self.browse_image('logo'))
+        logo_clear_btn = QPushButton("삭제")
+        logo_clear_btn.setFixedWidth(60)
+        logo_clear_btn.clicked.connect(lambda: self.clear_image('logo'))
+        logo_layout.addWidget(self.logo_path_input)
+        logo_layout.addWidget(logo_btn)
+        logo_layout.addWidget(logo_clear_btn)
+        image_layout.addRow("회사 로고:", logo_layout)
+
+        # 직인 파일
+        stamp_layout = QHBoxLayout()
+        self.stamp_path_input = QLineEdit()
+        self.stamp_path_input.setPlaceholderText("직인 이미지 파일 경로")
+        self.stamp_path_input.setReadOnly(True)
+        stamp_btn = QPushButton("찾기")
+        stamp_btn.setFixedWidth(60)
+        stamp_btn.clicked.connect(lambda: self.browse_image('stamp'))
+        stamp_clear_btn = QPushButton("삭제")
+        stamp_clear_btn.setFixedWidth(60)
+        stamp_clear_btn.clicked.connect(lambda: self.clear_image('stamp'))
+        stamp_layout.addWidget(self.stamp_path_input)
+        stamp_layout.addWidget(stamp_btn)
+        stamp_layout.addWidget(stamp_clear_btn)
+        image_layout.addRow("대표자 직인:", stamp_layout)
+
+        # 안내 문구
+        info_label = QLabel("※ 로고: 견적서 상단 'BFL' 위치에 표시됩니다.\n"
+                           "※ 직인: 대표자 이름 옆에 표시됩니다.\n"
+                           "※ 권장 형식: PNG (투명 배경), 크기: 로고 200x60px, 직인 80x80px")
+        info_label.setStyleSheet("color: #666; font-size: 10px;")
+        image_layout.addRow("", info_label)
+
+        image_group.setLayout(image_layout)
+        layout.addWidget(image_group)
+
         layout.addStretch()
+
+    def browse_image(self, image_type):
+        """이미지 파일 선택"""
+        from PyQt5.QtWidgets import QFileDialog
+        import shutil
+        import os
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "이미지 선택",
+            "",
+            "이미지 파일 (*.png *.jpg *.jpeg *.bmp);;모든 파일 (*.*)"
+        )
+
+        if file_path:
+            # config 폴더에 복사
+            config_dir = "config"
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+
+            # 파일 이름 결정
+            ext = os.path.splitext(file_path)[1]
+            if image_type == 'logo':
+                dest_name = f"company_logo{ext}"
+                self.logo_path_input.setText(file_path)
+            else:
+                dest_name = f"company_stamp{ext}"
+                self.stamp_path_input.setText(file_path)
+
+            dest_path = os.path.join(config_dir, dest_name)
+
+            try:
+                shutil.copy2(file_path, dest_path)
+                if image_type == 'logo':
+                    self.logo_path_input.setText(dest_path)
+                else:
+                    self.stamp_path_input.setText(dest_path)
+                QMessageBox.information(self, "완료", f"이미지가 저장되었습니다.\n{dest_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"이미지 저장 실패: {str(e)}")
+
+    def clear_image(self, image_type):
+        """이미지 경로 삭제"""
+        if image_type == 'logo':
+            self.logo_path_input.clear()
+        else:
+            self.stamp_path_input.clear()
 
     def load_settings(self):
         """데이터베이스에서 설정 불러오기"""
@@ -346,6 +438,12 @@ class SettingsDialog(QDialog):
             if 'smtp_sender_name' in settings_dict:
                 self.smtp_sender_name_input.setText(settings_dict['smtp_sender_name'])
 
+            # 로고/직인 경로
+            if 'logo_path' in settings_dict:
+                self.logo_path_input.setText(settings_dict['logo_path'])
+            if 'stamp_path' in settings_dict:
+                self.stamp_path_input.setText(settings_dict['stamp_path'])
+
         except Exception as e:
             print(f"설정 로드 중 오류: {str(e)}")
 
@@ -380,7 +478,10 @@ class SettingsDialog(QDialog):
                 ('smtp_security', self.smtp_security_combo.currentText()),
                 ('smtp_email', self.smtp_email_input.text()),
                 ('smtp_password', self.smtp_password_input.text()),
-                ('smtp_sender_name', self.smtp_sender_name_input.text())
+                ('smtp_sender_name', self.smtp_sender_name_input.text()),
+                # 로고/직인 경로
+                ('logo_path', self.logo_path_input.text()),
+                ('stamp_path', self.stamp_path_input.text())
             ]
 
             for key, value in settings:
