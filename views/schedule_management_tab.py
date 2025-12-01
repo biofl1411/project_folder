@@ -22,6 +22,7 @@ from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
 from utils.logger import log_message, log_error, log_exception, safe_get
+from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
 
 
 def get_korean_holidays(year):
@@ -816,19 +817,15 @@ class ScheduleSelectDialog(QDialog):
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(', '.join(types)))
 
                     elif col_key == 'status':
+                        # 상태 (커스텀 설정 사용)
                         status = schedule.get('status', 'pending') or 'pending'
-                        status_text = {
-                            'pending': '대기', 'scheduled': '입고예정',
-                            'received': '입고', 'completed': '종료',
-                            'in_progress': '입고', 'cancelled': '종료'
-                        }.get(status, status)
+                        status_map = get_status_map()
+                        status_colors = get_status_colors()
+                        status_text = status_map.get(status, status)
                         status_item = QTableWidgetItem(status_text)
-                        if status in ['scheduled']:
-                            status_item.setBackground(Qt.cyan)
-                        elif status in ['received', 'in_progress']:
-                            status_item.setBackground(Qt.yellow)
-                        elif status in ['completed', 'cancelled']:
-                            status_item.setBackground(Qt.green)
+                        # 커스텀 색상 적용
+                        if status in status_colors:
+                            status_item.setBackground(QColor(status_colors[status]))
                         self.schedule_table.setItem(row, col_index, status_item)
 
                     elif col_key == 'interim_date':
@@ -912,11 +909,8 @@ class ScheduleSelectDialog(QDialog):
                 client_name = schedule.get('client_name', '') or ''
                 product_name = schedule.get('product_name', '') or ''
                 status = schedule.get('status', '') or ''
-                status_text = {
-                    'pending': '대기', 'scheduled': '입고예정',
-                    'received': '입고', 'completed': '종료',
-                    'in_progress': '입고', 'cancelled': '종료'
-                }.get(status, status)
+                status_map = get_status_map()
+                status_text = status_map.get(status, status)
 
                 match = False
 
@@ -1600,10 +1594,8 @@ class ScheduleManagementTab(QWidget):
             self.last_test_date_value.setText('-')
 
         status = schedule.get('status', 'pending') or 'pending'
-        status_text = {
-            'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
-            'in_progress': '입고', 'cancelled': '종료'
-        }.get(status, status)
+        status_map = get_status_map()
+        status_text = status_map.get(status, status)
         self.status_value.setText(status_text)
 
         # 검체량 계산
@@ -2392,14 +2384,16 @@ class ScheduleManagementTab(QWidget):
         return data
 
     def change_status(self):
-        """상태 클릭 시 변경 가능하도록 (입고예정, 입고, 종료)"""
+        """상태 클릭 시 변경 가능하도록 (커스텀 상태 사용)"""
         if not self.current_schedule:
             QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
             return
 
         from PyQt5.QtWidgets import QInputDialog
 
-        status_options = ["입고예정", "입고", "종료"]
+        # 커스텀 상태 목록 가져오기
+        status_options = get_status_names()
+        status_colors = get_status_colors()
         current_status = self.status_value.text()
 
         # 현재 상태의 인덱스 찾기
@@ -2415,24 +2409,15 @@ class ScheduleManagementTab(QWidget):
 
         if ok and new_status:
             # 상태 코드로 변환
-            status_code_map = {
-                "입고예정": "pending",
-                "입고": "in_progress",
-                "종료": "completed"
-            }
-            status_code = status_code_map.get(new_status, "pending")
+            status_code = get_status_code_by_name(new_status)
 
             # 현재 스케줄 정보 업데이트
             self.current_schedule['status'] = status_code
             self.status_value.setText(new_status)
 
-            # 스타일 변경 (상태에 따른 색상)
-            if new_status == "입고예정":
-                self.status_value.setStyleSheet("color: #f39c12; text-decoration: underline; font-weight: bold;")
-            elif new_status == "입고":
-                self.status_value.setStyleSheet("color: #27ae60; text-decoration: underline; font-weight: bold;")
-            else:  # 종료
-                self.status_value.setStyleSheet("color: #7f8c8d; text-decoration: underline; font-weight: bold;")
+            # 스타일 변경 (커스텀 색상 적용)
+            color = status_colors.get(status_code, '#2980b9')
+            self.status_value.setStyleSheet(f"color: {color}; text-decoration: underline; font-weight: bold;")
 
     def toggle_interim_report(self):
         """중간보고서 요청/미요청 토글"""
