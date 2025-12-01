@@ -1595,8 +1595,16 @@ class ScheduleManagementTab(QWidget):
 
         status = schedule.get('status', 'pending') or 'pending'
         status_map = get_status_map()
+        status_colors = get_status_colors()
         status_text = status_map.get(status, status)
         self.status_value.setText(status_text)
+
+        # 상태 색상 적용 (텍스트 색상으로만, 배경색은 흰색 유지)
+        status_color = status_colors.get(status, '#2980b9')
+        self.status_value.setStyleSheet(
+            f"background-color: white; padding: 3px; border: 1px solid #bdc3c7; "
+            f"color: {status_color}; font-size: 11px; text-decoration: underline; font-weight: bold;"
+        )
 
         # 검체량 계산
         self.update_sample_info(schedule, sampling_count)
@@ -2384,7 +2392,7 @@ class ScheduleManagementTab(QWidget):
         return data
 
     def change_status(self):
-        """상태 클릭 시 변경 가능하도록 (커스텀 상태 사용)"""
+        """상태 클릭 시 변경 가능하도록 (커스텀 상태 사용, 즉시 DB 저장)"""
         if not self.current_schedule:
             QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
             return
@@ -2415,9 +2423,28 @@ class ScheduleManagementTab(QWidget):
             self.current_schedule['status'] = status_code
             self.status_value.setText(new_status)
 
-            # 스타일 변경 (커스텀 색상 적용)
+            # 스타일 변경 (배경 흰색 유지, 텍스트 색상만 변경)
             color = status_colors.get(status_code, '#2980b9')
-            self.status_value.setStyleSheet(f"color: {color}; text-decoration: underline; font-weight: bold;")
+            self.status_value.setStyleSheet(
+                f"background-color: white; padding: 3px; border: 1px solid #bdc3c7; "
+                f"color: {color}; font-size: 11px; text-decoration: underline; font-weight: bold;"
+            )
+
+            # DB에 즉시 저장
+            try:
+                from database import get_connection
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE schedules SET status = ? WHERE id = ?", (status_code, schedule_id))
+                    conn.commit()
+                    conn.close()
+
+                    # 스케줄 저장 시그널 발생 (스케줄 작성 탭 새로고침용)
+                    self.schedule_saved.emit()
+            except Exception as e:
+                print(f"상태 저장 오류: {e}")
 
     def toggle_interim_report(self):
         """중간보고서 요청/미요청 토글"""
