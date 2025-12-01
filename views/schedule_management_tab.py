@@ -825,7 +825,13 @@ class ScheduleSelectDialog(QDialog):
                         status_item = QTableWidgetItem(status_text)
                         # 커스텀 색상 적용
                         if status in status_colors:
-                            status_item.setBackground(QColor(status_colors[status]))
+                            color = QColor(status_colors[status])
+                            status_item.setBackground(color)
+                            # 배경색이 어두우면 흰색 글씨, 밝으면 검정색 글씨
+                            if color.lightness() < 128:
+                                status_item.setForeground(QColor('#FFFFFF'))
+                            else:
+                                status_item.setForeground(QColor('#000000'))
                         self.schedule_table.setItem(row, col_index, status_item)
 
                     elif col_key == 'interim_date':
