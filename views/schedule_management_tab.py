@@ -783,14 +783,14 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (3줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간, 3행: 계산식"""
+        """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
         cost_frame = QFrame()
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(3)
         cost_layout.setContentsMargins(5, 3, 5, 3)
 
-        # 좌측: 3줄 레이아웃
+        # 좌측: 2줄 레이아웃
         left_layout = QVBoxLayout()
         left_layout.setSpacing(3)
 
@@ -800,19 +800,20 @@ class ScheduleManagementTab(QWidget):
         input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 1px;"
         formula_style = "font-size: 12px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
 
-        # 1행: 항목별 비용 내역
+        # 1행: 항목별 비용 내역 (자동 줄바꿈 지원)
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
         # 항목별 비용 내역
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
+        self.item_cost_detail.setWordWrap(True)  # 자동 줄바꿈 활성화
         row1.addWidget(self.item_cost_detail)
 
         row1.addStretch()
         left_layout.addLayout(row1)
 
-        # 2행: | 1회/회차/보고서/중간
+        # 2행: | 1회/회차/보고서/중간/계산식 (한 줄에 모두)
         row2 = QHBoxLayout()
         row2.setSpacing(8)
 
@@ -856,19 +857,13 @@ class ScheduleManagementTab(QWidget):
         self.interim_cost_label.hide()
         self.interim_report_cost_input.hide()
 
-        row2.addStretch()
-        left_layout.addLayout(row2)
-
-        # 3행: 계산식
-        row3 = QHBoxLayout()
-        row3.setSpacing(10)
-
+        # 계산식을 2행에 추가
         self.final_cost_formula = QLabel("-")
         self.final_cost_formula.setStyleSheet(formula_style)
-        row3.addWidget(self.final_cost_formula)
+        row2.addWidget(self.final_cost_formula)
 
-        row3.addStretch()
-        left_layout.addLayout(row3)
+        row2.addStretch()
+        left_layout.addLayout(row2)
 
         cost_layout.addLayout(left_layout)
 
