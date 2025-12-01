@@ -8,11 +8,13 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTableWidget, QTableWidgetItem, QHeaderView,
                            QFrame, QMessageBox, QComboBox, QCheckBox, QLabel,
                            QApplication, QDialog, QGroupBox, QScrollArea,
-                           QDialogButtonBox, QLineEdit)
+                           QDialogButtonBox, QLineEdit, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtGui import QColor
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
+from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
 from utils.logger import log_message, log_error, log_exception
 
 
@@ -248,7 +250,7 @@ class ScheduleTab(QWidget):
         button_layout.addWidget(QLabel("상태 변경:"))
 
         self.status_combo = QComboBox()
-        self.status_combo.addItems(["대기", "입고예정", "입고", "종료"])
+        self.status_combo.addItems(get_status_names())
         self.status_combo.setMinimumWidth(100)
         button_layout.addWidget(self.status_combo)
 
@@ -258,6 +260,12 @@ class ScheduleTab(QWidget):
         button_layout.addWidget(change_status_btn)
 
         button_layout.addStretch()
+
+        # 엑셀 내보내기 버튼
+        export_btn = QPushButton("엑셀 내보내기")
+        export_btn.setStyleSheet("background-color: #217346; color: white;")
+        export_btn.clicked.connect(self.export_to_excel)
+        button_layout.addWidget(export_btn)
 
         # 표시 설정 버튼
         settings_btn = QPushButton("표시 설정")
@@ -532,20 +540,15 @@ class ScheduleTab(QWidget):
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(packaging_text))
 
                     elif col_key == 'status':
-                        # 상태 (배경색 포함)
+                        # 상태 (커스텀 설정 사용)
                         status = schedule.get('status', 'pending') or 'pending'
-                        status_text = {
-                            'pending': '대기', 'scheduled': '입고예정',
-                            'received': '입고', 'completed': '종료',
-                            'in_progress': '입고', 'cancelled': '종료'
-                        }.get(status, status)
+                        status_map = get_status_map()
+                        status_colors = get_status_colors()
+                        status_text = status_map.get(status, status)
                         status_item = QTableWidgetItem(status_text)
-                        if status in ['scheduled']:
-                            status_item.setBackground(Qt.cyan)
-                        elif status in ['received', 'in_progress']:
-                            status_item.setBackground(Qt.yellow)
-                        elif status in ['completed', 'cancelled']:
-                            status_item.setBackground(Qt.green)
+                        # 커스텀 색상 적용
+                        if status in status_colors:
+                            status_item.setBackground(QColor(status_colors[status]))
                         self.schedule_table.setItem(row, col_index, status_item)
 
                     elif col_key == 'custom_temperatures':
@@ -673,15 +676,13 @@ class ScheduleTab(QWidget):
             filtered = []
             is_chosung = self.is_chosung_only(search_text)
 
+            status_map = get_status_map()
+
             for schedule in self.all_schedules:
                 client_name = schedule.get('client_name', '') or ''
                 product_name = schedule.get('product_name', '') or ''
                 status = schedule.get('status', '') or ''
-                status_text = {
-                    'pending': '대기', 'scheduled': '입고예정',
-                    'received': '입고', 'completed': '종료',
-                    'in_progress': '입고', 'cancelled': '종료'
-                }.get(status, status)
+                status_text = status_map.get(status, status)
 
                 match = False
 
@@ -817,15 +818,9 @@ class ScheduleTab(QWidget):
         try:
             from models.schedules import Schedule
 
-            # 선택된 상태 가져오기
+            # 선택된 상태 가져오기 (커스텀 상태 사용)
             selected_status_text = self.status_combo.currentText()
-            status_map = {
-                '대기': 'pending',
-                '입고예정': 'scheduled',
-                '입고': 'received',
-                '종료': 'completed'
-            }
-            new_status = status_map.get(selected_status_text, 'pending')
+            new_status = get_status_code_by_name(selected_status_text)
 
             # 체크된 행 찾기
             checked_rows = []
@@ -1014,3 +1009,63 @@ class ScheduleTab(QWidget):
 
         # 정렬 실행
         self.schedule_table.sortItems(logical_index, self.current_sort_order)
+
+    def export_to_excel(self):
+        """스케줄 목록을 엑셀 파일로 내보내기"""
+        try:
+            import pandas as pd
+            from datetime import datetime
+
+            # 저장 경로 선택
+            default_filename = f"스케줄목록_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "엑셀 파일 저장",
+                default_filename,
+                "Excel Files (*.xlsx);;All Files (*)"
+            )
+
+            if not file_path:
+                return
+
+            # 테이블 데이터 수집
+            headers = []
+            visible_columns = []
+
+            # 보이는 컬럼만 수집
+            for col_index in range(self.schedule_table.columnCount()):
+                if not self.schedule_table.isColumnHidden(col_index):
+                    header = self.schedule_table.horizontalHeaderItem(col_index)
+                    if header and header.text() not in ['선택', 'ID']:
+                        headers.append(header.text())
+                        visible_columns.append(col_index)
+
+            # 데이터 수집
+            data = []
+            for row in range(self.schedule_table.rowCount()):
+                row_data = []
+                for col_index in visible_columns:
+                    item = self.schedule_table.item(row, col_index)
+                    row_data.append(item.text() if item else '')
+                data.append(row_data)
+
+            # DataFrame 생성 및 엑셀 저장
+            df = pd.DataFrame(data, columns=headers)
+            df.to_excel(file_path, index=False, engine='openpyxl')
+
+            QMessageBox.information(
+                self, "내보내기 완료",
+                f"엑셀 파일이 저장되었습니다.\n{file_path}"
+            )
+            log_message('ScheduleTab', f'엑셀 내보내기 완료: {file_path}')
+
+        except ImportError:
+            QMessageBox.critical(
+                self, "라이브러리 오류",
+                "엑셀 내보내기를 위해 pandas와 openpyxl 라이브러리가 필요합니다.\n"
+                "pip install pandas openpyxl 명령으로 설치하세요."
+            )
+        except Exception as e:
+            import traceback
+            error_msg = f"엑셀 내보내기 중 오류 발생:\n{str(e)}"
+            log_exception('ScheduleTab', error_msg)
+            QMessageBox.critical(self, "오류", error_msg)

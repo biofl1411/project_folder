@@ -2,8 +2,87 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
                             QWidget, QFormLayout, QLineEdit, QPushButton,
                             QLabel, QMessageBox, QSpinBox, QGroupBox, QCheckBox,
-                            QComboBox)
+                            QComboBox, QListWidget, QListWidgetItem, QColorDialog,
+                            QFrame, QGridLayout)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
+
+
+# 상태 설정을 가져오는 유틸리티 함수
+def get_status_settings():
+    """데이터베이스에서 상태 설정을 가져옴
+
+    Returns:
+        list: [{'code': 'pending', 'name': '대기', 'color': '#FFFFFF'}, ...]
+    """
+    default_statuses = [
+        {'code': 'pending', 'name': '대기', 'color': '#FFFFFF'},
+        {'code': 'scheduled', 'name': '입고예정', 'color': '#00FFFF'},
+        {'code': 'received', 'name': '입고', 'color': '#FFFF00'},
+        {'code': 'completed', 'name': '종료', 'color': '#00FF00'},
+    ]
+
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = 'custom_statuses'")
+        result = cursor.fetchone()
+        conn.close()
+
+        if result and result['value']:
+            import json
+            return json.loads(result['value'])
+    except Exception as e:
+        print(f"상태 설정 로드 오류: {e}")
+
+    return default_statuses
+
+
+def get_status_map():
+    """상태 코드 -> 이름 매핑 반환
+
+    Returns:
+        dict: {'pending': '대기', 'scheduled': '입고예정', ...}
+    """
+    statuses = get_status_settings()
+    return {s['code']: s['name'] for s in statuses}
+
+
+def get_status_colors():
+    """상태 코드 -> 색상 매핑 반환
+
+    Returns:
+        dict: {'pending': '#FFFFFF', 'scheduled': '#00FFFF', ...}
+    """
+    statuses = get_status_settings()
+    return {s['code']: s['color'] for s in statuses}
+
+
+def get_status_names():
+    """상태 이름 목록 반환 (콤보박스용)
+
+    Returns:
+        list: ['대기', '입고예정', '입고', '종료']
+    """
+    statuses = get_status_settings()
+    return [s['name'] for s in statuses]
+
+
+def get_status_code_by_name(name):
+    """상태 이름으로 코드 조회
+
+    Args:
+        name: 상태 이름 (예: '대기')
+
+    Returns:
+        str: 상태 코드 (예: 'pending')
+    """
+    statuses = get_status_settings()
+    for s in statuses:
+        if s['name'] == name:
+            return s['code']
+    return 'pending'
 
 
 class SettingsDialog(QDialog):
@@ -47,6 +126,11 @@ class SettingsDialog(QDialog):
         schedule_tab = QWidget()
         self.setup_schedule_tab(schedule_tab)
         self.tab_widget.addTab(schedule_tab, "스케줄")
+
+        # 상태 설정 탭
+        status_tab = QWidget()
+        self.setup_status_tab(status_tab)
+        self.tab_widget.addTab(status_tab, "상태")
 
         layout.addWidget(self.tab_widget)
 
@@ -422,6 +506,280 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
 
+    def setup_status_tab(self, tab):
+        """상태 설정 탭 - 상태 커스터마이징"""
+        layout = QVBoxLayout(tab)
+
+        # 설명
+        info_label = QLabel(
+            "스케줄의 상태 항목을 커스터마이징할 수 있습니다.\n"
+            "상태 이름과 색상을 변경하거나 새로운 상태를 추가할 수 있습니다."
+        )
+        info_label.setStyleSheet("color: #666; font-size: 11px; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # 상태 목록 그룹
+        status_group = QGroupBox("상태 목록")
+        status_layout = QVBoxLayout(status_group)
+
+        # 상태 목록 위젯
+        self.status_list_widget = QListWidget()
+        self.status_list_widget.setMinimumHeight(150)
+        self.status_list_widget.itemClicked.connect(self.on_status_item_clicked)
+        status_layout.addWidget(self.status_list_widget)
+
+        # 상태 추가/삭제 버튼
+        btn_layout = QHBoxLayout()
+        add_status_btn = QPushButton("+ 상태 추가")
+        add_status_btn.clicked.connect(self.add_status_item)
+        remove_status_btn = QPushButton("- 상태 삭제")
+        remove_status_btn.clicked.connect(self.remove_status_item)
+        move_up_btn = QPushButton("▲ 위로")
+        move_up_btn.clicked.connect(self.move_status_up)
+        move_down_btn = QPushButton("▼ 아래로")
+        move_down_btn.clicked.connect(self.move_status_down)
+        btn_layout.addWidget(add_status_btn)
+        btn_layout.addWidget(remove_status_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(move_up_btn)
+        btn_layout.addWidget(move_down_btn)
+        status_layout.addLayout(btn_layout)
+
+        layout.addWidget(status_group)
+
+        # 상태 편집 그룹
+        edit_group = QGroupBox("상태 편집")
+        edit_layout = QFormLayout(edit_group)
+
+        # 상태 코드 (내부용)
+        self.status_code_input = QLineEdit()
+        self.status_code_input.setPlaceholderText("영문 코드 (예: pending, in_progress)")
+        edit_layout.addRow("코드:", self.status_code_input)
+
+        # 상태 이름 (표시용)
+        self.status_name_input = QLineEdit()
+        self.status_name_input.setPlaceholderText("표시 이름 (예: 대기, 진행중)")
+        edit_layout.addRow("이름:", self.status_name_input)
+
+        # 상태 색상
+        color_layout = QHBoxLayout()
+        self.status_color_preview = QFrame()
+        self.status_color_preview.setFixedSize(30, 30)
+        self.status_color_preview.setStyleSheet("background-color: #FFFFFF; border: 1px solid #ccc;")
+        self.status_color_value = "#FFFFFF"
+        color_layout.addWidget(self.status_color_preview)
+        color_btn = QPushButton("색상 선택")
+        color_btn.clicked.connect(self.choose_status_color)
+        color_layout.addWidget(color_btn)
+        color_layout.addStretch()
+        edit_layout.addRow("색상:", color_layout)
+
+        # 적용 버튼
+        apply_btn = QPushButton("변경 적용")
+        apply_btn.setStyleSheet("background-color: #3498db; color: white;")
+        apply_btn.clicked.connect(self.apply_status_edit)
+        edit_layout.addRow("", apply_btn)
+
+        layout.addWidget(edit_group)
+
+        # 기본값 복원 버튼
+        reset_layout = QHBoxLayout()
+        reset_layout.addStretch()
+        reset_btn = QPushButton("기본값 복원")
+        reset_btn.clicked.connect(self.reset_status_to_default)
+        reset_layout.addWidget(reset_btn)
+        layout.addLayout(reset_layout)
+
+        # 안내 문구
+        note_label = QLabel(
+            "※ 코드는 영문 소문자와 밑줄(_)만 사용 가능합니다.\n"
+            "※ 이 설정은 스케줄 작성 탭과 스케줄 관리 탭에 반영됩니다.\n"
+            "※ 기존 데이터의 상태 코드는 변경되지 않습니다."
+        )
+        note_label.setStyleSheet("color: #e74c3c; font-size: 10px;")
+        layout.addWidget(note_label)
+
+        layout.addStretch()
+
+        # 상태 목록 초기화
+        self.custom_statuses = []
+
+    def load_status_list(self):
+        """상태 목록 로드"""
+        self.status_list_widget.clear()
+        self.custom_statuses = get_status_settings()
+
+        for status in self.custom_statuses:
+            item = QListWidgetItem(f"{status['name']} ({status['code']})")
+            item.setData(Qt.UserRole, status)
+            # 색상 표시
+            color = QColor(status.get('color', '#FFFFFF'))
+            item.setBackground(color)
+            # 대비되는 텍스트 색상
+            if color.lightness() < 128:
+                item.setForeground(QColor('#FFFFFF'))
+            self.status_list_widget.addItem(item)
+
+    def on_status_item_clicked(self, item):
+        """상태 항목 클릭 시 편집 영역에 표시"""
+        status = item.data(Qt.UserRole)
+        if status:
+            self.status_code_input.setText(status['code'])
+            self.status_name_input.setText(status['name'])
+            self.status_color_value = status.get('color', '#FFFFFF')
+            self.status_color_preview.setStyleSheet(
+                f"background-color: {self.status_color_value}; border: 1px solid #ccc;"
+            )
+
+    def choose_status_color(self):
+        """색상 선택 다이얼로그"""
+        color = QColorDialog.getColor(QColor(self.status_color_value), self, "상태 색상 선택")
+        if color.isValid():
+            self.status_color_value = color.name()
+            self.status_color_preview.setStyleSheet(
+                f"background-color: {self.status_color_value}; border: 1px solid #ccc;"
+            )
+
+    def add_status_item(self):
+        """새 상태 추가"""
+        # 고유한 코드 생성
+        existing_codes = [s['code'] for s in self.custom_statuses]
+        new_code = "new_status"
+        counter = 1
+        while new_code in existing_codes:
+            new_code = f"new_status_{counter}"
+            counter += 1
+
+        new_status = {'code': new_code, 'name': '새 상태', 'color': '#CCCCCC'}
+        self.custom_statuses.append(new_status)
+
+        # 목록에 추가
+        item = QListWidgetItem(f"{new_status['name']} ({new_status['code']})")
+        item.setData(Qt.UserRole, new_status)
+        item.setBackground(QColor(new_status['color']))
+        self.status_list_widget.addItem(item)
+
+        # 새 항목 선택
+        self.status_list_widget.setCurrentItem(item)
+        self.on_status_item_clicked(item)
+
+    def remove_status_item(self):
+        """선택된 상태 삭제"""
+        current_row = self.status_list_widget.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "선택 오류", "삭제할 상태를 선택하세요.")
+            return
+
+        if len(self.custom_statuses) <= 1:
+            QMessageBox.warning(self, "삭제 불가", "최소 1개의 상태가 필요합니다.")
+            return
+
+        # 확인
+        item = self.status_list_widget.item(current_row)
+        status = item.data(Qt.UserRole)
+        reply = QMessageBox.question(
+            self, "삭제 확인",
+            f"'{status['name']}' 상태를 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            self.status_list_widget.takeItem(current_row)
+            del self.custom_statuses[current_row]
+
+    def move_status_up(self):
+        """상태 위로 이동"""
+        current_row = self.status_list_widget.currentRow()
+        if current_row > 0:
+            # 데이터 교환
+            self.custom_statuses[current_row], self.custom_statuses[current_row - 1] = \
+                self.custom_statuses[current_row - 1], self.custom_statuses[current_row]
+
+            # 목록 새로고침
+            self.refresh_status_list()
+            self.status_list_widget.setCurrentRow(current_row - 1)
+
+    def move_status_down(self):
+        """상태 아래로 이동"""
+        current_row = self.status_list_widget.currentRow()
+        if current_row < len(self.custom_statuses) - 1:
+            # 데이터 교환
+            self.custom_statuses[current_row], self.custom_statuses[current_row + 1] = \
+                self.custom_statuses[current_row + 1], self.custom_statuses[current_row]
+
+            # 목록 새로고침
+            self.refresh_status_list()
+            self.status_list_widget.setCurrentRow(current_row + 1)
+
+    def refresh_status_list(self):
+        """상태 목록 새로고침"""
+        self.status_list_widget.clear()
+        for status in self.custom_statuses:
+            item = QListWidgetItem(f"{status['name']} ({status['code']})")
+            item.setData(Qt.UserRole, status)
+            color = QColor(status.get('color', '#FFFFFF'))
+            item.setBackground(color)
+            if color.lightness() < 128:
+                item.setForeground(QColor('#FFFFFF'))
+            self.status_list_widget.addItem(item)
+
+    def apply_status_edit(self):
+        """편집 내용 적용"""
+        current_row = self.status_list_widget.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "선택 오류", "편집할 상태를 선택하세요.")
+            return
+
+        code = self.status_code_input.text().strip()
+        name = self.status_name_input.text().strip()
+
+        if not code or not name:
+            QMessageBox.warning(self, "입력 오류", "코드와 이름을 모두 입력하세요.")
+            return
+
+        # 코드 유효성 검사
+        import re
+        if not re.match(r'^[a-z_]+$', code):
+            QMessageBox.warning(self, "코드 오류", "코드는 영문 소문자와 밑줄(_)만 사용 가능합니다.")
+            return
+
+        # 코드 중복 검사 (자기 자신 제외)
+        for i, s in enumerate(self.custom_statuses):
+            if i != current_row and s['code'] == code:
+                QMessageBox.warning(self, "코드 중복", "이미 사용 중인 코드입니다.")
+                return
+
+        # 업데이트
+        self.custom_statuses[current_row] = {
+            'code': code,
+            'name': name,
+            'color': self.status_color_value
+        }
+
+        # 목록 새로고침
+        self.refresh_status_list()
+        self.status_list_widget.setCurrentRow(current_row)
+
+        QMessageBox.information(self, "적용 완료", "변경 사항이 적용되었습니다.")
+
+    def reset_status_to_default(self):
+        """상태를 기본값으로 복원"""
+        reply = QMessageBox.question(
+            self, "기본값 복원",
+            "상태 설정을 기본값으로 복원하시겠습니까?\n현재 설정이 모두 삭제됩니다.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            self.custom_statuses = [
+                {'code': 'pending', 'name': '대기', 'color': '#FFFFFF'},
+                {'code': 'scheduled', 'name': '입고예정', 'color': '#00FFFF'},
+                {'code': 'received', 'name': '입고', 'color': '#FFFF00'},
+                {'code': 'completed', 'name': '종료', 'color': '#00FF00'},
+            ]
+            self.refresh_status_list()
+            QMessageBox.information(self, "복원 완료", "기본값으로 복원되었습니다.")
+
     def load_settings(self):
         """데이터베이스에서 설정 불러오기"""
         try:
@@ -509,6 +867,9 @@ class SettingsDialog(QDialog):
                 except:
                     self.interim_report_offset_spin.setValue(0)
 
+            # 상태 목록 로드
+            self.load_status_list()
+
         except Exception as e:
             print(f"설정 로드 중 오류: {str(e)}")
 
@@ -548,8 +909,13 @@ class SettingsDialog(QDialog):
                 ('logo_path', self.logo_path_input.text()),
                 ('stamp_path', self.stamp_path_input.text()),
                 # 스케줄 설정
-                ('interim_report_offset', str(self.interim_report_offset_spin.value()))
+                ('interim_report_offset', str(self.interim_report_offset_spin.value())),
             ]
+
+            # 상태 설정 추가 (JSON으로 저장)
+            import json
+            if self.custom_statuses:
+                settings.append(('custom_statuses', json.dumps(self.custom_statuses, ensure_ascii=False)))
 
             for key, value in settings:
                 cursor.execute("""
