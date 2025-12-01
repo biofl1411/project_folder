@@ -825,7 +825,13 @@ class ScheduleSelectDialog(QDialog):
                         status_item = QTableWidgetItem(status_text)
                         # 커스텀 색상 적용
                         if status in status_colors:
-                            status_item.setBackground(QColor(status_colors[status]))
+                            color = QColor(status_colors[status])
+                            status_item.setBackground(color)
+                            # 배경색이 어두우면 흰색 글씨, 밝으면 검정색 글씨
+                            if color.lightness() < 128:
+                                status_item.setForeground(QColor('#FFFFFF'))
+                            else:
+                                status_item.setForeground(QColor('#000000'))
                         self.schedule_table.setItem(row, col_index, status_item)
 
                     elif col_key == 'interim_date':
@@ -2067,6 +2073,21 @@ class ScheduleManagementTab(QWidget):
         final_cost_with_vat = final_cost_no_vat + vat
         self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
 
+        # 금액을 DB에 저장
+        self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
+    def _save_amounts_to_db(self, supply_amount, tax_amount, total_amount):
+        """금액을 DB에 저장"""
+        if not self.current_schedule:
+            return
+        try:
+            from models.schedules import Schedule
+            schedule_id = self.current_schedule.get('id')
+            if schedule_id:
+                Schedule.update_amounts(schedule_id, supply_amount, tax_amount, total_amount)
+        except Exception as e:
+            print(f"금액 저장 오류: {e}")
+
     def show_estimate(self):
         """견적서 보기 버튼 클릭 시 처리"""
         if not self.current_schedule:
@@ -2953,6 +2974,9 @@ class ScheduleManagementTab(QWidget):
         final_cost_with_vat = final_cost_no_vat + vat
         self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
 
+        # 금액을 DB에 저장
+        self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
     def on_cost_input_changed(self):
         """보고서 비용 입력 변경 시 총비용 재계산"""
         if not self.current_schedule:
@@ -2998,3 +3022,6 @@ class ScheduleManagementTab(QWidget):
         vat = int(final_cost_no_vat * 0.1)
         final_cost_with_vat = final_cost_no_vat + vat
         self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
+
+        # 금액을 DB에 저장
+        self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)

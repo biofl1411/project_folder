@@ -16,7 +16,10 @@ class Schedule:
             new_columns = {
                 'estimate_date': 'TEXT',
                 'expected_date': 'TEXT',
-                'interim_report_date': 'TEXT'
+                'interim_report_date': 'TEXT',
+                'supply_amount': 'INTEGER DEFAULT 0',
+                'tax_amount': 'INTEGER DEFAULT 0',
+                'total_amount': 'INTEGER DEFAULT 0'
             }
 
             for col_name, col_type in new_columns.items():
@@ -334,3 +337,23 @@ class Schedule:
         except Exception as e:
             print(f"스케줄 필터 조회 중 오류: {str(e)}")
             return []
+
+    @staticmethod
+    def update_amounts(schedule_id, supply_amount, tax_amount, total_amount):
+        """스케줄 금액 업데이트"""
+        try:
+            Schedule._ensure_columns()
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules
+                SET supply_amount = ?, tax_amount = ?, total_amount = ?
+                WHERE id = ?
+            """, (supply_amount, tax_amount, total_amount, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"스케줄 금액 업데이트 중 오류: {str(e)}")
+            return False

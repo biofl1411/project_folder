@@ -48,6 +48,10 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('start_date', '시작일', True),
         ('end_date', '종료일', True),
         ('estimate_date', '견적일자', True),
+        # 금액
+        ('supply_amount', '공급가액', True),
+        ('tax_amount', '세액', True),
+        ('total_amount', '합계', True),
         ('status', '상태', True),
         ('memo', '메모', False),
     ]
@@ -210,6 +214,10 @@ class ScheduleTab(QWidget):
         ('start_date', '시작일', 'start_date'),
         ('end_date', '종료일', 'end_date'),
         ('estimate_date', '견적일자', 'estimate_date'),
+        # 금액
+        ('supply_amount', '공급가액', 'supply_amount'),
+        ('tax_amount', '세액', 'tax_amount'),
+        ('total_amount', '합계', 'total_amount'),
         ('status', '상태', 'status'),
         ('memo', '메모', 'memo'),
     ]
@@ -545,6 +553,14 @@ class ScheduleTab(QWidget):
                         packaging_text = f"{weight}{unit}" if weight > 0 else ''
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(packaging_text))
 
+                    elif col_key in ('supply_amount', 'tax_amount', 'total_amount'):
+                        # 금액 필드 (포맷팅)
+                        amount = schedule.get(col_key, 0) or 0
+                        amount_text = f"{int(amount):,}" if amount > 0 else ''
+                        amount_item = QTableWidgetItem(amount_text)
+                        amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        self.schedule_table.setItem(row, col_index, amount_item)
+
                     elif col_key == 'status':
                         # 상태 (커스텀 설정 사용)
                         status = schedule.get('status', 'pending') or 'pending'
@@ -554,7 +570,13 @@ class ScheduleTab(QWidget):
                         status_item = QTableWidgetItem(status_text)
                         # 커스텀 색상 적용
                         if status in status_colors:
-                            status_item.setBackground(QColor(status_colors[status]))
+                            color = QColor(status_colors[status])
+                            status_item.setBackground(color)
+                            # 배경색이 어두우면 흰색 글씨, 밝으면 검정색 글씨
+                            if color.lightness() < 128:
+                                status_item.setForeground(QColor('#FFFFFF'))
+                            else:
+                                status_item.setForeground(QColor('#000000'))
                         self.schedule_table.setItem(row, col_index, status_item)
 
                     elif col_key == 'custom_temperatures':
@@ -1212,18 +1234,57 @@ class ScheduleTab(QWidget):
                                 del schedule_data[date_field]
 
                     # 식품유형 처리 (이름으로 ID 조회)
+                    food_type_id = None
                     if 'food_type_name' in schedule_data:
                         food_type_name = schedule_data.pop('food_type_name')
-                        # TODO: 식품유형 ID 조회 로직 추가 가능
+                        try:
+                            from models.product_types import ProductType
+                            food_types = ProductType.get_all()
+                            for ft in food_types:
+                                if ft.get('type_name') == food_type_name:
+                                    food_type_id = ft.get('id')
+                                    break
+                        except:
+                            pass
+
+                    # client_name으로 client_id 조회
+                    client_id = None
+                    client_name = schedule_data.pop('client_name', '')
+                    if client_name:
+                        try:
+                            from models.clients import Client
+                            clients = Client.get_all()
+                            for c in clients:
+                                if c.get('company_name') == client_name:
+                                    client_id = c.get('id')
+                                    break
+                        except:
+                            pass
+
+                    # 필드명 매핑
+                    test_start_date = schedule_data.pop('start_date', None)
+                    expected_date = schedule_data.pop('end_date', None)
 
                     # 기본값 설정
-                    if 'status' not in schedule_data:
-                        schedule_data['status'] = 'pending'
-                    if 'sampling_count' not in schedule_data:
-                        schedule_data['sampling_count'] = 6
+                    status = schedule_data.get('status', 'pending')
+                    sampling_count = schedule_data.get('sampling_count', 6)
+                    product_name = schedule_data.get('product_name', '')
 
                     # DB에 저장
-                    Schedule.create(schedule_data)
+                    Schedule.create(
+                        client_id=client_id,
+                        product_name=product_name,
+                        food_type_id=food_type_id,
+                        test_method=schedule_data.get('test_method'),
+                        storage_condition=schedule_data.get('storage_condition'),
+                        test_start_date=test_start_date,
+                        expected_date=expected_date,
+                        test_period_days=schedule_data.get('test_period_days', 0),
+                        test_period_months=schedule_data.get('test_period_months', 0),
+                        test_period_years=schedule_data.get('test_period_years', 0),
+                        sampling_count=sampling_count,
+                        status=status
+                    )
                     imported_count += 1
 
                 except Exception as e:
