@@ -11,7 +11,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QDialog, QFormLayout, QTextEdit, QCheckBox, QGroupBox,
                              QFileDialog, QGridLayout, QSpinBox, QSplitter,
                              QScrollArea, QTabWidget, QListWidget, QListWidgetItem,
-                             QDialogButtonBox, QCalendarWidget, QMenu, QAction)
+                             QDialogButtonBox, QCalendarWidget, QMenu, QAction,
+                             QSizePolicy)
 from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QBrush, QCursor
 import pandas as pd
@@ -800,7 +801,7 @@ class ScheduleManagementTab(QWidget):
         input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 1px;"
         formula_style = "font-size: 12px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
 
-        # 1행: 항목별 비용 내역 (자동 줄바꿈 지원)
+        # 1행: 항목별 비용 내역 (자동 줄바꿈 지원, 전체 너비 사용)
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
@@ -808,9 +809,9 @@ class ScheduleManagementTab(QWidget):
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
         self.item_cost_detail.setWordWrap(True)  # 자동 줄바꿈 활성화
+        self.item_cost_detail.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # 가로로 확장
         row1.addWidget(self.item_cost_detail)
 
-        row1.addStretch()
         left_layout.addLayout(row1)
 
         # 2행: | 1회/회차/보고서/중간/계산식 (한 줄에 모두)
