@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QSizePolicy
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 from models.fees import Fee
 
@@ -78,14 +78,15 @@ class EstimateTab(QWidget):
         # 1. 헤더 (로고 + 견적서 타이틀)
         header_layout = QHBoxLayout()
 
-        # 로고
-        logo_label = QLabel("BFL")
-        logo_label.setStyleSheet("""
+        # 로고 (기본값은 텍스트, 이미지가 있으면 이미지로 대체)
+        self.logo_label = QLabel("BFL")
+        self.logo_label.setStyleSheet("""
             font-size: 36px;
             font-weight: bold;
             color: #1e90ff;
             font-family: Arial;
         """)
+        self.logo_label.setFixedHeight(60)  # 로고 높이 고정
 
         # 견적서 타이틀
         title_label = QLabel("견 적 서")
@@ -98,7 +99,7 @@ class EstimateTab(QWidget):
         """)
         title_label.setAlignment(Qt.AlignCenter)
 
-        header_layout.addWidget(logo_label)
+        header_layout.addWidget(self.logo_label)
         header_layout.addStretch()
         header_layout.addWidget(title_label)
         header_layout.addStretch()
@@ -172,13 +173,26 @@ class EstimateTab(QWidget):
         self.sender_input.setStyleSheet(input_style)
 
         # 오른쪽 정보 (회사 정보 - 설정에서 불러옴)
+        right_info_widget = QWidget()
+        right_info_layout = QHBoxLayout(right_info_widget)
+        right_info_layout.setContentsMargins(0, 0, 0, 0)
+        right_info_layout.setSpacing(10)
+
         self.right_company_info = QLabel("")
         self.right_company_info.setStyleSheet("font-size: 11px;")
+
+        # 직인 이미지
+        self.stamp_label = QLabel("")
+        self.stamp_label.setFixedSize(60, 60)
+        self.stamp_label.setStyleSheet("border: none;")
+
+        right_info_layout.addWidget(self.right_company_info)
+        right_info_layout.addWidget(self.stamp_label)
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
         info_layout.addWidget(self.estimate_no_input, 0, 1)
-        info_layout.addWidget(self.right_company_info, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
+        info_layout.addWidget(right_info_widget, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
 
         info_layout.addWidget(estimate_date_title, 1, 0)
         info_layout.addWidget(self.estimate_date_input, 1, 1)
@@ -333,6 +347,7 @@ class EstimateTab(QWidget):
 
     def load_company_info(self):
         """설정에서 회사 정보 불러오기"""
+        import os
         try:
             from database import get_connection
             conn = get_connection()
@@ -351,6 +366,36 @@ class EstimateTab(QWidget):
             # 주소
             address = settings_dict.get('company_address', '서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호')
             self.header_address_label.setText(address)
+
+            # 로고 이미지 로드
+            logo_path = settings_dict.get('logo_path', '')
+            if logo_path and os.path.exists(logo_path):
+                pixmap = QPixmap(logo_path)
+                if not pixmap.isNull():
+                    # 로고 크기 조정 (높이 60px 기준으로 비율 유지)
+                    scaled_pixmap = pixmap.scaledToHeight(60, Qt.SmoothTransformation)
+                    self.logo_label.setPixmap(scaled_pixmap)
+                    self.logo_label.setStyleSheet("")  # 기존 텍스트 스타일 제거
+            else:
+                # 기본 텍스트 로고
+                self.logo_label.setText("BFL")
+                self.logo_label.setStyleSheet("""
+                    font-size: 36px;
+                    font-weight: bold;
+                    color: #1e90ff;
+                    font-family: Arial;
+                """)
+
+            # 직인 이미지 로드
+            stamp_path = settings_dict.get('stamp_path', '')
+            if stamp_path and os.path.exists(stamp_path):
+                stamp_pixmap = QPixmap(stamp_path)
+                if not stamp_pixmap.isNull():
+                    # 직인 크기 조정 (60x60px)
+                    scaled_stamp = stamp_pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    self.stamp_label.setPixmap(scaled_stamp)
+            else:
+                self.stamp_label.clear()
 
             # 오른쪽 회사 정보 구성 (제목열 맞춤)
             ceo = settings_dict.get('company_ceo', '이용표')
