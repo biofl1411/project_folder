@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
     QScrollArea, QGridLayout, QGroupBox, QTextEdit, QMessageBox,
-    QLineEdit, QSizePolicy
+    QLineEdit, QSizePolicy, QSplitter, QFormLayout
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
@@ -37,9 +37,13 @@ class EstimateTab(QWidget):
         self.excel_btn = QPushButton("엑셀 저장")
         self.excel_btn.clicked.connect(self.save_as_excel)
 
+        self.email_toggle_btn = QPushButton("이메일 전송 ▼")
+        self.email_toggle_btn.clicked.connect(self.toggle_email_panel)
+
         button_layout.addWidget(self.print_btn)
         button_layout.addWidget(self.pdf_btn)
         button_layout.addWidget(self.excel_btn)
+        button_layout.addWidget(self.email_toggle_btn)
         button_layout.addStretch()
 
         main_layout.addWidget(button_frame)
@@ -71,7 +75,19 @@ class EstimateTab(QWidget):
         scroll_layout.addStretch()
         scroll_area.setWidget(scroll_content)
 
-        main_layout.addWidget(scroll_area)
+        # 스플리터로 견적서와 이메일 패널 분리
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(scroll_area)
+
+        # 이메일 패널 생성
+        self.email_panel = self.create_email_panel()
+        self.email_panel.setVisible(False)  # 기본적으로 숨김
+        splitter.addWidget(self.email_panel)
+
+        # 스플리터 비율 설정 (견적서 70%, 이메일 30%)
+        splitter.setSizes([700, 300])
+
+        main_layout.addWidget(splitter)
 
     def create_estimate_content(self):
         """견적서 내용 생성"""
@@ -1035,3 +1051,421 @@ class EstimateTab(QWidget):
     def save_as_excel(self):
         """엑셀로 저장"""
         QMessageBox.information(self, "알림", "엑셀 저장 기능은 추후 구현 예정입니다.")
+
+    def create_email_panel(self):
+        """이메일 전송 패널 생성"""
+        panel = QFrame()
+        panel.setStyleSheet("""
+            QFrame {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+        """)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+
+        # 제목
+        title_label = QLabel("이메일 전송")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; border: none;")
+        layout.addWidget(title_label)
+
+        # 폼 레이아웃
+        form_layout = QFormLayout()
+        form_layout.setSpacing(8)
+
+        # 입력 필드 스타일
+        input_style = """
+            QLineEdit, QTextEdit {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                padding: 5px;
+                background-color: white;
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                border: 1px solid #1e90ff;
+            }
+        """
+
+        # 수신자 (여러 명, 콤마로 구분)
+        self.email_to_input = QLineEdit()
+        self.email_to_input.setPlaceholderText("여러 명은 콤마(,)로 구분 (예: a@email.com, b@email.com)")
+        self.email_to_input.setStyleSheet(input_style)
+        form_layout.addRow("수신자:", self.email_to_input)
+
+        # 참조 (여러 명, 콤마로 구분)
+        self.email_cc_input = QLineEdit()
+        self.email_cc_input.setPlaceholderText("여러 명은 콤마(,)로 구분 (선택사항)")
+        self.email_cc_input.setStyleSheet(input_style)
+        form_layout.addRow("참조(CC):", self.email_cc_input)
+
+        # 제목
+        self.email_subject_input = QLineEdit()
+        self.email_subject_input.setStyleSheet(input_style)
+        form_layout.addRow("제목:", self.email_subject_input)
+
+        layout.addLayout(form_layout)
+
+        # 본문
+        body_label = QLabel("본문:")
+        body_label.setStyleSheet("border: none;")
+        layout.addWidget(body_label)
+
+        self.email_body_input = QTextEdit()
+        self.email_body_input.setStyleSheet(input_style)
+        self.email_body_input.setMinimumHeight(150)
+        layout.addWidget(self.email_body_input)
+
+        # 첨부파일 표시
+        attachment_layout = QHBoxLayout()
+        attachment_label = QLabel("첨부파일:")
+        attachment_label.setStyleSheet("border: none;")
+        self.attachment_path_label = QLabel("견적서가 PDF로 자동 첨부됩니다")
+        self.attachment_path_label.setStyleSheet("color: #666; border: none;")
+        attachment_layout.addWidget(attachment_label)
+        attachment_layout.addWidget(self.attachment_path_label)
+        attachment_layout.addStretch()
+        layout.addLayout(attachment_layout)
+
+        # 버튼 영역
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        self.email_preview_btn = QPushButton("미리보기 새로고침")
+        self.email_preview_btn.clicked.connect(self.refresh_email_template)
+        btn_layout.addWidget(self.email_preview_btn)
+
+        self.email_send_btn = QPushButton("이메일 발송")
+        self.email_send_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1e90ff;
+                color: white;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1873cc;
+            }
+        """)
+        self.email_send_btn.clicked.connect(self.send_email)
+        btn_layout.addWidget(self.email_send_btn)
+
+        layout.addLayout(btn_layout)
+
+        return panel
+
+    def toggle_email_panel(self):
+        """이메일 패널 표시/숨김 토글"""
+        if self.email_panel.isVisible():
+            self.email_panel.setVisible(False)
+            self.email_toggle_btn.setText("이메일 전송 ▼")
+        else:
+            self.email_panel.setVisible(True)
+            self.email_toggle_btn.setText("이메일 전송 ▲")
+            # 이메일 템플릿 로드
+            self.refresh_email_template()
+
+    def refresh_email_template(self):
+        """이메일 템플릿 새로고침"""
+        if not self.current_schedule:
+            self.email_subject_input.setText("[바이오푸드랩] 견적서 송부의 건")
+            self.email_body_input.setPlainText("스케줄을 먼저 선택해주세요.")
+            return
+
+        # 동적 데이터 추출
+        client_name = self.current_schedule.get('client_name', '') or ''
+        food_type = self.current_schedule.get('food_type_name', '') or ''
+
+        # 보관조건 변환
+        storage_code = self.current_schedule.get('storage_condition', 'room_temp')
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage = storage_map.get(storage_code, storage_code)
+
+        # 실험방법 변환
+        test_method = self.current_schedule.get('test_method', 'real')
+        method_map = {
+            'real': '실측실험',
+            'acceleration': '가속실험',
+            'custom_real': '의뢰자요청(실측)',
+            'custom_accel': '의뢰자요청(가속)',
+            'custom_acceleration': '의뢰자요청(가속)'
+        }
+        method_str = method_map.get(test_method, test_method)
+
+        # 실험 횟수
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # 온도 구간 수
+        if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+            zone_count = 3
+        else:
+            zone_count = 1
+
+        # 실험 주기 계산
+        test_period_days = self.current_schedule.get('test_period_days', 0) or 0
+        test_period_months = self.current_schedule.get('test_period_months', 0) or 0
+        test_period_years = self.current_schedule.get('test_period_years', 0) or 0
+        total_expiry_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+
+        if test_method in ['real', 'custom_real']:
+            experiment_days = int(total_expiry_days * 1.5)
+        else:
+            experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
+
+        if experiment_days > 0 and sampling_count > 0:
+            experiment_interval = experiment_days // sampling_count
+        else:
+            experiment_interval = 15
+
+        # 필요 시료량 계산
+        total_samples = sampling_count * zone_count
+        packaging_weight = self.current_schedule.get('packaging_weight', 0) or 0
+        packaging_unit = self.current_schedule.get('packaging_unit', 'g') or 'g'
+        if packaging_weight > 0:
+            sample_text = f"포장단위 {packaging_weight}{packaging_unit} 이상 제품 기준 총 {total_samples}ea 이상"
+        else:
+            sample_text = f"총 {total_samples}ea 이상"
+
+        # 총액 계산
+        total_price = self.calculate_total_price(self.current_schedule)
+        vat = int(total_price * 0.1)
+        total_with_vat = total_price + vat
+
+        # 제목 설정
+        self.email_subject_input.setText(f"[바이오푸드랩] {client_name} 견적서 송부의 건")
+
+        # 본문 템플릿
+        body_template = f"""안녕하세요, (주)바이오푸드랩입니다.
+
+{client_name} 귀하
+
+요청하신 소비기한 설정시험 견적서를 송부드립니다.
+
+■ 견적 정보
+  - 식품유형: {food_type}
+  - 보관조건: {storage}
+  - 실험방법: {method_str}
+  - 실험횟수: {sampling_count}회 (온도 {zone_count}구간)
+  - 실험주기: {experiment_interval}일
+  - 필요시료: {sample_text}
+  - 견적금액: {total_with_vat:,}원 (VAT 포함)
+
+첨부된 견적서를 확인해 주시기 바랍니다.
+문의사항이 있으시면 언제든 연락 부탁드립니다.
+
+감사합니다.
+
+─────────────────────────
+(주)바이오푸드랩
+Tel: 02-xxx-xxxx
+Email: info@biofoodlab.co.kr
+─────────────────────────"""
+
+        self.email_body_input.setPlainText(body_template)
+
+    def send_email(self):
+        """이메일 발송"""
+        import os
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+        from datetime import datetime
+
+        # 입력 검증
+        to_emails = self.email_to_input.text().strip()
+        if not to_emails:
+            QMessageBox.warning(self, "입력 오류", "수신자 이메일을 입력해주세요.")
+            return
+
+        if not self.current_schedule:
+            QMessageBox.warning(self, "오류", "견적서를 먼저 선택해주세요.")
+            return
+
+        # SMTP 설정 가져오기
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            settings = cursor.fetchall()
+            conn.close()
+
+            settings_dict = {s['key']: s['value'] for s in settings}
+
+            smtp_server = settings_dict.get('smtp_server', '')
+            smtp_port = int(settings_dict.get('smtp_port', '587'))
+            smtp_security = settings_dict.get('smtp_security', 'TLS')
+            smtp_email = settings_dict.get('smtp_email', '')
+            smtp_password = settings_dict.get('smtp_password', '')
+            sender_name = settings_dict.get('smtp_sender_name', '(주)바이오푸드랩')
+            output_path = settings_dict.get('output_path', '')
+
+            if not smtp_server or not smtp_email or not smtp_password:
+                QMessageBox.warning(self, "설정 오류",
+                    "이메일 설정이 완료되지 않았습니다.\n설정 > 이메일 탭에서 SMTP 설정을 완료해주세요.")
+                return
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 로드 중 오류: {str(e)}")
+            return
+
+        # PDF 저장 (첨부용)
+        pdf_path = self._save_pdf_for_email(output_path)
+        if not pdf_path:
+            return
+
+        # 이메일 구성
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = f"{sender_name} <{smtp_email}>"
+
+            # 수신자 처리 (여러 명)
+            to_list = [email.strip() for email in to_emails.split(',') if email.strip()]
+            msg['To'] = ', '.join(to_list)
+
+            # 참조 처리 (여러 명)
+            cc_emails = self.email_cc_input.text().strip()
+            cc_list = []
+            if cc_emails:
+                cc_list = [email.strip() for email in cc_emails.split(',') if email.strip()]
+                msg['Cc'] = ', '.join(cc_list)
+
+            msg['Subject'] = self.email_subject_input.text()
+
+            # 본문
+            body = self.email_body_input.toPlainText()
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+            # PDF 첨부
+            with open(pdf_path, 'rb') as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="{os.path.basename(pdf_path)}"'
+                )
+                msg.attach(part)
+
+            # SMTP 연결 및 발송
+            all_recipients = to_list + cc_list
+
+            if smtp_security == "SSL":
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
+            else:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+                if smtp_security == "TLS":
+                    server.starttls()
+
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, all_recipients, msg.as_string())
+            server.quit()
+
+            QMessageBox.information(self, "발송 완료",
+                f"이메일이 성공적으로 발송되었습니다.\n\n"
+                f"수신자: {', '.join(to_list)}\n"
+                f"{'참조: ' + ', '.join(cc_list) if cc_list else ''}\n"
+                f"첨부파일: {os.path.basename(pdf_path)}")
+
+            # 첨부파일 경로 업데이트
+            self.attachment_path_label.setText(f"첨부됨: {os.path.basename(pdf_path)}")
+
+        except smtplib.SMTPAuthenticationError:
+            QMessageBox.critical(self, "인증 오류",
+                "SMTP 인증에 실패했습니다.\n이메일 또는 비밀번호를 확인해주세요.\n\n"
+                "Gmail의 경우 '앱 비밀번호'를 사용해야 합니다.")
+        except smtplib.SMTPException as e:
+            QMessageBox.critical(self, "발송 오류", f"이메일 발송 중 오류가 발생했습니다:\n{str(e)}")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"오류가 발생했습니다:\n{str(e)}")
+
+    def _save_pdf_for_email(self, output_path):
+        """이메일 첨부용 PDF 저장"""
+        import os
+        from datetime import datetime
+        from PyQt5.QtCore import QMarginsF
+        from PyQt5.QtGui import QPainter, QPageLayout, QPageSize
+
+        # 파일명 생성
+        client_name = self.current_schedule.get('client_name', '업체명') or '업체명'
+        food_type = self.current_schedule.get('food_type_name', '식품유형') or '식품유형'
+        estimate_date = datetime.now().strftime('%Y%m%d')
+
+        storage_code = self.current_schedule.get('storage_condition', 'room_temp')
+        storage_map = {'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'}
+        storage = storage_map.get(storage_code, storage_code)
+
+        test_method = self.current_schedule.get('test_method', 'real')
+        method_map = {
+            'real': '실측', 'acceleration': '가속',
+            'custom_real': '의뢰자요청_실측', 'custom_accel': '의뢰자요청_가속',
+            'custom_acceleration': '의뢰자요청_가속'
+        }
+        method_str = method_map.get(test_method, test_method)
+
+        def sanitize_filename(name):
+            invalid_chars = '<>:"/\\|?*'
+            for char in invalid_chars:
+                name = name.replace(char, '_')
+            return name
+
+        filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
+        filename = sanitize_filename(filename)
+
+        # 저장 경로 결정
+        if output_path and os.path.isdir(output_path):
+            file_path = os.path.join(output_path, filename)
+        else:
+            default_path = os.path.expanduser("~/Documents")
+            if not os.path.exists(default_path):
+                default_path = os.path.expanduser("~")
+            file_path = os.path.join(default_path, filename)
+
+        # PDF 생성
+        try:
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(file_path)
+
+            page_layout = QPageLayout(
+                QPageSize(QPageSize.A4),
+                QPageLayout.Portrait,
+                QMarginsF(10, 10, 10, 10)
+            )
+            printer.setPageLayout(page_layout)
+
+            painter = QPainter()
+            if painter.begin(printer):
+                page_rect = printer.pageRect(QPrinter.DevicePixel)
+                widget = self.estimate_container
+                widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
+                widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
+
+                scale = page_rect.width() / widget_width
+                if widget_height * scale > page_rect.height():
+                    scale = page_rect.height() / widget_height
+                scale = scale * 0.95
+
+                painter.scale(scale, scale)
+                widget.render(painter)
+                painter.end()
+
+                return file_path
+            else:
+                QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
+                return None
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"PDF 저장 중 오류: {str(e)}")
+            return None
