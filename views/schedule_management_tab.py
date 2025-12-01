@@ -25,38 +25,57 @@ from utils.logger import log_message, log_error, log_exception, safe_get
 
 
 def get_korean_holidays(year):
-    """한국 공휴일 목록 반환 (고정 공휴일 + 음력 공휴일 + 대체공휴일)"""
+    """한국 공휴일 목록 반환 (고정 공휴일 + 음력 공휴일 + 대체공휴일)
+
+    대체공휴일 적용 기준:
+    - 설날/추석 연휴: 일요일과 겹치면 연휴 다음 첫 평일 (2014년~)
+    - 어린이날: 토요일 또는 일요일과 겹치면 다음 평일 (2014년~)
+    - 삼일절, 광복절, 개천절, 한글날: 일요일과 겹치면 다음 월요일 (2021년~)
+    - 부처님오신날, 크리스마스: 일요일과 겹치면 다음 월요일 (2023년~)
+    """
     from datetime import date, timedelta
 
     holidays = set()
 
-    # 고정 공휴일과 대체공휴일 적용 여부
+    # 고정 공휴일 처리
+    # substitute_type: 'none'=미적용, 'sunday'=일요일만, 'weekend'=토/일 모두
     fixed_holidays = [
-        (1, 1, '신정', False),        # 신정 - 대체공휴일 미적용
-        (3, 1, '삼일절', True),       # 삼일절 - 대체공휴일 적용 (2022년~)
-        (5, 5, '어린이날', True),     # 어린이날 - 대체공휴일 적용
-        (6, 6, '현충일', False),      # 현충일 - 대체공휴일 미적용
-        (8, 15, '광복절', True),      # 광복절 - 대체공휴일 적용 (2022년~)
-        (10, 3, '개천절', True),      # 개천절 - 대체공휴일 적용 (2022년~)
-        (10, 9, '한글날', True),      # 한글날 - 대체공휴일 적용 (2022년~)
-        (12, 25, '크리스마스', True), # 크리스마스 - 대체공휴일 적용 (2023년~)
+        (1, 1, '신정', 'none'),           # 신정 - 대체공휴일 미적용
+        (3, 1, '삼일절', 'sunday'),       # 삼일절 - 일요일만 대체공휴일
+        (5, 5, '어린이날', 'weekend'),    # 어린이날 - 토/일 모두 대체공휴일
+        (6, 6, '현충일', 'none'),         # 현충일 - 대체공휴일 미적용
+        (8, 15, '광복절', 'sunday'),      # 광복절 - 일요일만 대체공휴일
+        (10, 3, '개천절', 'sunday'),      # 개천절 - 일요일만 대체공휴일
+        (10, 9, '한글날', 'sunday'),      # 한글날 - 일요일만 대체공휴일
+        (12, 25, '크리스마스', 'sunday'), # 크리스마스 - 일요일만 대체공휴일
     ]
 
-    for month, day, name, has_substitute in fixed_holidays:
+    for month, day, name, substitute_type in fixed_holidays:
         try:
             holiday_date = date(year, month, day)
             holidays.add(holiday_date)
 
-            # 대체공휴일 계산: 일요일이면 다음 월요일
-            if has_substitute and holiday_date.weekday() == 6:  # 일요일
-                substitute = holiday_date + timedelta(days=1)
-                holidays.add(substitute)
+            # 대체공휴일 계산
+            if substitute_type == 'weekend':
+                # 토요일(5) 또는 일요일(6)이면 다음 월요일
+                if holiday_date.weekday() == 5:  # 토요일
+                    substitute = holiday_date + timedelta(days=2)
+                    holidays.add(substitute)
+                elif holiday_date.weekday() == 6:  # 일요일
+                    substitute = holiday_date + timedelta(days=1)
+                    holidays.add(substitute)
+            elif substitute_type == 'sunday':
+                # 일요일이면 다음 월요일
+                if holiday_date.weekday() == 6:
+                    substitute = holiday_date + timedelta(days=1)
+                    holidays.add(substitute)
         except:
             pass
 
     # 음력 공휴일 (양력 변환 - 연도별 정확한 날짜)
     # 설날 연휴 (전날, 당일, 다음날), 추석 연휴 (전날, 당일, 다음날)
     lunar_holidays = {
+        # 2025-2030년
         2025: {
             'seollal': [(1, 28), (1, 29), (1, 30)],
             'chuseok': [(10, 5), (10, 6), (10, 7)],
@@ -80,6 +99,27 @@ def get_korean_holidays(year):
         2030: {
             'seollal': [(2, 2), (2, 3), (2, 4)],
             'chuseok': [(10, 11), (10, 12), (10, 13)],
+        },
+        # 2031-2035년
+        2031: {
+            'seollal': [(1, 22), (1, 23), (1, 24)],
+            'chuseok': [(9, 27), (9, 28), (9, 29)],  # 9/28 일요일 → 대체공휴일
+        },
+        2032: {
+            'seollal': [(2, 10), (2, 11), (2, 12)],
+            'chuseok': [(9, 18), (9, 19), (9, 20)],  # 9/19 일요일 → 대체공휴일
+        },
+        2033: {
+            'seollal': [(1, 30), (1, 31), (2, 1)],   # 1/30 일요일 → 대체공휴일
+            'chuseok': [(9, 7), (9, 8), (9, 9)],
+        },
+        2034: {
+            'seollal': [(2, 18), (2, 19), (2, 20)],  # 2/19 일요일 → 대체공휴일
+            'chuseok': [(9, 26), (9, 27), (9, 28)],
+        },
+        2035: {
+            'seollal': [(2, 7), (2, 8), (2, 9)],
+            'chuseok': [(9, 15), (9, 16), (9, 17)],  # 9/16 일요일 → 대체공휴일
         },
     }
 
@@ -111,11 +151,16 @@ def get_korean_holidays(year):
     # 부처님오신날 (음력 4월 8일 - 대체공휴일 적용 2024년~)
     buddha_birthday = {
         2025: (5, 5),
-        2026: (5, 24),
+        2026: (5, 24),   # 일요일 → 5/25 대체공휴일
         2027: (5, 13),
         2028: (5, 2),
         2029: (5, 20),
         2030: (5, 9),
+        2031: (5, 28),
+        2032: (5, 16),   # 일요일 → 5/17 대체공휴일
+        2033: (5, 6),
+        2034: (5, 25),
+        2035: (5, 15),
     }
 
     if year in buddha_birthday:
