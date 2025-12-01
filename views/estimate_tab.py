@@ -192,10 +192,10 @@ class EstimateTab(QWidget):
         right_info_widget = QWidget()
         right_info_layout = QHBoxLayout(right_info_widget)
         right_info_layout.setContentsMargins(0, 0, 0, 0)
-        right_info_layout.setSpacing(10)
+        right_info_layout.setSpacing(-30)  # 음수 간격으로 도장이 텍스트에 겹치도록
 
         self.right_company_info = QLabel("")
-        self.right_company_info.setStyleSheet("font-size: 11px;")
+        self.right_company_info.setStyleSheet("font-size: 11px; padding-left: 35px;")  # 왼쪽 여백 추가
 
         # 직인 이미지
         self.stamp_label = QLabel("")
