@@ -547,50 +547,139 @@ class DateSelectDialog(QDialog):
 
 
 class ScheduleSelectDialog(QDialog):
-    """스케줄 선택 팝업 다이얼로그"""
+    """스케줄 선택 팝업 다이얼로그 - 스케줄 작성 탭과 동일한 컬럼 표시"""
+
+    # 한글 초성 매핑
+    CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+
+    # 컬럼 정의 (key, header_name, data_key, default_visible)
+    ALL_COLUMNS = [
+        ('id', 'ID', 'id', False),
+        ('client_name', '업체명', 'client_name', True),
+        ('sales_rep', '영업담당', 'sales_rep', True),
+        ('product_name', '샘플명', 'product_name', True),
+        ('food_type', '식품유형', 'food_type_id', False),
+        ('test_method', '실험방법', 'test_method', True),
+        ('storage_condition', '보관조건', 'storage_condition', True),
+        ('expiry_period', '소비기한', None, True),
+        ('test_period', '실험기간', None, False),
+        ('sampling_count', '샘플링횟수', 'sampling_count', False),
+        ('report_type', '보고서종류', None, False),
+        ('interim_date', '중간보고일', 'interim_date', False),
+        ('start_date', '시작일', 'start_date', True),
+        ('end_date', '종료일', 'end_date', True),
+        ('status', '상태', 'status', True),
+        ('memo', '메모', 'memo', False),
+    ]
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.selected_schedule_id = None
+        self.all_schedules = []  # 전체 스케줄 목록 저장
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle("스케줄 선택")
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(1000, 500)
+        self.resize(1200, 600)
 
         layout = QVBoxLayout(self)
 
         # 검색 영역
-        search_layout = QHBoxLayout()
+        search_frame = QFrame()
+        search_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f3e5f5;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 3px 8px;
+            }
+            QLineEdit {
+                background-color: white;
+                border: 1px solid #ce93d8;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #ab47bc;
+            }
+        """)
+        search_layout = QHBoxLayout(search_frame)
+
         search_layout.addWidget(QLabel("검색:"))
+
+        # 검색 필드 선택
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItems(["전체", "업체명", "샘플명", "상태"])
+        self.search_field_combo.setMinimumWidth(80)
+        search_layout.addWidget(self.search_field_combo)
+
+        # 검색 입력
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("업체명, 제품명 검색...")
-        self.search_input.returnPressed.connect(self.search_schedules)
+        self.search_input.setPlaceholderText("검색어 입력... (초성 검색 가능: ㅂㅇㅍㄷㄹ)")
+        self.search_input.setMinimumWidth(300)
+        self.search_input.textChanged.connect(self.filter_schedules)
         search_layout.addWidget(self.search_input)
 
-        search_btn = QPushButton("검색")
-        search_btn.clicked.connect(self.search_schedules)
-        search_layout.addWidget(search_btn)
-        layout.addLayout(search_layout)
+        # 검색 필드 변경 시에도 필터 적용
+        self.search_field_combo.currentIndexChanged.connect(self.filter_schedules)
+
+        # 초기화 버튼
+        reset_btn = QPushButton("초기화")
+        reset_btn.clicked.connect(self.reset_search)
+        search_layout.addWidget(reset_btn)
+
+        search_layout.addStretch()
+        layout.addWidget(search_frame)
 
         # 스케줄 목록 테이블
         self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(6)
-        self.schedule_table.setHorizontalHeaderLabels([
-            "ID", "업체명", "제품명", "실험방법", "시작일", "상태"
-        ])
-        self.schedule_table.setColumnHidden(0, True)
+        self.schedule_table.setColumnCount(len(self.ALL_COLUMNS))
+        headers = [col[1] for col in self.ALL_COLUMNS]
+        self.schedule_table.setHorizontalHeaderLabels(headers)
 
+        # 열 너비 조절 설정
         header = self.schedule_table.horizontalHeader()
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(True)
+
+        # 각 열의 기본 너비 설정
+        column_widths = {
+            'id': 40,
+            'client_name': 120,
+            'sales_rep': 80,
+            'product_name': 120,
+            'food_type': 100,
+            'test_method': 80,
+            'storage_condition': 70,
+            'expiry_period': 90,
+            'test_period': 70,
+            'sampling_count': 70,
+            'report_type': 100,
+            'interim_date': 90,
+            'start_date': 90,
+            'end_date': 90,
+            'status': 70,
+            'memo': 150,
+        }
+        for col_index, col_def in enumerate(self.ALL_COLUMNS):
+            col_key = col_def[0]
+            if col_key in column_widths:
+                self.schedule_table.setColumnWidth(col_index, column_widths[col_key])
 
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.schedule_table.doubleClicked.connect(self.accept)
+
+        # 헤더 클릭으로 정렬 기능 활성화
+        self.schedule_table.setSortingEnabled(True)
+        self.schedule_table.horizontalHeader().setSortIndicatorShown(True)
+
         layout.addWidget(self.schedule_table)
 
         # 버튼
@@ -599,56 +688,276 @@ class ScheduleSelectDialog(QDialog):
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
+        # 컬럼 표시 설정 적용
+        self.apply_column_settings()
+
+        # 데이터 로드
         self.load_schedules()
 
-    def load_schedules(self):
+    def get_column_settings(self):
+        """데이터베이스에서 스케줄 작성 탭 컬럼 설정 로드"""
         try:
-            schedules = Schedule.get_all()
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return result['value'].split(',')
+            else:
+                # 기본값: 기본 표시 컬럼
+                return [col[0] for col in self.ALL_COLUMNS if col[3]]
+        except Exception as e:
+            print(f"컬럼 설정 로드 오류: {e}")
+            return [col[0] for col in self.ALL_COLUMNS if col[3]]
+
+    def apply_column_settings(self):
+        """컬럼 표시 설정을 테이블에 적용"""
+        visible_columns = self.get_column_settings()
+
+        for col_index, col_def in enumerate(self.ALL_COLUMNS):
+            col_key = col_def[0]
+            if col_key == 'id':
+                # ID 열은 항상 숨김
+                self.schedule_table.setColumnHidden(col_index, True)
+            else:
+                # 설정에 따라 표시/숨김
+                is_hidden = col_key not in visible_columns
+                self.schedule_table.setColumnHidden(col_index, is_hidden)
+
+    def load_schedules(self):
+        """스케줄 목록 로드"""
+        try:
+            raw_schedules = Schedule.get_all() or []
+            self.all_schedules = [dict(s) for s in raw_schedules]
+            self.display_schedules(self.all_schedules)
+        except Exception as e:
+            print(f"스케줄 로드 오류: {e}")
+
+    def display_schedules(self, schedules):
+        """스케줄 목록을 테이블에 표시"""
+        self.schedule_table.setUpdatesEnabled(False)
+        try:
             self.schedule_table.setRowCount(0)
 
             for row, schedule in enumerate(schedules):
                 self.schedule_table.insertRow(row)
-                self.schedule_table.setItem(row, 0, QTableWidgetItem(str(schedule.get('id', ''))))
-                self.schedule_table.setItem(row, 1, QTableWidgetItem(schedule.get('client_name', '') or '-'))
-                self.schedule_table.setItem(row, 2, QTableWidgetItem(schedule.get('product_name', '') or '-'))
 
-                test_method = schedule.get('test_method', '') or ''
-                test_method_text = {
-                    'real': '실측', 'acceleration': '가속',
-                    'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'
-                }.get(test_method, '-')
-                self.schedule_table.setItem(row, 3, QTableWidgetItem(test_method_text))
-                self.schedule_table.setItem(row, 4, QTableWidgetItem(schedule.get('start_date', '') or '-'))
+                for col_index, col_def in enumerate(self.ALL_COLUMNS):
+                    col_key = col_def[0]
+                    data_key = col_def[2]
 
-                status = schedule.get('status', 'pending') or 'pending'
+                    if col_key == 'id':
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(str(schedule.get('id', ''))))
+
+                    elif col_key == 'test_method':
+                        test_method = schedule.get('test_method', '') or ''
+                        test_method_text = {
+                            'real': '실측', 'acceleration': '가속',
+                            'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'
+                        }.get(test_method, test_method)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(test_method_text))
+
+                    elif col_key == 'storage_condition':
+                        storage = schedule.get('storage_condition', '') or ''
+                        storage_text = {
+                            'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'
+                        }.get(storage, storage)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(storage_text))
+
+                    elif col_key == 'food_type':
+                        food_type_id = schedule.get('food_type_id', '')
+                        food_type_name = ''
+                        if food_type_id:
+                            try:
+                                food_type = ProductType.get_by_id(food_type_id)
+                                if food_type:
+                                    food_type_name = food_type.get('type_name', '') or ''
+                            except:
+                                pass
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(food_type_name))
+
+                    elif col_key == 'expiry_period':
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        parts = []
+                        if years > 0:
+                            parts.append(f"{years}년")
+                        if months > 0:
+                            parts.append(f"{months}개월")
+                        if days > 0:
+                            parts.append(f"{days}일")
+                        expiry_text = ' '.join(parts) if parts else ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(expiry_text))
+
+                    elif col_key == 'test_period':
+                        test_method = schedule.get('test_method', 'real')
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        total_days = days + (months * 30) + (years * 365)
+                        if test_method in ['acceleration', 'custom_acceleration']:
+                            test_days = total_days // 2
+                        else:
+                            test_days = int(total_days * 1.5)
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(f"{test_days}일" if test_days > 0 else ''))
+
+                    elif col_key == 'report_type':
+                        types = []
+                        if schedule.get('report_interim'):
+                            types.append('중간')
+                        if schedule.get('report_korean'):
+                            types.append('국문')
+                        if schedule.get('report_english'):
+                            types.append('영문')
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(', '.join(types)))
+
+                    elif col_key == 'status':
+                        status = schedule.get('status', 'pending') or 'pending'
+                        status_text = {
+                            'pending': '대기', 'scheduled': '입고예정',
+                            'received': '입고', 'completed': '종료',
+                            'in_progress': '입고', 'cancelled': '종료'
+                        }.get(status, status)
+                        status_item = QTableWidgetItem(status_text)
+                        if status in ['scheduled']:
+                            status_item.setBackground(Qt.cyan)
+                        elif status in ['received', 'in_progress']:
+                            status_item.setBackground(Qt.yellow)
+                        elif status in ['completed', 'cancelled']:
+                            status_item.setBackground(Qt.green)
+                        self.schedule_table.setItem(row, col_index, status_item)
+
+                    elif col_key == 'interim_date':
+                        report_interim = schedule.get('report_interim', False)
+                        start_date = schedule.get('start_date', '') or ''
+                        sampling_count = schedule.get('sampling_count', 6) or 6
+
+                        test_method = schedule.get('test_method', 'real') or 'real'
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        total_expiry_days = days + (months * 30) + (years * 365)
+
+                        if test_method in ['acceleration', 'custom_acceleration']:
+                            experiment_days = total_expiry_days // 2
+                        else:
+                            experiment_days = int(total_expiry_days * 1.5)
+
+                        interim_date_text = '-'
+                        if report_interim and start_date and experiment_days > 0 and sampling_count >= 6:
+                            try:
+                                from datetime import timedelta
+                                start = datetime.strptime(start_date, '%Y-%m-%d')
+                                interval = experiment_days // sampling_count
+                                interim_date = start + timedelta(days=interval * 6)
+                                interim_date_text = interim_date.strftime('%Y-%m-%d')
+                            except:
+                                interim_date_text = '-'
+
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(interim_date_text))
+
+                    else:
+                        value = schedule.get(data_key, '') if data_key else ''
+                        if value is None:
+                            value = ''
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(str(value)))
+
+        except Exception as e:
+            print(f"스케줄 표시 중 오류: {e}")
+        finally:
+            self.schedule_table.setUpdatesEnabled(True)
+
+    def get_chosung(self, text):
+        """문자열에서 초성 추출"""
+        result = ""
+        for char in text:
+            if '가' <= char <= '힣':
+                char_code = ord(char) - ord('가')
+                chosung_idx = char_code // 588
+                result += self.CHOSUNG_LIST[chosung_idx]
+            else:
+                result += char
+        return result
+
+    def is_chosung_only(self, text):
+        """문자열이 초성만으로 이루어져 있는지 확인"""
+        for char in text:
+            if char not in self.CHOSUNG_LIST and char != ' ':
+                return False
+        return True
+
+    def match_chosung(self, text, search_text):
+        """초성 검색 매칭"""
+        text_chosung = self.get_chosung(text)
+        return search_text.lower() in text_chosung.lower()
+
+    def filter_schedules(self):
+        """실시간 검색 필터링 (초성 검색 지원)"""
+        try:
+            search_text = self.search_input.text().strip()
+            search_field = self.search_field_combo.currentText()
+
+            if not search_text:
+                self.display_schedules(self.all_schedules)
+                return
+
+            filtered = []
+            is_chosung = self.is_chosung_only(search_text)
+
+            for schedule in self.all_schedules:
+                client_name = schedule.get('client_name', '') or ''
+                product_name = schedule.get('product_name', '') or ''
+                status = schedule.get('status', '') or ''
                 status_text = {
-                    'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
+                    'pending': '대기', 'scheduled': '입고예정',
+                    'received': '입고', 'completed': '종료',
                     'in_progress': '입고', 'cancelled': '종료'
                 }.get(status, status)
-                self.schedule_table.setItem(row, 5, QTableWidgetItem(status_text))
+
+                match = False
+
+                if search_field == "전체":
+                    if is_chosung:
+                        match = (self.match_chosung(client_name, search_text) or
+                                 self.match_chosung(product_name, search_text) or
+                                 self.match_chosung(status_text, search_text))
+                    else:
+                        search_lower = search_text.lower()
+                        match = (search_lower in client_name.lower() or
+                                 search_lower in product_name.lower() or
+                                 search_lower in status_text.lower())
+                elif search_field == "업체명":
+                    if is_chosung:
+                        match = self.match_chosung(client_name, search_text)
+                    else:
+                        match = search_text.lower() in client_name.lower()
+                elif search_field == "샘플명":
+                    if is_chosung:
+                        match = self.match_chosung(product_name, search_text)
+                    else:
+                        match = search_text.lower() in product_name.lower()
+                elif search_field == "상태":
+                    if is_chosung:
+                        match = self.match_chosung(status_text, search_text)
+                    else:
+                        match = search_text.lower() in status_text.lower()
+
+                if match:
+                    filtered.append(schedule)
+
+            self.display_schedules(filtered)
         except Exception as e:
-            print(f"스케줄 로드 오류: {e}")
+            print(f"스케줄 검색 중 오류: {e}")
 
-    def search_schedules(self):
-        keyword = self.search_input.text().strip()
-        schedules = Schedule.search(keyword) if keyword else Schedule.get_all()
-
-        self.schedule_table.setRowCount(0)
-        for row, schedule in enumerate(schedules):
-            self.schedule_table.insertRow(row)
-            self.schedule_table.setItem(row, 0, QTableWidgetItem(str(schedule.get('id', ''))))
-            self.schedule_table.setItem(row, 1, QTableWidgetItem(schedule.get('client_name', '') or '-'))
-            self.schedule_table.setItem(row, 2, QTableWidgetItem(schedule.get('product_name', '') or '-'))
-            test_method = schedule.get('test_method', '') or ''
-            test_method_text = {'real': '실측', 'acceleration': '가속', 'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'}.get(test_method, '-')
-            self.schedule_table.setItem(row, 3, QTableWidgetItem(test_method_text))
-            self.schedule_table.setItem(row, 4, QTableWidgetItem(schedule.get('start_date', '') or '-'))
-            status = schedule.get('status', 'pending') or 'pending'
-            status_text = {
-                'pending': '대기', 'scheduled': '입고예정', 'received': '입고', 'completed': '종료',
-                'in_progress': '입고', 'cancelled': '종료'
-            }.get(status, status)
-            self.schedule_table.setItem(row, 5, QTableWidgetItem(status_text))
+    def reset_search(self):
+        """검색 초기화"""
+        self.search_input.clear()
+        self.search_field_combo.setCurrentIndex(0)
+        self.display_schedules(self.all_schedules)
 
     def accept(self):
         selected = self.schedule_table.selectedIndexes()
