@@ -188,22 +188,23 @@ class EstimateTab(QWidget):
         self.sender_input = QLineEdit("㈜바이오푸드랩")
         self.sender_input.setStyleSheet(input_style)
 
-        # 오른쪽 정보 (회사 정보 - 설정에서 불러옴)
+        # 오른쪽 정보 (회사 정보 - 설정에서 불러옴) + 직인
         right_info_widget = QWidget()
-        right_info_layout = QHBoxLayout(right_info_widget)
-        right_info_layout.setContentsMargins(0, 0, 0, 0)
-        right_info_layout.setSpacing(-30)  # 음수 간격으로 도장이 텍스트에 겹치도록
+        right_info_widget.setFixedWidth(280)
 
+        # 회사 정보 라벨
         self.right_company_info = QLabel("")
-        self.right_company_info.setStyleSheet("font-size: 11px; padding-left: 35px;")  # 왼쪽 여백 추가
+        self.right_company_info.setStyleSheet("font-size: 11px;")
+        self.right_company_info.setParent(right_info_widget)
+        self.right_company_info.move(0, 0)
 
-        # 직인 이미지
+        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정)
         self.stamp_label = QLabel("")
         self.stamp_label.setFixedSize(60, 60)
-        self.stamp_label.setStyleSheet("border: none;")
-
-        right_info_layout.addWidget(self.right_company_info)
-        right_info_layout.addWidget(self.stamp_label)
+        self.stamp_label.setStyleSheet("border: none; background: transparent;")
+        self.stamp_label.setParent(right_info_widget)
+        self.stamp_label.move(95, 5)  # 대표자 이름 옆에 위치
+        self.stamp_label.raise_()  # 위로 올려서 텍스트 위에 표시
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
