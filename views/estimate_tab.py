@@ -893,7 +893,144 @@ class EstimateTab(QWidget):
 
     def save_as_pdf(self):
         """PDF로 저장"""
-        QMessageBox.information(self, "알림", "PDF 저장 기능은 추후 구현 예정입니다.")
+        import os
+        from datetime import datetime
+        from PyQt5.QtWidgets import QFileDialog
+        from PyQt5.QtCore import QMarginsF
+        from PyQt5.QtGui import QPainter, QPageLayout, QPageSize
+
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "저장할 견적서가 없습니다. 먼저 스케줄을 선택해주세요.")
+            return
+
+        # 설정에서 출력 경로 가져오기
+        output_path = ""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'output_path'")
+            result = cursor.fetchone()
+            conn.close()
+            if result and result['value']:
+                output_path = result['value']
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
+        # 파일명 생성: 업체명+식품유형+견적일자+보관조건+실험방법
+        client_name = self.current_schedule.get('client_name', '업체명') or '업체명'
+        food_type = self.current_schedule.get('food_type_name', '식품유형') or '식품유형'
+        estimate_date = datetime.now().strftime('%Y%m%d')
+
+        # 보관조건 변환
+        storage_code = self.current_schedule.get('storage_condition', 'room_temp')
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage = storage_map.get(storage_code, storage_code)
+
+        # 실험방법 변환
+        test_method = self.current_schedule.get('test_method', 'real')
+        method_map = {
+            'real': '실측',
+            'acceleration': '가속',
+            'custom_real': '의뢰자요청_실측',
+            'custom_accel': '의뢰자요청_가속',
+            'custom_acceleration': '의뢰자요청_가속'
+        }
+        method_str = method_map.get(test_method, test_method)
+
+        # 파일명에서 사용할 수 없는 문자 제거
+        def sanitize_filename(name):
+            invalid_chars = '<>:"/\\|?*'
+            for char in invalid_chars:
+                name = name.replace(char, '_')
+            return name
+
+        filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
+        filename = sanitize_filename(filename)
+
+        # 저장 경로 결정
+        if output_path and os.path.isdir(output_path):
+            # 설정된 폴더가 존재하면 사용
+            file_path = os.path.join(output_path, filename)
+            # 파일 덮어쓰기 확인
+            if os.path.exists(file_path):
+                reply = QMessageBox.question(
+                    self, "파일 덮어쓰기",
+                    f"파일이 이미 존재합니다:\n{file_path}\n\n덮어쓰시겠습니까?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    # 다른 이름으로 저장
+                    file_path, _ = QFileDialog.getSaveFileName(
+                        self, "PDF 저장", os.path.join(output_path, filename),
+                        "PDF 파일 (*.pdf)"
+                    )
+                    if not file_path:
+                        return
+        else:
+            # 설정된 폴더가 없으면 사용자에게 물어봄
+            default_path = os.path.expanduser("~/Documents")
+            if not os.path.exists(default_path):
+                default_path = os.path.expanduser("~")
+
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "PDF 저장", os.path.join(default_path, filename),
+                "PDF 파일 (*.pdf)"
+            )
+            if not file_path:
+                return
+
+        # PDF 생성
+        try:
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(file_path)
+
+            # A4 사이즈 설정
+            page_layout = QPageLayout(
+                QPageSize(QPageSize.A4),
+                QPageLayout.Portrait,
+                QMarginsF(10, 10, 10, 10)  # 여백 설정 (mm)
+            )
+            printer.setPageLayout(page_layout)
+
+            painter = QPainter()
+            if painter.begin(printer):
+                # 페이지 크기
+                page_rect = printer.pageRect(QPrinter.DevicePixel)
+
+                # 위젯의 실제 내용 크기 계산
+                widget = self.estimate_container
+                widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
+                widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
+
+                # A4 너비에 맞게 스케일 계산
+                scale = page_rect.width() / widget_width
+
+                # 세로가 넘치면 세로 기준으로 스케일 조정
+                if widget_height * scale > page_rect.height():
+                    scale = page_rect.height() / widget_height
+
+                # 여유 공간 확보
+                scale = scale * 0.95
+
+                # 왼쪽 상단에서 시작
+                painter.scale(scale, scale)
+                widget.render(painter)
+                painter.end()
+
+                QMessageBox.information(self, "저장 완료", f"PDF가 저장되었습니다.\n\n{file_path}")
+            else:
+                QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"PDF 저장 중 오류가 발생했습니다:\n{str(e)}")
 
     def save_as_excel(self):
         """엑셀로 저장"""
