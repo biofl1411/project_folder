@@ -624,7 +624,10 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.sampling_interval_value, 2, 5)
         self.interim_date_label = self._create_label("중간보고일", label_style)
         grid.addWidget(self.interim_date_label, 2, 6)
-        self.interim_date_value = self._create_value_label("-", value_style)
+        self.interim_date_value = ClickableLabel("-")
+        self.interim_date_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.interim_date_value.setAlignment(Qt.AlignCenter)
+        self.interim_date_value.clicked.connect(self.edit_interim_date_with_calendar)
         grid.addWidget(self.interim_date_value, 2, 7)
 
         # 행 4: 1회실험검체량, 포장단위, 필요검체량, 마지막실험일
@@ -1046,9 +1049,25 @@ class ScheduleManagementTab(QWidget):
         if report_interim and start_date != '-' and experiment_days > 0 and sampling_count >= 6:
             try:
                 from datetime import datetime, timedelta
+                from database import get_connection
                 start = datetime.strptime(start_date, '%Y-%m-%d')
                 interval = experiment_days // sampling_count
-                interim_date = start + timedelta(days=interval * 6)
+
+                # 설정에서 중간보고일 오프셋 가져오기
+                interim_offset = 0
+                try:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT value FROM settings WHERE key = 'interim_report_offset'")
+                    result = cursor.fetchone()
+                    conn.close()
+                    if result and result['value']:
+                        interim_offset = int(result['value'])
+                except:
+                    interim_offset = 0
+
+                # 6회차 날짜 + 설정된 오프셋을 중간보고일로 설정
+                interim_date = start + timedelta(days=interval * 6 + interim_offset)
                 self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
             except:
                 self.interim_date_value.setText('-')
@@ -1932,6 +1951,8 @@ class ScheduleManagementTab(QWidget):
 
         try:
             from datetime import datetime, timedelta
+            from database import get_connection
+
             start = datetime.strptime(start_date_str, '%Y-%m-%d')
 
             days = self.current_schedule.get('test_period_days', 0) or 0
@@ -1939,10 +1960,23 @@ class ScheduleManagementTab(QWidget):
             years = self.current_schedule.get('test_period_years', 0) or 0
             experiment_days = days + (months * 30) + (years * 365)
 
+            # 설정에서 중간보고일 오프셋 가져오기
+            interim_offset = 0
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM settings WHERE key = 'interim_report_offset'")
+                result = cursor.fetchone()
+                conn.close()
+                if result and result['value']:
+                    interim_offset = int(result['value'])
+            except:
+                interim_offset = 0
+
             if experiment_days > 0 and sampling_count > 0:
                 interval = experiment_days // sampling_count
-                # 6회차 날짜를 중간보고일로 설정
-                interim_date = start + timedelta(days=interval * 6)
+                # 6회차 날짜 + 설정된 오프셋을 중간보고일로 설정
+                interim_date = start + timedelta(days=interval * 6 + interim_offset)
                 self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
             else:
                 self.interim_date_value.setText('-')
@@ -1967,6 +2001,43 @@ class ScheduleManagementTab(QWidget):
 
         # 비용 재계산
         self.recalculate_costs()
+
+    def edit_interim_date_with_calendar(self):
+        """달력을 통해 중간보고일 수정"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        # 중간보고서 요청 상태 확인
+        report_interim = self.current_schedule.get('report_interim', 0)
+        if not report_interim:
+            QMessageBox.warning(self, "변경 불가", "중간보고서가 '요청'으로 설정되어 있어야 합니다.")
+            return
+
+        current_date_text = self.interim_date_value.text()
+
+        # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
+        current_date = None
+        if current_date_text and current_date_text != "-":
+            try:
+                from datetime import datetime
+                current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
+            except:
+                current_date = None
+
+        # 날짜 선택 다이얼로그 표시
+        dialog = DateSelectDialog(self, current_date=current_date, title="중간보고일 선택")
+        if dialog.exec_() and dialog.selected_date:
+            # 선택된 날짜 저장
+            new_date_str = dialog.selected_date.strftime('%Y-%m-%d')
+            self.interim_date_value.setText(new_date_str)
+
+            # 스타일 변경 (수정된 날짜 강조)
+            value_style = "background-color: #FFE4B5; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;"
+            self.interim_date_value.setStyleSheet(value_style)
+
+            # 현재 스케줄에도 저장 (저장 시 반영됨)
+            self.current_schedule['interim_report_date_custom'] = new_date_str
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""

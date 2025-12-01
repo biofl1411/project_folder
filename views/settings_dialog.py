@@ -43,6 +43,11 @@ class SettingsDialog(QDialog):
         self.setup_path_tab(path_tab)
         self.tab_widget.addTab(path_tab, "파일 경로")
 
+        # 스케줄 설정 탭
+        schedule_tab = QWidget()
+        self.setup_schedule_tab(schedule_tab)
+        self.tab_widget.addTab(schedule_tab, "스케줄")
+
         layout.addWidget(self.tab_widget)
 
         # 버튼 영역
@@ -364,6 +369,56 @@ class SettingsDialog(QDialog):
         else:
             self.stamp_path_input.clear()
 
+    def setup_schedule_tab(self, tab):
+        """스케줄 설정 탭"""
+        layout = QVBoxLayout(tab)
+
+        # 중간보고서 설정 그룹
+        interim_group = QGroupBox("중간보고서 날짜 설정")
+        interim_layout = QFormLayout()
+
+        # 설명 라벨
+        description_label = QLabel(
+            "중간보고일은 '3. 온도조건별 실험 스케줄'의 6회 실험일을 기준으로\n"
+            "아래 설정한 일수를 더하여 자동 계산됩니다."
+        )
+        description_label.setStyleSheet("color: #666; font-size: 11px; margin-bottom: 10px;")
+        interim_layout.addRow(description_label)
+
+        # 중간보고일 오프셋 설정
+        offset_layout = QHBoxLayout()
+        offset_label = QLabel("6회 실험일 +")
+        self.interim_report_offset_spin = QSpinBox()
+        self.interim_report_offset_spin.setRange(0, 90)
+        self.interim_report_offset_spin.setValue(0)
+        self.interim_report_offset_spin.setSuffix(" 일")
+        self.interim_report_offset_spin.setMinimumWidth(100)
+        offset_layout.addWidget(offset_label)
+        offset_layout.addWidget(self.interim_report_offset_spin)
+        offset_layout.addStretch()
+        interim_layout.addRow("중간보고일 계산:", offset_layout)
+
+        # 예시 설명
+        example_label = QLabel(
+            "예시: 6회 실험일이 2026-01-30이고 +15일로 설정하면\n"
+            "      중간보고일은 2026-02-14로 자동 계산됩니다."
+        )
+        example_label.setStyleSheet("color: #27ae60; font-size: 10px; margin-top: 5px;")
+        interim_layout.addRow(example_label)
+
+        interim_group.setLayout(interim_layout)
+        layout.addWidget(interim_group)
+
+        # 안내 문구
+        info_label = QLabel(
+            "※ 이 설정은 스케줄 관리 탭의 중간보고일 자동 계산에 적용됩니다.\n"
+            "※ 중간보고일은 스케줄 관리 탭에서 달력을 통해 직접 수정할 수도 있습니다."
+        )
+        info_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+
     def load_settings(self):
         """데이터베이스에서 설정 불러오기"""
         try:
@@ -444,6 +499,13 @@ class SettingsDialog(QDialog):
             if 'stamp_path' in settings_dict:
                 self.stamp_path_input.setText(settings_dict['stamp_path'])
 
+            # 스케줄 설정
+            if 'interim_report_offset' in settings_dict:
+                try:
+                    self.interim_report_offset_spin.setValue(int(settings_dict['interim_report_offset']))
+                except:
+                    self.interim_report_offset_spin.setValue(0)
+
         except Exception as e:
             print(f"설정 로드 중 오류: {str(e)}")
 
@@ -481,7 +543,9 @@ class SettingsDialog(QDialog):
                 ('smtp_sender_name', self.smtp_sender_name_input.text()),
                 # 로고/직인 경로
                 ('logo_path', self.logo_path_input.text()),
-                ('stamp_path', self.stamp_path_input.text())
+                ('stamp_path', self.stamp_path_input.text()),
+                # 스케줄 설정
+                ('interim_report_offset', str(self.interim_report_offset_spin.value()))
             ]
 
             for key, value in settings:
