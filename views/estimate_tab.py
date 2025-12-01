@@ -192,10 +192,10 @@ class EstimateTab(QWidget):
         right_info_widget = QWidget()
         right_info_layout = QHBoxLayout(right_info_widget)
         right_info_layout.setContentsMargins(0, 0, 0, 0)
-        right_info_layout.setSpacing(10)
+        right_info_layout.setSpacing(-30)  # 음수 간격으로 도장이 텍스트에 겹치도록
 
         self.right_company_info = QLabel("")
-        self.right_company_info.setStyleSheet("font-size: 11px;")
+        self.right_company_info.setStyleSheet("font-size: 11px; padding-left: 35px;")  # 왼쪽 여백 추가
 
         # 직인 이미지
         self.stamp_label = QLabel("")
@@ -1007,6 +1007,7 @@ class EstimateTab(QWidget):
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
+            printer.setResolution(300)  # 300 DPI로 고해상도 설정
 
             # A4 사이즈 설정
             page_layout = QPageLayout(
@@ -1018,6 +1019,11 @@ class EstimateTab(QWidget):
 
             painter = QPainter()
             if painter.begin(printer):
+                # 고품질 렌더링 설정
+                painter.setRenderHint(QPainter.Antialiasing, True)
+                painter.setRenderHint(QPainter.TextAntialiasing, True)
+                painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
                 # 페이지 크기
                 page_rect = printer.pageRect(QPrinter.DevicePixel)
 
@@ -1472,6 +1478,7 @@ class EstimateTab(QWidget):
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
+            printer.setResolution(300)  # 300 DPI로 고해상도 설정
 
             page_layout = QPageLayout(
                 QPageSize(QPageSize.A4),
@@ -1482,6 +1489,11 @@ class EstimateTab(QWidget):
 
             painter = QPainter()
             if painter.begin(printer):
+                # 고품질 렌더링 설정
+                painter.setRenderHint(QPainter.Antialiasing, True)
+                painter.setRenderHint(QPainter.TextAntialiasing, True)
+                painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
                 page_rect = printer.pageRect(QPrinter.DevicePixel)
                 widget = self.estimate_container
                 widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
