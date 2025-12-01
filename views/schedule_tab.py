@@ -48,6 +48,10 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('start_date', '시작일', True),
         ('end_date', '종료일', True),
         ('estimate_date', '견적일자', True),
+        # 금액
+        ('supply_amount', '공급가액', True),
+        ('tax_amount', '세액', True),
+        ('total_amount', '합계', True),
         ('status', '상태', True),
         ('memo', '메모', False),
     ]
@@ -210,6 +214,10 @@ class ScheduleTab(QWidget):
         ('start_date', '시작일', 'start_date'),
         ('end_date', '종료일', 'end_date'),
         ('estimate_date', '견적일자', 'estimate_date'),
+        # 금액
+        ('supply_amount', '공급가액', 'supply_amount'),
+        ('tax_amount', '세액', 'tax_amount'),
+        ('total_amount', '합계', 'total_amount'),
         ('status', '상태', 'status'),
         ('memo', '메모', 'memo'),
     ]
@@ -544,6 +552,14 @@ class ScheduleTab(QWidget):
                         unit = schedule.get('packaging_unit', 'g') or 'g'
                         packaging_text = f"{weight}{unit}" if weight > 0 else ''
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(packaging_text))
+
+                    elif col_key in ('supply_amount', 'tax_amount', 'total_amount'):
+                        # 금액 필드 (포맷팅)
+                        amount = schedule.get(col_key, 0) or 0
+                        amount_text = f"{int(amount):,}" if amount > 0 else ''
+                        amount_item = QTableWidgetItem(amount_text)
+                        amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        self.schedule_table.setItem(row, col_index, amount_item)
 
                     elif col_key == 'status':
                         # 상태 (커스텀 설정 사용)
