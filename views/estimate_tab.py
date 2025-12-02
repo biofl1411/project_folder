@@ -190,11 +190,12 @@ class EstimateTab(QWidget):
 
         # 오른쪽 정보 (회사 정보 - 설정에서 불러옴) + 직인
         right_info_widget = QWidget()
-        right_info_widget.setFixedWidth(280)
+        right_info_widget.setFixedSize(280, 130)
 
         # 회사 정보 라벨
         self.right_company_info = QLabel("")
         self.right_company_info.setStyleSheet("font-size: 11px;")
+        self.right_company_info.setFixedSize(280, 130)
         self.right_company_info.setParent(right_info_widget)
         self.right_company_info.move(0, 0)
 
@@ -203,7 +204,7 @@ class EstimateTab(QWidget):
         self.stamp_label.setFixedSize(60, 60)
         self.stamp_label.setStyleSheet("border: none; background: transparent;")
         self.stamp_label.setParent(right_info_widget)
-        self.stamp_label.move(95, 5)  # 대표자 이름 옆에 위치
+        self.stamp_label.move(100, 2)  # 대표자 이름 옆에 위치 (2번째 줄)
         self.stamp_label.raise_()  # 위로 올려서 텍스트 위에 표시
 
         # 그리드 레이아웃에 배치
