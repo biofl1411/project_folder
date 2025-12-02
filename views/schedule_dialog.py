@@ -1118,9 +1118,15 @@ class ScheduleCreateDialog(QDialog):
 
             if dialog_exists:
                 # 현재 사용자의 이름으로 업체 필터링 (영업담당과 일치하는 업체만 표시)
+                # 단, 관리자 또는 고객지원팀/마케팅팀은 전체 업체 조회 가능
                 sales_rep_filter = None
                 if self.current_user:
-                    sales_rep_filter = self.current_user.get('name', '')
+                    role = self.current_user.get('role', '')
+                    department = self.current_user.get('department', '')
+
+                    # 관리자 또는 고객지원팀/마케팅팀은 전체 업체 조회
+                    if role != 'admin' and department not in ['고객지원팀', '마케팅팀']:
+                        sales_rep_filter = self.current_user.get('name', '')
 
                 # 실제 다이얼로그 사용
                 dialog = ClientSearchDialog(self, sales_rep_filter=sales_rep_filter)
