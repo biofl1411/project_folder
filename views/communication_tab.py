@@ -10,9 +10,10 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                            QTextEdit, QLineEdit, QTabWidget, QTableWidget,
                            QTableWidgetItem, QHeaderView, QDialog, QFormLayout,
                            QComboBox, QMessageBox, QScrollArea, QCheckBox,
-                           QGroupBox, QDialogButtonBox, QPlainTextEdit)
+                           QGroupBox, QDialogButtonBox, QPlainTextEdit, QFileDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QBrush
+import os
 
 
 class CommunicationTab(QWidget):
@@ -622,10 +623,11 @@ class ComposeMailDialog(QDialog):
     def __init__(self, parent, users, current_user):
         super().__init__(parent)
         self.setWindowTitle("새 메일 작성")
-        self.setMinimumSize(600, 600)
+        self.setMinimumSize(650, 750)
         self.current_user = current_user
         self.to_checkboxes = {}
         self.cc_checkboxes = {}
+        self.attachment_files = []  # 첨부파일 목록
 
         # 사용자 목록 로드 (DB에서 직접)
         self.users = self._load_users()
@@ -678,7 +680,7 @@ class ComposeMailDialog(QDialog):
         # 수신자 스크롤 영역
         to_scroll = QScrollArea()
         to_scroll.setWidgetResizable(True)
-        to_scroll.setMaximumHeight(150)
+        to_scroll.setMaximumHeight(120)
         to_widget = QWidget()
         to_grid = QVBoxLayout(to_widget)
         to_grid.setSpacing(3)
@@ -686,9 +688,13 @@ class ComposeMailDialog(QDialog):
         for user in self.users:
             name = user.get('name', '')
             dept = user.get('department', '')
+            email = user.get('email', '')
             display_text = f"{name} ({dept})" if dept else name
+            if email:
+                display_text += f" [{email}]"
             cb = QCheckBox(display_text)
             cb.setProperty('user_id', user.get('id'))
+            cb.setProperty('user_email', email)
             self.to_checkboxes[user.get('id')] = cb
             to_grid.addWidget(cb)
         to_grid.addStretch()
@@ -717,7 +723,7 @@ class ComposeMailDialog(QDialog):
         # 참조자 스크롤 영역
         cc_scroll = QScrollArea()
         cc_scroll.setWidgetResizable(True)
-        cc_scroll.setMaximumHeight(150)
+        cc_scroll.setMaximumHeight(120)
         cc_widget = QWidget()
         cc_grid = QVBoxLayout(cc_widget)
         cc_grid.setSpacing(3)
@@ -725,9 +731,13 @@ class ComposeMailDialog(QDialog):
         for user in self.users:
             name = user.get('name', '')
             dept = user.get('department', '')
+            email = user.get('email', '')
             display_text = f"{name} ({dept})" if dept else name
+            if email:
+                display_text += f" [{email}]"
             cb = QCheckBox(display_text)
             cb.setProperty('user_id', user.get('id'))
+            cb.setProperty('user_email', email)
             self.cc_checkboxes[user.get('id')] = cb
             cc_grid.addWidget(cb)
         cc_grid.addStretch()
@@ -748,7 +758,48 @@ class ComposeMailDialog(QDialog):
         layout.addWidget(QLabel("내용:"))
         self.content_input = QPlainTextEdit()
         self.content_input.setPlaceholderText("메일 내용을 입력하세요")
+        self.content_input.setMaximumHeight(150)
         layout.addWidget(self.content_input)
+
+        # 첨부파일 영역
+        attach_group = QGroupBox("첨부파일")
+        attach_layout = QVBoxLayout(attach_group)
+
+        # 첨부파일 버튼
+        attach_btn_layout = QHBoxLayout()
+        add_attach_btn = QPushButton("파일 추가")
+        add_attach_btn.setStyleSheet("padding: 5px 15px;")
+        add_attach_btn.clicked.connect(self.add_attachment)
+        remove_attach_btn = QPushButton("선택 삭제")
+        remove_attach_btn.setStyleSheet("padding: 5px 15px;")
+        remove_attach_btn.clicked.connect(self.remove_attachment)
+        attach_btn_layout.addWidget(add_attach_btn)
+        attach_btn_layout.addWidget(remove_attach_btn)
+        attach_btn_layout.addStretch()
+        attach_layout.addLayout(attach_btn_layout)
+
+        # 첨부파일 목록
+        self.attachment_list = QListWidget()
+        self.attachment_list.setMaximumHeight(80)
+        self.attachment_list.setStyleSheet("QListWidget { border: 1px solid #ddd; }")
+        attach_layout.addWidget(self.attachment_list)
+
+        layout.addWidget(attach_group)
+
+        # 실제 이메일 발송 옵션
+        email_option_layout = QHBoxLayout()
+        self.send_real_email_checkbox = QCheckBox("실제 이메일 발송 (등록된 이메일 주소로 발송)")
+        self.send_real_email_checkbox.setStyleSheet("color: #2980b9; font-weight: bold;")
+        email_option_layout.addWidget(self.send_real_email_checkbox)
+
+        # SMTP 설정 버튼
+        smtp_settings_btn = QPushButton("SMTP 설정")
+        smtp_settings_btn.setStyleSheet("padding: 3px 10px;")
+        smtp_settings_btn.clicked.connect(self.open_smtp_settings)
+        email_option_layout.addWidget(smtp_settings_btn)
+        email_option_layout.addStretch()
+
+        layout.addLayout(email_option_layout)
 
         # 버튼
         btn_layout = QHBoxLayout()
@@ -761,6 +812,35 @@ class ComposeMailDialog(QDialog):
         btn_layout.addWidget(send_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def add_attachment(self):
+        """첨부파일 추가"""
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "첨부파일 선택", "",
+            "All Files (*);;PDF Files (*.pdf);;Image Files (*.png *.jpg *.jpeg);;Documents (*.doc *.docx *.xls *.xlsx)"
+        )
+
+        for file_path in files:
+            if file_path not in self.attachment_files:
+                self.attachment_files.append(file_path)
+                filename = os.path.basename(file_path)
+                item = QListWidgetItem(filename)
+                item.setData(Qt.UserRole, file_path)
+                self.attachment_list.addItem(item)
+
+    def remove_attachment(self):
+        """선택된 첨부파일 삭제"""
+        selected_items = self.attachment_list.selectedItems()
+        for item in selected_items:
+            file_path = item.data(Qt.UserRole)
+            if file_path in self.attachment_files:
+                self.attachment_files.remove(file_path)
+            self.attachment_list.takeItem(self.attachment_list.row(item))
+
+    def open_smtp_settings(self):
+        """SMTP 설정 다이얼로그 열기"""
+        dialog = SMTPSettingsDialog(self)
+        dialog.exec_()
 
     def select_all_users(self, target):
         """전체 선택"""
@@ -795,6 +875,7 @@ class ComposeMailDialog(QDialog):
         try:
             from models.communications import MailNotice
 
+            # 시스템 내 메일 전송
             MailNotice.send(
                 self.current_user['id'],
                 subject,
@@ -803,10 +884,77 @@ class ComposeMailDialog(QDialog):
                 cc_ids if cc_ids else None
             )
 
+            # 실제 이메일 발송 옵션이 체크된 경우
+            if self.send_real_email_checkbox.isChecked():
+                self._send_real_emails(to_ids, cc_ids, subject, content)
+
             self.accept()
 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"메일 전송 실패: {e}")
+
+    def _send_real_emails(self, to_ids, cc_ids, subject, content):
+        """실제 이메일 발송"""
+        try:
+            from utils.email_sender import EmailSender
+
+            # SMTP 설정 로드
+            settings = EmailSender.load_smtp_settings()
+
+            if not settings.get('smtp_server') or not settings.get('smtp_username'):
+                QMessageBox.warning(self, "SMTP 설정 필요",
+                    "SMTP 설정이 완료되지 않았습니다.\n'SMTP 설정' 버튼을 눌러 설정을 완료해주세요.")
+                return
+
+            # 이메일 주소 수집
+            to_emails = []
+            cc_emails = []
+
+            for uid, cb in self.to_checkboxes.items():
+                if cb.isChecked():
+                    email = cb.property('user_email')
+                    if email:
+                        to_emails.append(email)
+
+            for uid, cb in self.cc_checkboxes.items():
+                if cb.isChecked():
+                    email = cb.property('user_email')
+                    if email:
+                        cc_emails.append(email)
+
+            if not to_emails:
+                QMessageBox.warning(self, "이메일 주소 없음",
+                    "선택된 수신자 중 등록된 이메일 주소가 없습니다.\n사용자 관리에서 이메일 주소를 등록해주세요.")
+                return
+
+            # EmailSender 인스턴스 생성
+            use_ssl = settings.get('smtp_use_ssl', '1') == '1'
+            sender = EmailSender(
+                smtp_server=settings.get('smtp_server'),
+                smtp_port=int(settings.get('smtp_port', 465)),
+                username=settings.get('smtp_username'),
+                password=settings.get('smtp_password'),
+                use_ssl=use_ssl
+            )
+
+            # 이메일 발송
+            sender_name = settings.get('smtp_sender_name', '')
+            success, message = sender.send_email(
+                to_emails=to_emails,
+                subject=subject,
+                body=content,
+                cc_emails=cc_emails if cc_emails else None,
+                attachments=self.attachment_files if self.attachment_files else None,
+                sender_name=sender_name
+            )
+
+            if success:
+                QMessageBox.information(self, "이메일 발송 완료", message)
+            else:
+                QMessageBox.warning(self, "이메일 발송 실패", message)
+
+        except Exception as e:
+            QMessageBox.critical(self, "이메일 발송 오류", f"이메일 발송 중 오류가 발생했습니다:\n{str(e)}")
 
 
 class ViewMailDialog(QDialog):
@@ -856,3 +1004,158 @@ class ViewMailDialog(QDialog):
         close_btn = QPushButton("닫기")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
+
+
+class SMTPSettingsDialog(QDialog):
+    """SMTP 설정 다이얼로그"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("SMTP 설정")
+        self.setMinimumSize(450, 350)
+        self.initUI()
+        self.load_settings()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        # 안내 라벨
+        info_label = QLabel("이메일 발송을 위한 SMTP 서버 설정")
+        info_label.setStyleSheet("font-weight: bold; color: #2980b9; padding: 5px;")
+        layout.addWidget(info_label)
+
+        # 설정 폼
+        form_group = QGroupBox("SMTP 서버 설정")
+        form_layout = QFormLayout(form_group)
+
+        self.server_input = QLineEdit()
+        self.server_input.setPlaceholderText("예: smtp.gmail.com")
+        form_layout.addRow("SMTP 서버:", self.server_input)
+
+        self.port_input = QLineEdit()
+        self.port_input.setPlaceholderText("예: 465 (SSL) 또는 587 (TLS)")
+        form_layout.addRow("포트:", self.port_input)
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("발신용 이메일 주소")
+        form_layout.addRow("사용자명:", self.username_input)
+
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setPlaceholderText("이메일 비밀번호 또는 앱 비밀번호")
+        form_layout.addRow("비밀번호:", self.password_input)
+
+        self.sender_name_input = QLineEdit()
+        self.sender_name_input.setPlaceholderText("발신자 표시 이름")
+        form_layout.addRow("발신자 이름:", self.sender_name_input)
+
+        self.use_ssl_checkbox = QCheckBox("SSL 사용 (포트 465)")
+        self.use_ssl_checkbox.setChecked(True)
+        form_layout.addRow("", self.use_ssl_checkbox)
+
+        layout.addWidget(form_group)
+
+        # Gmail 안내
+        gmail_info = QLabel(
+            "Gmail 사용 시:\n"
+            "• 서버: smtp.gmail.com, 포트: 465 (SSL)\n"
+            "• 앱 비밀번호 사용 (Google 계정 > 보안 > 앱 비밀번호)\n"
+            "• 2단계 인증이 활성화되어 있어야 합니다."
+        )
+        gmail_info.setStyleSheet("color: #666; font-size: 11px; padding: 10px; background-color: #f9f9f9; border-radius: 5px;")
+        gmail_info.setWordWrap(True)
+        layout.addWidget(gmail_info)
+
+        # 버튼
+        btn_layout = QHBoxLayout()
+
+        test_btn = QPushButton("연결 테스트")
+        test_btn.setStyleSheet("padding: 8px 15px;")
+        test_btn.clicked.connect(self.test_connection)
+        btn_layout.addWidget(test_btn)
+
+        btn_layout.addStretch()
+
+        save_btn = QPushButton("저장")
+        save_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 8px 20px; font-weight: bold;")
+        save_btn.clicked.connect(self.save_settings)
+        btn_layout.addWidget(save_btn)
+
+        cancel_btn = QPushButton("취소")
+        cancel_btn.setStyleSheet("padding: 8px 15px;")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
+
+    def load_settings(self):
+        """설정 로드"""
+        try:
+            from utils.email_sender import EmailSender
+            settings = EmailSender.load_smtp_settings()
+
+            self.server_input.setText(settings.get('smtp_server', ''))
+            self.port_input.setText(settings.get('smtp_port', '465'))
+            self.username_input.setText(settings.get('smtp_username', ''))
+            self.password_input.setText(settings.get('smtp_password', ''))
+            self.sender_name_input.setText(settings.get('smtp_sender_name', ''))
+            self.use_ssl_checkbox.setChecked(settings.get('smtp_use_ssl', '1') == '1')
+
+        except Exception as e:
+            print(f"SMTP 설정 로드 오류: {e}")
+
+    def save_settings(self):
+        """설정 저장"""
+        try:
+            from utils.email_sender import EmailSender
+
+            server = self.server_input.text().strip()
+            port = self.port_input.text().strip()
+            username = self.username_input.text().strip()
+            password = self.password_input.text()
+            sender_name = self.sender_name_input.text().strip()
+            use_ssl = self.use_ssl_checkbox.isChecked()
+
+            if not server or not port or not username:
+                QMessageBox.warning(self, "입력 오류", "서버, 포트, 사용자명은 필수 입력 항목입니다.")
+                return
+
+            success = EmailSender.save_smtp_settings(
+                server, port, username, password, use_ssl, sender_name
+            )
+
+            if success:
+                QMessageBox.information(self, "저장 완료", "SMTP 설정이 저장되었습니다.")
+                self.accept()
+            else:
+                QMessageBox.critical(self, "저장 실패", "SMTP 설정 저장에 실패했습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
+
+    def test_connection(self):
+        """SMTP 연결 테스트"""
+        try:
+            from utils.email_sender import EmailSender
+
+            server = self.server_input.text().strip()
+            port = self.port_input.text().strip()
+            username = self.username_input.text().strip()
+            password = self.password_input.text()
+            use_ssl = self.use_ssl_checkbox.isChecked()
+
+            if not server or not port or not username or not password:
+                QMessageBox.warning(self, "입력 오류", "모든 필수 항목을 입력하세요.")
+                return
+
+            success, message = EmailSender.test_connection(
+                server, port, username, password, use_ssl
+            )
+
+            if success:
+                QMessageBox.information(self, "연결 성공", f"SMTP 서버 연결에 성공했습니다!\n{message}")
+            else:
+                QMessageBox.warning(self, "연결 실패", f"SMTP 서버 연결에 실패했습니다.\n{message}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"연결 테스트 중 오류: {str(e)}")
