@@ -88,12 +88,14 @@ def get_status_code_by_name(name):
 class SettingsDialog(QDialog):
     """설정 다이얼로그"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, current_user=None):
         super().__init__(parent)
         self.setWindowTitle("설정")
         self.setMinimumSize(550, 500)
+        self.current_user = current_user
         self.initUI()
         self.load_settings()
+        self.apply_user_permissions()
 
     def initUI(self):
         """UI 초기화"""
@@ -132,6 +134,11 @@ class SettingsDialog(QDialog):
         self.setup_status_tab(status_tab)
         self.tab_widget.addTab(status_tab, "상태")
 
+        # 비밀번호 변경 탭
+        password_tab = QWidget()
+        self.setup_password_tab(password_tab)
+        self.tab_widget.addTab(password_tab, "비밀번호 변경")
+
         layout.addWidget(self.tab_widget)
 
         # 버튼 영역
@@ -145,6 +152,109 @@ class SettingsDialog(QDialog):
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def setup_password_tab(self, tab):
+        """비밀번호 변경 탭"""
+        layout = QVBoxLayout(tab)
+
+        # 비밀번호 변경 그룹
+        pwd_group = QGroupBox("비밀번호 변경")
+        pwd_layout = QFormLayout()
+
+        self.current_password_input = QLineEdit()
+        self.current_password_input.setEchoMode(QLineEdit.Password)
+        self.current_password_input.setPlaceholderText("현재 비밀번호")
+        pwd_layout.addRow("현재 비밀번호:", self.current_password_input)
+
+        self.new_password_input = QLineEdit()
+        self.new_password_input.setEchoMode(QLineEdit.Password)
+        self.new_password_input.setPlaceholderText("새 비밀번호")
+        pwd_layout.addRow("새 비밀번호:", self.new_password_input)
+
+        self.confirm_password_input = QLineEdit()
+        self.confirm_password_input.setEchoMode(QLineEdit.Password)
+        self.confirm_password_input.setPlaceholderText("새 비밀번호 확인")
+        pwd_layout.addRow("비밀번호 확인:", self.confirm_password_input)
+
+        change_pwd_btn = QPushButton("비밀번호 변경")
+        change_pwd_btn.setStyleSheet("background-color: #2196F3; color: white;")
+        change_pwd_btn.clicked.connect(self.change_password)
+        pwd_layout.addRow("", change_pwd_btn)
+
+        pwd_group.setLayout(pwd_layout)
+        layout.addWidget(pwd_group)
+
+        # 안내 메시지
+        info_label = QLabel("* 비밀번호 변경 시 다음 로그인부터 적용됩니다.")
+        info_label.setStyleSheet("color: #666; font-size: 10px;")
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+
+    def change_password(self):
+        """비밀번호 변경 처리"""
+        if not self.current_user:
+            QMessageBox.warning(self, "오류", "로그인 정보가 없습니다.")
+            return
+
+        current_pwd = self.current_password_input.text()
+        new_pwd = self.new_password_input.text()
+        confirm_pwd = self.confirm_password_input.text()
+
+        if not current_pwd or not new_pwd or not confirm_pwd:
+            QMessageBox.warning(self, "입력 오류", "모든 필드를 입력하세요.")
+            return
+
+        if new_pwd != confirm_pwd:
+            QMessageBox.warning(self, "입력 오류", "새 비밀번호가 일치하지 않습니다.")
+            return
+
+        if len(new_pwd) < 4:
+            QMessageBox.warning(self, "입력 오류", "비밀번호는 4자 이상이어야 합니다.")
+            return
+
+        # 현재 비밀번호 확인
+        from models.users import User
+        if not User.verify_password(self.current_user['id'], current_pwd):
+            QMessageBox.warning(self, "인증 오류", "현재 비밀번호가 올바르지 않습니다.")
+            return
+
+        # 비밀번호 변경
+        if User.update_password(self.current_user['id'], new_pwd):
+            QMessageBox.information(self, "성공", "비밀번호가 변경되었습니다.\n다음 로그인부터 적용됩니다.")
+            self.current_password_input.clear()
+            self.new_password_input.clear()
+            self.confirm_password_input.clear()
+        else:
+            QMessageBox.critical(self, "오류", "비밀번호 변경에 실패했습니다.")
+
+    def apply_user_permissions(self):
+        """사용자 권한에 따라 탭 접근 제한"""
+        if not self.current_user:
+            return
+
+        # 관리자는 모든 탭 접근 가능
+        if self.current_user.get('role') == 'admin':
+            return
+
+        from models.users import User
+        has_full_settings = User.has_permission(self.current_user, 'settings_full')
+
+        # 일반 사용자가 접근할 수 없는 탭 목록 (인덱스)
+        # 0: 일반, 1: 부가세/할인, 2: 이메일, 3: 파일 경로, 4: 스케줄, 5: 상태, 6: 비밀번호
+        restricted_tabs = []
+
+        if not has_full_settings:
+            # 일반 사용자: 일반(입력폼만), 이메일, 비밀번호 변경만 접근 가능
+            restricted_tabs = [1, 3, 4, 5]  # 부가세/할인, 파일 경로, 스케줄, 상태
+
+        # 제한된 탭 비활성화
+        for tab_index in restricted_tabs:
+            if tab_index < self.tab_widget.count():
+                self.tab_widget.setTabEnabled(tab_index, False)
+                # 탭 이름에 잠금 표시
+                current_text = self.tab_widget.tabText(tab_index)
+                self.tab_widget.setTabText(tab_index, f"🔒 {current_text}")
 
     def setup_general_tab(self, tab):
         """일반 설정 탭"""
