@@ -1,8 +1,10 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                            QTabWidget, QPushButton, QLabel, QMessageBox,
-                           QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
+                           QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
+                           QDialog, QCheckBox, QScrollArea, QGroupBox,
+                           QDialogButtonBox)
 from PyQt5.QtCore import Qt, QSize, QSettings
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtGui import QIcon, QFont, QColor, QCursor
 
 from .login import LoginWindow
 
@@ -179,74 +181,518 @@ class MainWindow(QMainWindow):
     def create_dashboard_tab(self, tab):
         """대시보드 탭 내용 생성"""
         layout = QVBoxLayout(tab)
-        
-        # 상단 요약 정보
+
+        # 대시보드 위젯 참조 저장
+        self.dashboard_cards = {}
+        self.dashboard_detail_table = None
+        self.dashboard_current_filter = None
+        self.dashboard_all_schedules = []
+
+        # 상단 요약 정보 카드들
         summary_frame = QFrame()
         summary_frame.setFrameShape(QFrame.StyledPanel)
         summary_frame.setStyleSheet("background-color: white; border-radius: 5px;")
         summary_layout = QHBoxLayout(summary_frame)
-        
-        # 요약 정보 항목들
+
+        # 요약 정보 항목들 (클릭 가능)
         info_items = [
-            {"title": "등록 업체", "value": "0", "color": "#2196F3"},
-            {"title": "실험 항목", "value": "0", "color": "#4CAF50"},
-            {"title": "진행 중 실험", "value": "0", "color": "#FF9800"},
-            {"title": "이번 달 견적", "value": "0", "color": "#9C27B0"}
+            {"key": "scheduled", "title": "입고 예정", "value": "0", "color": "#00BFFF"},
+            {"key": "interim", "title": "중간보고", "value": "0", "color": "#4CAF50"},
+            {"key": "received", "title": "입고", "value": "0", "color": "#FF9800"},
+            {"key": "extension", "title": "연장실험", "value": "0", "color": "#9C27B0"}
         ]
-        
+
         for item in info_items:
             item_frame = QFrame()
-            item_frame.setStyleSheet(f"border: 1px solid {item['color']}; border-radius: 5px;")
+            item_frame.setStyleSheet(f"""
+                QFrame {{
+                    border: 2px solid {item['color']};
+                    border-radius: 8px;
+                    background-color: white;
+                }}
+                QFrame:hover {{
+                    background-color: {item['color']}20;
+                    border: 2px solid {item['color']};
+                }}
+            """)
+            item_frame.setCursor(QCursor(Qt.PointingHandCursor))
+            item_frame.mousePressEvent = lambda event, key=item['key']: self.on_dashboard_card_click(key)
             item_layout = QVBoxLayout(item_frame)
-            
+
             title_label = QLabel(item["title"])
             title_label.setAlignment(Qt.AlignCenter)
-            title_label.setStyleSheet("font-weight: bold;")
-            
+            title_label.setStyleSheet("font-weight: bold; font-size: 14px; border: none;")
+
             value_label = QLabel(item["value"])
             value_label.setAlignment(Qt.AlignCenter)
-            value_label.setStyleSheet(f"font-size: 24px; color: {item['color']};")
-            
+            value_label.setStyleSheet(f"font-size: 28px; font-weight: bold; color: {item['color']}; border: none;")
+            value_label.setObjectName(f"dashboard_value_{item['key']}")
+
             item_layout.addWidget(title_label)
             item_layout.addWidget(value_label)
-            
+
+            # 카드 참조 저장
+            self.dashboard_cards[item['key']] = {
+                'frame': item_frame,
+                'value_label': value_label,
+                'color': item['color']
+            }
+
             summary_layout.addWidget(item_frame)
-        
+
         layout.addWidget(summary_frame)
-        
-        # 최근 스케줄 목록
-        schedule_frame = QFrame()
-        schedule_frame.setFrameShape(QFrame.StyledPanel)
-        schedule_frame.setStyleSheet("background-color: white; border-radius: 5px;")
-        schedule_layout = QVBoxLayout(schedule_frame)
-        
-        schedule_title = QLabel("최근 스케줄")
-        schedule_title.setStyleSheet("font-size: 16px; font-weight: bold;")
-        schedule_layout.addWidget(schedule_title)
-        
-        schedule_table = QTableWidget(0, 4)
-        schedule_table.setHorizontalHeaderLabels(["업체명", "제목", "시작일", "상태"])
-        schedule_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        schedule_layout.addWidget(schedule_table)
-        
-        layout.addWidget(schedule_frame)
-        
+
+        # 세부 내역 섹션
+        detail_frame = QFrame()
+        detail_frame.setFrameShape(QFrame.StyledPanel)
+        detail_frame.setStyleSheet("background-color: white; border-radius: 5px;")
+        detail_layout = QVBoxLayout(detail_frame)
+
+        # 세부 내역 헤더 (타이틀 + 표시 설정 버튼)
+        detail_header_layout = QHBoxLayout()
+
+        self.detail_title_label = QLabel("세부 내역")
+        self.detail_title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        detail_header_layout.addWidget(self.detail_title_label)
+
+        detail_header_layout.addStretch()
+
+        # 표시 설정 버튼
+        display_settings_btn = QPushButton("표시 설정")
+        display_settings_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 5px 15px;")
+        display_settings_btn.clicked.connect(self.open_dashboard_display_settings)
+        detail_header_layout.addWidget(display_settings_btn)
+
+        detail_layout.addLayout(detail_header_layout)
+
+        # 세부 내역 테이블
+        self.dashboard_detail_table = QTableWidget(0, 0)
+        self.dashboard_detail_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.dashboard_detail_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.dashboard_detail_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.dashboard_detail_table.horizontalHeader().setStretchLastSection(True)
+        self.dashboard_detail_table.doubleClicked.connect(self.on_dashboard_detail_double_click)
+        detail_layout.addWidget(self.dashboard_detail_table)
+
+        layout.addWidget(detail_frame)
+
         # 최근 견적 목록
         estimate_frame = QFrame()
         estimate_frame.setFrameShape(QFrame.StyledPanel)
         estimate_frame.setStyleSheet("background-color: white; border-radius: 5px;")
         estimate_layout = QVBoxLayout(estimate_frame)
-        
+
         estimate_title = QLabel("최근 견적")
         estimate_title.setStyleSheet("font-size: 16px; font-weight: bold;")
         estimate_layout.addWidget(estimate_title)
-        
-        estimate_table = QTableWidget(0, 4)
-        estimate_table.setHorizontalHeaderLabels(["업체명", "제목", "작성일", "총액"])
-        estimate_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        estimate_layout.addWidget(estimate_table)
-        
+
+        self.dashboard_estimate_table = QTableWidget(0, 4)
+        self.dashboard_estimate_table.setHorizontalHeaderLabels(["업체명", "제목", "작성일", "총액"])
+        self.dashboard_estimate_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        estimate_layout.addWidget(self.dashboard_estimate_table)
+
         layout.addWidget(estimate_frame)
+
+    def load_dashboard_data(self):
+        """대시보드 데이터 로드 및 카드 업데이트"""
+        try:
+            from models.schedules import Schedule
+            from .settings_dialog import get_status_map
+
+            # 모든 스케줄 가져오기
+            all_schedules = Schedule.get_all() or []
+            self.dashboard_all_schedules = [dict(s) for s in all_schedules]
+
+            # 사용자 권한에 따라 필터링
+            if self.current_user:
+                department = self.current_user.get('department', '')
+                user_name = self.current_user.get('name', '')
+                role = self.current_user.get('role', '')
+
+                if role != 'admin' and department not in ['고객지원팀', '마케팅팀']:
+                    self.dashboard_all_schedules = [
+                        s for s in self.dashboard_all_schedules
+                        if (s.get('sales_rep', '') or '') == user_name
+                    ]
+
+            # 각 카드별 건수 계산
+            scheduled_count = sum(1 for s in self.dashboard_all_schedules if s.get('status') == 'scheduled')
+            interim_count = sum(1 for s in self.dashboard_all_schedules if s.get('report_interim'))
+            received_count = sum(1 for s in self.dashboard_all_schedules if s.get('status') == 'received')
+            extension_count = sum(1 for s in self.dashboard_all_schedules if s.get('extension_test'))
+
+            # 카드 값 업데이트
+            if hasattr(self, 'dashboard_cards') and self.dashboard_cards:
+                self.dashboard_cards['scheduled']['value_label'].setText(str(scheduled_count))
+                self.dashboard_cards['interim']['value_label'].setText(str(interim_count))
+                self.dashboard_cards['received']['value_label'].setText(str(received_count))
+                self.dashboard_cards['extension']['value_label'].setText(str(extension_count))
+
+            # 기본으로 입고 예정 데이터 표시
+            self.on_dashboard_card_click('scheduled')
+
+        except Exception as e:
+            print(f"대시보드 데이터 로드 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_dashboard_card_click(self, card_key):
+        """대시보드 카드 클릭 시 해당 데이터를 세부 내역에 표시"""
+        self.dashboard_current_filter = card_key
+
+        # 카드별 타이틀 및 필터링
+        titles = {
+            'scheduled': '세부 내역 - 입고 예정',
+            'interim': '세부 내역 - 중간보고',
+            'received': '세부 내역 - 입고',
+            'extension': '세부 내역 - 연장실험'
+        }
+
+        if hasattr(self, 'detail_title_label'):
+            self.detail_title_label.setText(titles.get(card_key, '세부 내역'))
+
+        # 선택된 카드 강조 표시
+        for key, card in self.dashboard_cards.items():
+            if key == card_key:
+                card['frame'].setStyleSheet(f"""
+                    QFrame {{
+                        border: 3px solid {card['color']};
+                        border-radius: 8px;
+                        background-color: {card['color']}30;
+                    }}
+                """)
+            else:
+                card['frame'].setStyleSheet(f"""
+                    QFrame {{
+                        border: 2px solid {card['color']};
+                        border-radius: 8px;
+                        background-color: white;
+                    }}
+                    QFrame:hover {{
+                        background-color: {card['color']}20;
+                    }}
+                """)
+
+        # 데이터 필터링
+        filtered_schedules = []
+        if card_key == 'scheduled':
+            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('status') == 'scheduled']
+        elif card_key == 'interim':
+            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('report_interim')]
+        elif card_key == 'received':
+            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('status') == 'received']
+        elif card_key == 'extension':
+            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('extension_test')]
+
+        # 테이블에 데이터 표시
+        self.display_dashboard_detail(filtered_schedules)
+
+    def get_dashboard_column_settings(self):
+        """대시보드 세부 내역 컬럼 설정 가져오기"""
+        default_columns = ['client_name', 'product_name', 'start_date', 'end_date', 'status', 'interim_date']
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result and result['value']:
+                return result['value'].split(',')
+        except Exception as e:
+            print(f"대시보드 컬럼 설정 로드 오류: {e}")
+
+        return default_columns
+
+    def display_dashboard_detail(self, schedules):
+        """세부 내역 테이블에 스케줄 표시"""
+        if not self.dashboard_detail_table:
+            return
+
+        try:
+            from .settings_dialog import get_status_map, get_status_colors
+
+            # 표시할 컬럼 설정
+            visible_columns = self.get_dashboard_column_settings()
+
+            # 컬럼 정의
+            all_columns = [
+                ('client_name', '업체명'),
+                ('product_name', '샘플명'),
+                ('sales_rep', '영업담당'),
+                ('food_type', '식품유형'),
+                ('test_method', '실험방법'),
+                ('storage_condition', '보관조건'),
+                ('expiry_period', '소비기한'),
+                ('sampling_count', '샘플링횟수'),
+                ('start_date', '시작일'),
+                ('end_date', '종료일'),
+                ('interim_date', '중간보고일'),
+                ('extension_test', '연장실험'),
+                ('status', '상태'),
+                ('memo', '메모'),
+            ]
+
+            # 표시할 컬럼만 필터링
+            display_columns = [(key, name) for key, name in all_columns if key in visible_columns]
+
+            # 테이블 설정
+            self.dashboard_detail_table.setColumnCount(len(display_columns) + 1)  # +1 for hidden ID
+            headers = ['ID'] + [col[1] for col in display_columns]
+            self.dashboard_detail_table.setHorizontalHeaderLabels(headers)
+            self.dashboard_detail_table.setColumnHidden(0, True)  # ID 숨김
+
+            self.dashboard_detail_table.setRowCount(0)
+
+            status_map = get_status_map()
+            status_colors = get_status_colors()
+
+            for row, schedule in enumerate(schedules):
+                self.dashboard_detail_table.insertRow(row)
+
+                # ID 저장 (숨김)
+                self.dashboard_detail_table.setItem(row, 0, QTableWidgetItem(str(schedule.get('id', ''))))
+
+                for col_idx, (col_key, col_name) in enumerate(display_columns):
+                    value = ''
+
+                    if col_key == 'client_name':
+                        value = schedule.get('client_name', '') or ''
+                    elif col_key == 'product_name':
+                        value = schedule.get('product_name', '') or ''
+                    elif col_key == 'sales_rep':
+                        value = schedule.get('sales_rep', '') or ''
+                    elif col_key == 'food_type':
+                        food_type_id = schedule.get('food_type_id')
+                        if food_type_id:
+                            try:
+                                from models.product_types import ProductType
+                                food_type = ProductType.get_by_id(food_type_id)
+                                if food_type:
+                                    value = food_type.get('type_name', '') or ''
+                            except:
+                                pass
+                    elif col_key == 'test_method':
+                        method = schedule.get('test_method', '') or ''
+                        method_map = {'real': '실측', 'acceleration': '가속',
+                                     'custom_real': '의뢰자(실측)', 'custom_acceleration': '의뢰자(가속)'}
+                        value = method_map.get(method, method)
+                    elif col_key == 'storage_condition':
+                        storage = schedule.get('storage_condition', '') or ''
+                        storage_map = {'room_temp': '상온', 'warm': '실온', 'cool': '냉장', 'freeze': '냉동'}
+                        value = storage_map.get(storage, storage)
+                    elif col_key == 'expiry_period':
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        parts = []
+                        if years > 0:
+                            parts.append(f"{years}년")
+                        if months > 0:
+                            parts.append(f"{months}개월")
+                        if days > 0:
+                            parts.append(f"{days}일")
+                        value = ' '.join(parts) if parts else ''
+                    elif col_key == 'sampling_count':
+                        value = str(schedule.get('sampling_count', '') or '')
+                    elif col_key == 'start_date':
+                        value = schedule.get('start_date', '') or ''
+                    elif col_key == 'end_date':
+                        value = schedule.get('end_date', '') or ''
+                    elif col_key == 'interim_date':
+                        # 중간보고일 계산
+                        report_interim = schedule.get('report_interim', False)
+                        start_date = schedule.get('start_date', '') or ''
+                        sampling_count = schedule.get('sampling_count', 6) or 6
+
+                        test_method = schedule.get('test_method', 'real') or 'real'
+                        days = schedule.get('test_period_days', 0) or 0
+                        months = schedule.get('test_period_months', 0) or 0
+                        years = schedule.get('test_period_years', 0) or 0
+                        total_expiry_days = days + (months * 30) + (years * 365)
+
+                        if test_method in ['acceleration', 'custom_acceleration']:
+                            experiment_days = total_expiry_days // 2
+                        else:
+                            experiment_days = int(total_expiry_days * 1.5)
+
+                        value = '-'
+                        if report_interim and start_date and experiment_days > 0 and sampling_count >= 6:
+                            try:
+                                from datetime import datetime, timedelta
+                                start = datetime.strptime(start_date, '%Y-%m-%d')
+                                interval = experiment_days // sampling_count
+                                interim_date = start + timedelta(days=interval * 6)
+                                value = interim_date.strftime('%Y-%m-%d')
+                            except:
+                                value = '-'
+                    elif col_key == 'extension_test':
+                        ext = schedule.get('extension_test', False)
+                        value = '진행' if ext else '미진행'
+                    elif col_key == 'status':
+                        status = schedule.get('status', 'pending') or 'pending'
+                        value = status_map.get(status, status)
+                    elif col_key == 'memo':
+                        value = schedule.get('memo', '') or ''
+
+                    item = QTableWidgetItem(str(value))
+
+                    # 상태 컬럼에 색상 적용
+                    if col_key == 'status':
+                        status = schedule.get('status', 'pending') or 'pending'
+                        if status in status_colors:
+                            color = QColor(status_colors[status])
+                            item.setBackground(color)
+                            if color.lightness() < 128:
+                                item.setForeground(QColor('#FFFFFF'))
+
+                    self.dashboard_detail_table.setItem(row, col_idx + 1, item)
+
+        except Exception as e:
+            print(f"세부 내역 표시 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_dashboard_detail_double_click(self, index):
+        """세부 내역 더블클릭 시 스케줄 관리 탭으로 이동"""
+        row = index.row()
+        id_item = self.dashboard_detail_table.item(row, 0)
+        if id_item:
+            schedule_id = int(id_item.text())
+            self.show_schedule_detail(schedule_id)
+
+    def open_dashboard_display_settings(self):
+        """대시보드 세부 내역 표시 설정 다이얼로그"""
+        dialog = DashboardDisplaySettingsDialog(self)
+        if dialog.exec_():
+            # 현재 필터 유지하며 데이터 다시 표시
+            if self.dashboard_current_filter:
+                self.on_dashboard_card_click(self.dashboard_current_filter)
+
+
+class DashboardDisplaySettingsDialog(QDialog):
+    """대시보드 세부 내역 표시 설정 다이얼로그"""
+
+    COLUMN_OPTIONS = [
+        ('client_name', '업체명', True),
+        ('product_name', '샘플명', True),
+        ('sales_rep', '영업담당', False),
+        ('food_type', '식품유형', False),
+        ('test_method', '실험방법', False),
+        ('storage_condition', '보관조건', False),
+        ('expiry_period', '소비기한', False),
+        ('sampling_count', '샘플링횟수', False),
+        ('start_date', '시작일', True),
+        ('end_date', '종료일', True),
+        ('interim_date', '중간보고일', True),
+        ('extension_test', '연장실험', False),
+        ('status', '상태', True),
+        ('memo', '메모', False),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("세부 내역 표시 설정")
+        self.setMinimumSize(350, 450)
+        self.checkboxes = {}
+        self.initUI()
+        self.load_settings()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        info_label = QLabel("세부 내역에서 표시할 컬럼을 선택하세요:")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        column_group = QGroupBox("표시 컬럼")
+        column_layout = QVBoxLayout(column_group)
+
+        for col_key, col_name, default_visible in self.COLUMN_OPTIONS:
+            checkbox = QCheckBox(col_name)
+            checkbox.setChecked(default_visible)
+            self.checkboxes[col_key] = checkbox
+            column_layout.addWidget(checkbox)
+
+        scroll_layout.addWidget(column_group)
+        scroll_layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(self.select_all)
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(self.deselect_all)
+        btn_layout.addWidget(select_all_btn)
+        btn_layout.addWidget(deselect_all_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.save_settings)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def select_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(True)
+
+    def deselect_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(False)
+
+    def load_settings(self):
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result and result['value']:
+                visible_columns = result['value'].split(',')
+                for col_key, checkbox in self.checkboxes.items():
+                    checkbox.setChecked(col_key in visible_columns)
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
+    def save_settings(self):
+        try:
+            from database import get_connection
+
+            visible_columns = [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+            value = ','.join(visible_columns)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE key = 'dashboard_detail_columns'
+            """, (value,))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (key, value, description)
+                    VALUES ('dashboard_detail_columns', ?, '대시보드 세부 내역 표시 컬럼')
+                """, (value,))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "표시 설정이 저장되었습니다.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
     
     def create_status_bar(self):
         """하단 상태 바 생성"""
@@ -303,6 +749,9 @@ class MainWindow(QMainWindow):
 
         # 권한 기반 탭 활성화/비활성화
         self.apply_tab_permissions(user_data)
+
+        # 대시보드 데이터 로드
+        self.load_dashboard_data()
 
         self.status_label.setText(f"{user_data['name']}님으로 로그인됨")
         self.show()
