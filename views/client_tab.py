@@ -428,10 +428,45 @@ class ClientTab(QWidget):
             self.setup_table()
             self.load_clients()
 
+    def get_sales_rep_filter(self):
+        """권한에 따라 영업담당 필터 반환"""
+        if not self.current_user:
+            return None
+
+        from models.users import User
+
+        # 관리자는 모든 업체 보기
+        if self.current_user.get('role') == 'admin':
+            return None
+
+        # 모든 업체보기 권한이 있으면 필터 없음
+        if User.has_permission(self.current_user, 'client_view_all'):
+            return None
+
+        # 해당 업체만 보기 권한이 있으면 로그인한 사용자 이름으로 필터
+        if User.has_permission(self.current_user, 'client_view_own'):
+            return self.current_user.get('name', '')
+
+        # 두 권한 모두 없으면 빈 결과 (아무것도 볼 수 없음)
+        return '__NO_ACCESS__'
+
     def load_clients(self):
         """업체 목록 로드 (페이지네이션 적용)"""
         try:
             log_message('ClientTab', f'업체 목록 로드 시작 (페이지 {self.current_page})')
+
+            # 영업담당 필터 확인 (권한 기반)
+            sales_rep_filter = self.get_sales_rep_filter()
+
+            # 접근 권한이 없는 경우
+            if sales_rep_filter == '__NO_ACCESS__':
+                self.all_clients = []
+                self.total_count = 0
+                self.total_pages = 1
+                self.display_clients([])
+                self.update_pagination_ui()
+                log_message('ClientTab', '업체 접근 권한 없음')
+                return
 
             # 검색어 확인
             search_keyword = self.search_input.text().strip() if hasattr(self, 'search_input') else None
@@ -442,6 +477,11 @@ class ClientTab(QWidget):
                 # 초성 검색은 기존 방식 유지 (전체 로드 후 필터링)
                 raw_clients = Client.get_all() or []
                 self.all_clients = [dict(c) for c in raw_clients]
+
+                # 영업담당 필터 적용
+                if sales_rep_filter:
+                    self.all_clients = [c for c in self.all_clients if c.get('sales_rep') == sales_rep_filter]
+
                 self.filter_clients_chosung(search_keyword, search_field)
                 return
 
@@ -450,7 +490,8 @@ class ClientTab(QWidget):
                 page=self.current_page,
                 per_page=self.per_page,
                 search_keyword=search_keyword if search_keyword else None,
-                search_field=search_field
+                search_field=search_field,
+                sales_rep_filter=sales_rep_filter
             )
 
             self.all_clients = result['clients']
