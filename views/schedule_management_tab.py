@@ -21,6 +21,7 @@ from datetime import datetime
 from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
+from models.activity_log import ActivityLog
 from utils.logger import log_message, log_error, log_exception, safe_get
 from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
 
@@ -1045,6 +1046,63 @@ class ScheduleManagementTab(QWidget):
             if not has_perm:
                 self.save_schedule_btn.setToolTip("권한이 없습니다")
 
+    def can_edit_plan(self, show_message=True):
+        """
+        실험 계획안 수정 가능 여부 확인
+
+        조건:
+        1. 스케줄이 선택되어 있어야 함
+        2. 상태가 'pending' (대기)일 때만 수정 가능
+        3. 권한이 있어야 함 (schedule_mgmt_edit_plan)
+
+        Args:
+            show_message: True이면 수정 불가 시 메시지 표시
+
+        Returns:
+            bool: 수정 가능 여부
+        """
+        if not self.current_schedule:
+            if show_message:
+                QMessageBox.warning(self, "수정 불가", "먼저 스케줄을 선택하세요.")
+            return False
+
+        # 상태 확인 - 'pending' (대기) 상태일 때만 수정 가능
+        current_status = self.current_schedule.get('status', 'pending')
+        if current_status != 'pending':
+            if show_message:
+                status_map = get_status_map()
+                status_name = status_map.get(current_status, current_status)
+                QMessageBox.warning(
+                    self, "수정 불가",
+                    f"현재 상태가 '{status_name}'입니다.\n"
+                    "상태가 '대기' 상태일 때만 실험 계획안을 수정할 수 있습니다."
+                )
+            return False
+
+        # 권한 확인
+        if self.current_user:
+            from models.users import User
+            # 관리자는 항상 수정 가능
+            if self.current_user.get('role') != 'admin':
+                if not User.has_permission(self.current_user, 'schedule_mgmt_edit_plan'):
+                    if show_message:
+                        QMessageBox.warning(self, "권한 없음", "실험 계획안 수정 권한이 없습니다.")
+                    return False
+
+        return True
+
+    def log_activity(self, action_type, target_name=None, details=None):
+        """활동 로그 기록 헬퍼 메서드"""
+        if self.current_user and self.current_schedule:
+            ActivityLog.log(
+                user=self.current_user,
+                action_type=action_type,
+                target_type='schedule',
+                target_id=self.current_schedule.get('id'),
+                target_name=target_name or self.current_schedule.get('product_name', ''),
+                details=details
+            )
+
     def initUI(self):
         """UI 초기화"""
         # 메인 스크롤 영역
@@ -1890,12 +1948,17 @@ class ScheduleManagementTab(QWidget):
         updated_memo = '\n'.join(lines)
 
         try:
+            deleted_memo = current_item.text()  # 로그용
             success = Schedule.update_memo(schedule_id, updated_memo)
             if success:
                 self.current_schedule['memo'] = updated_memo
                 self.memo_edit.clear()
                 self.editing_memo_index = -1
                 self.load_memo_history()
+
+                # 활동 로그 기록
+                self.log_activity('schedule_memo_delete', details={'deleted_memo': deleted_memo[:100]})
+
                 QMessageBox.information(self, "삭제 완료", "메모가 삭제되었습니다.")
                 self.schedule_saved.emit()
             else:
@@ -1942,12 +2005,20 @@ class ScheduleManagementTab(QWidget):
             message = "메모가 저장되었습니다."
 
         try:
+            is_editing = self.editing_memo_index >= 0 and self.editing_memo_index < len(lines)
             success = Schedule.update_memo(schedule_id, updated_memo)
             if success:
                 self.current_schedule['memo'] = updated_memo
                 self.memo_edit.clear()
                 self.editing_memo_index = -1  # 수정 모드 해제
                 self.load_memo_history()
+
+                # 활동 로그 기록
+                if is_editing:
+                    self.log_activity('schedule_memo_edit', details={'memo': new_memo[:100]})
+                else:
+                    self.log_activity('schedule_memo_add', details={'memo': new_memo[:100]})
+
                 QMessageBox.information(self, "저장 완료", message)
                 # 스케줄 작성 탭 새로고침을 위해 시그널 발생
                 self.schedule_saved.emit()
@@ -2386,8 +2457,8 @@ class ScheduleManagementTab(QWidget):
 
     def add_test_item(self):
         """검사항목 추가"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "추가 실패", "먼저 스케줄을 선택하세요.")
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만)
+        if not self.can_edit_plan():
             return
 
         # 현재 테이블에 있는 항목들 수집
@@ -2398,6 +2469,9 @@ class ScheduleManagementTab(QWidget):
         if dialog.exec_() and dialog.selected_item:
             # 추가된 항목 저장
             self.additional_test_items.append(dialog.selected_item)
+
+            # 활동 로그 기록
+            self.log_activity('schedule_item_add', details={'item': dialog.selected_item})
 
             # 테이블 새로고침
             self.update_experiment_schedule(self.current_schedule)
@@ -2410,8 +2484,8 @@ class ScheduleManagementTab(QWidget):
 
     def remove_test_item(self):
         """검사항목 삭제"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "삭제 실패", "먼저 스케줄을 선택하세요.")
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만)
+        if not self.can_edit_plan():
             return
 
         # 현재 표시된 모든 항목 수집 (기본 + 추가)
@@ -2436,6 +2510,9 @@ class ScheduleManagementTab(QWidget):
             else:
                 # 기본 항목 삭제 (removed_base_items에 추가)
                 self.removed_base_items.append(item)
+
+            # 활동 로그 기록
+            self.log_activity('schedule_item_delete', details={'item': item})
 
             # 테이블 새로고침
             self.update_experiment_schedule(self.current_schedule)
@@ -2514,6 +2591,16 @@ class ScheduleManagementTab(QWidget):
             conn.commit()
             conn.close()
 
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_edit',
+                details={
+                    'action': '스케줄 변경사항 저장',
+                    'additional_items': len(self.additional_test_items) if self.additional_test_items else 0,
+                    'removed_items': len(self.removed_base_items) if self.removed_base_items else 0
+                }
+            )
+
             QMessageBox.information(self, "저장 완료", "스케줄 변경사항이 저장되었습니다.")
             self.schedule_saved.emit()
 
@@ -2559,12 +2646,20 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
             return
 
+        # 권한 확인 (상태 변경은 schedule_mgmt_edit_plan 권한 필요)
+        if self.current_user and self.current_user.get('role') != 'admin':
+            from models.users import User
+            if not User.has_permission(self.current_user, 'schedule_mgmt_edit_plan'):
+                QMessageBox.warning(self, "권한 없음", "실험 계획안 수정 권한이 없습니다.")
+                return
+
         from PyQt5.QtWidgets import QInputDialog
 
         # 커스텀 상태 목록 가져오기
         status_options = get_status_names()
         status_colors = get_status_colors()
         current_status = self.status_value.text()
+        old_status = current_status  # 로그용
 
         # 현재 상태의 인덱스 찾기
         try:
@@ -2603,6 +2698,12 @@ class ScheduleManagementTab(QWidget):
                     conn.commit()
                     conn.close()
 
+                    # 활동 로그 기록
+                    self.log_activity(
+                        'schedule_status_change',
+                        details={'old_status': old_status, 'new_status': new_status}
+                    )
+
                     # 스케줄 저장 시그널 발생 (스케줄 작성 탭 새로고침용)
                     self.schedule_saved.emit()
             except Exception as e:
@@ -2610,14 +2711,15 @@ class ScheduleManagementTab(QWidget):
 
     def toggle_interim_report(self):
         """중간보고서 요청/미요청 토글"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만, 권한 확인)
+        if not self.can_edit_plan():
             return
 
         from PyQt5.QtWidgets import QInputDialog
 
         options = ["요청", "미요청"]
         current_value = self.interim_report_value.text()
+        old_value = current_value  # 로그용
 
         try:
             current_index = options.index(current_value)
@@ -2633,6 +2735,12 @@ class ScheduleManagementTab(QWidget):
             is_requested = (new_value == "요청")
             self.current_schedule['report_interim'] = 1 if is_requested else 0
             self.interim_report_value.setText(new_value)
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_edit',
+                details={'field': '중간보고서', 'old_value': old_value, 'new_value': new_value}
+            )
 
             # 중간보고일 업데이트
             self._update_interim_date()
@@ -2727,8 +2835,8 @@ class ScheduleManagementTab(QWidget):
 
     def edit_interim_date_with_calendar(self):
         """달력을 통해 중간보고일 수정"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "변경 실패", "먼저 스케줄을 선택하세요.")
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만, 권한 확인)
+        if not self.can_edit_plan():
             return
 
         # 중간보고서 요청 상태 확인
@@ -2738,6 +2846,7 @@ class ScheduleManagementTab(QWidget):
             return
 
         current_date_text = self.interim_date_value.text()
+        old_date = current_date_text  # 로그용
 
         # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
         current_date = None
@@ -2754,6 +2863,12 @@ class ScheduleManagementTab(QWidget):
             # 선택된 날짜 저장
             new_date_str = dialog.selected_date.strftime('%Y-%m-%d')
             self.interim_date_value.setText(new_date_str)
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_date_edit',
+                details={'field': '중간보고일', 'old_date': old_date, 'new_date': new_date_str}
+            )
 
             # 스타일 변경 (수정된 날짜 강조)
             value_style = "background-color: #FFE4B5; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;"
@@ -2786,6 +2901,10 @@ class ScheduleManagementTab(QWidget):
         if col < 1 or col > sampling_count:
             return
 
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만)
+        if not self.can_edit_plan():
+            return
+
         item = table.item(row, col)
         if item is None:
             return
@@ -2802,13 +2921,25 @@ class ScheduleManagementTab(QWidget):
 
         item.setText(new_value)
 
+        # 활동 로그 기록 (검사항목명 가져오기)
+        test_item_name = table.item(row, 0).text() if table.item(row, 0) else ''
+        self.log_activity(
+            'schedule_experiment_toggle',
+            details={'test_item': test_item_name, 'round': col, 'old_value': current_value, 'new_value': new_value}
+        )
+
         # 비용 재계산
         self.recalculate_costs()
 
     def edit_date_with_calendar(self, col):
         """달력을 통해 날짜 수정 - 1회차 날짜 변경 시 시작일도 연동"""
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만)
+        if not self.can_edit_plan():
+            return
+
         table = self.experiment_table
         current_date_text = table.item(0, col).text() if table.item(0, col) else "-"
+        old_date = current_date_text  # 로그용
 
         # 시작일 가져오기
         start_date_str = self.current_schedule.get('start_date', '')
@@ -2841,6 +2972,13 @@ class ScheduleManagementTab(QWidget):
         if dialog.exec_() and dialog.selected_date:
             # 선택된 날짜 저장
             self.custom_dates[col] = dialog.selected_date
+
+            # 활동 로그 기록
+            new_date_str = dialog.selected_date.strftime('%Y-%m-%d')
+            self.log_activity(
+                'schedule_date_edit',
+                details={'round': col, 'old_date': old_date, 'new_date': new_date_str}
+            )
 
             # 테이블 날짜 업데이트 (연-월-일 형식)
             date_item = table.item(0, col)

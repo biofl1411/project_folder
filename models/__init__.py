@@ -7,3 +7,4 @@
 
 from .items import Item
 from .clients import Client
+from .activity_log import ActivityLog

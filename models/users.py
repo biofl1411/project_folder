@@ -66,6 +66,7 @@ PERMISSION_LABELS = {
     'schedule_mgmt_add_item': '항목추가',
     'schedule_mgmt_delete_item': '항목삭제',
     'schedule_mgmt_save': '저장',
+    'schedule_mgmt_edit_plan': '실험계획안 수정',
     # 견적서 관리
     'estimate_print': '인쇄',
     'estimate_pdf': 'PDF 저장',
@@ -116,6 +117,7 @@ PERMISSION_DESCRIPTIONS = {
     'schedule_mgmt_add_item': '스케줄에 검사항목을 추가할 수 있습니다.\n스케줄 관리 탭에서 "+ 항목 추가" 버튼 사용',
     'schedule_mgmt_delete_item': '스케줄에서 검사항목을 삭제할 수 있습니다.\n스케줄 관리 탭에서 "- 항목 삭제" 버튼 사용',
     'schedule_mgmt_save': '스케줄 관리에서 변경한 내용을 저장할 수 있습니다.\n스케줄 관리 탭에서 "저장" 버튼 사용',
+    'schedule_mgmt_edit_plan': '소비기한 설정 실험 계획안의 내용을 수정할 수 있습니다.\n중간보고서 토글, 중간보고일 수정, 상태 변경 등',
     # 견적서 관리
     'estimate_print': '견적서를 프린터로 인쇄할 수 있습니다.\n견적서 관리 탭에서 "인쇄" 버튼 사용',
     'estimate_pdf': '견적서를 PDF 파일로 저장할 수 있습니다.\n견적서 관리 탭에서 "PDF 저장" 버튼 사용',
@@ -139,7 +141,8 @@ PERMISSION_BY_CATEGORY = {
     'fee': ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
     'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
                       'schedule_mgmt_select', 'schedule_mgmt_add_item',
-                      'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
+                      'schedule_mgmt_delete_item', 'schedule_mgmt_save',
+                      'schedule_mgmt_edit_plan'],
     'estimate': ['estimate_print', 'estimate_pdf', 'estimate_email'],
     'storage': ['storage_edit'],
     'system': ['user_manage', 'settings_full'],

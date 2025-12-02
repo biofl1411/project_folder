@@ -105,10 +105,18 @@ class LoginWindow(QWidget):
         # 데이터베이스에서 사용자 인증
         try:
             from models.users import User
+            from models.activity_log import ActivityLog
 
             user_data = User.authenticate(username, password)
 
             if user_data:
+                # 로그인 활동 로그 기록
+                ActivityLog.log(
+                    user=user_data,
+                    action_type='user_login',
+                    details={'username': username}
+                )
+
                 # 로그인 성공
                 self.login_successful.emit(user_data)
                 self.close()
