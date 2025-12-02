@@ -22,6 +22,7 @@ PERMISSION_CATEGORIES = {
     'food_type': '식품 유형 관리',
     'fee': '수수료 관리',
     'schedule_mgmt': '스케줄 관리',
+    'storage': '보관구 관리',
     'system': '시스템'
 }
 
@@ -64,6 +65,8 @@ PERMISSION_LABELS = {
     'schedule_mgmt_add_item': '항목추가',
     'schedule_mgmt_delete_item': '항목삭제',
     'schedule_mgmt_save': '저장',
+    # 보관구 관리
+    'storage_edit': '보관구 수정',
     # 시스템
     'user_manage': '사용자 관리',
     'settings_full': '설정 전체 접근',
@@ -108,6 +111,8 @@ PERMISSION_DESCRIPTIONS = {
     'schedule_mgmt_add_item': '스케줄에 검사항목을 추가할 수 있습니다.\n스케줄 관리 탭에서 "+ 항목 추가" 버튼 사용',
     'schedule_mgmt_delete_item': '스케줄에서 검사항목을 삭제할 수 있습니다.\n스케줄 관리 탭에서 "- 항목 삭제" 버튼 사용',
     'schedule_mgmt_save': '스케줄 관리에서 변경한 내용을 저장할 수 있습니다.\n스케줄 관리 탭에서 "저장" 버튼 사용',
+    # 보관구 관리
+    'storage_edit': '보관구의 용량과 사용량을 수정할 수 있습니다.\n보관구 현황 탭에서 "수정" 버튼 및 "보관구 추가" 버튼 사용',
     # 시스템
     'user_manage': '사용자를 추가, 수정, 삭제하고 권한을 관리할 수 있습니다.\n사용자 관리 탭 접근 권한',
     'settings_full': '시스템 설정 전체에 접근할 수 있습니다.\n상태 설정, 시스템 설정 등 모든 설정 변경 가능',
@@ -126,6 +131,7 @@ PERMISSION_BY_CATEGORY = {
     'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
                       'schedule_mgmt_select', 'schedule_mgmt_add_item',
                       'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
+    'storage': ['storage_edit'],
     'system': ['user_manage', 'settings_full'],
 }
 
