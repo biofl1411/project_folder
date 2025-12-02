@@ -123,18 +123,25 @@ class EstimateTab(QWidget):
         self.estimate_layout.addLayout(header_layout)
 
         # 회사명 (설정에서 불러옴)
-        self.header_company_label = QLabel("(주) 바이오푸드랩")
+        self.header_company_label = QLabel("(주)바이오푸드랩")
         self.header_company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.estimate_layout.addWidget(self.header_company_label)
 
-        # 주소/연락처 (설정에서 불러옴)
+        # 주소 + 홈페이지 (한 줄로 배치)
+        address_website_layout = QHBoxLayout()
+        address_website_layout.setSpacing(10)
+
         self.header_address_label = QLabel("")
         self.header_address_label.setStyleSheet("font-size: 10px; color: #666;")
-        self.estimate_layout.addWidget(self.header_address_label)
 
-        website_label = QLabel("http://www.biofl.co.kr")
-        website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
-        self.estimate_layout.addWidget(website_label)
+        self.website_label = QLabel("https://www.biofl.co.kr")
+        self.website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
+
+        address_website_layout.addWidget(self.header_address_label)
+        address_website_layout.addWidget(self.website_label)
+        address_website_layout.addStretch()
+
+        self.estimate_layout.addLayout(address_website_layout)
 
         # 구분선
         self.add_separator()
