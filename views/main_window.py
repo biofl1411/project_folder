@@ -128,7 +128,12 @@ class MainWindow(QMainWindow):
 
         # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 새로고침
         self.schedule_management_tab.schedule_saved.connect(self.schedule_tab.load_schedules)
-        
+
+        # 보관구 현황 탭 (모든 사용자 조회 가능, 수정은 권한 필요)
+        from .storage_tab import StorageTab
+        self.storage_tab = StorageTab()
+        self.tab_widget.addTab(self.storage_tab, "보관구 현황")
+
         # 사용자 관리 탭 (관리자만 접근 가능)
         from .user_management_tab import UserManagementTab
         self.user_management_tab = UserManagementTab()
@@ -257,6 +262,8 @@ class MainWindow(QMainWindow):
             self.fee_tab.set_current_user(user_data)
         if hasattr(self, 'schedule_management_tab') and self.schedule_management_tab:
             self.schedule_management_tab.set_current_user(user_data)
+        if hasattr(self, 'storage_tab') and self.storage_tab:
+            self.storage_tab.set_current_user(user_data)
         if hasattr(self, 'user_management_tab') and self.user_management_tab:
             self.user_management_tab.set_current_user(user_data)
 
@@ -275,7 +282,7 @@ class MainWindow(QMainWindow):
             return
 
         # 탭 인덱스별 필요 권한 (하나라도 있으면 탭 접근 가능)
-        # 0:대시보드 (항상 접근), 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:사용자관리
+        # 0:대시보드 (항상 접근), 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:보관구현황 (모든 사용자), 8:사용자관리
         tab_permission_groups = {
             1: ['schedule_create', 'schedule_edit', 'schedule_delete',
                 'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
@@ -289,7 +296,8 @@ class MainWindow(QMainWindow):
             6: ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
                 'schedule_mgmt_select', 'schedule_mgmt_add_item',
                 'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
-            7: ['user_manage'],
+            # 7:보관구현황 - 모든 사용자 접근 가능 (권한은 내부에서 수정 기능만 제한)
+            8: ['user_manage'],
         }
 
         for tab_index, permissions in tab_permission_groups.items():
