@@ -15,155 +15,87 @@ DEPARTMENTS = [
     '지사'
 ]
 
-# 기본 권한 설정 (부서별)
-DEFAULT_PERMISSIONS = {
-    '관리자': {
-        'schedule_create': True,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': True,
-        'client_write': True,
-        'client_view_all': True,
-        'food_type_read': True,
-        'food_type_write': True,
-        'fee_manage': True,
-        'estimate_manage': True,
-        'schedule_manage_read': True,
-        'schedule_manage_write': True,
-        'user_manage': True,
-        'settings_full': True,
-    },
-    '이화학팀': {
-        'schedule_create': False,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': False,
-        'client_write': False,
-        'client_view_all': False,
-        'food_type_read': False,
-        'food_type_write': False,
-        'fee_manage': False,
-        'estimate_manage': False,
-        'schedule_manage_read': True,
-        'schedule_manage_write': False,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '미생물팀': {
-        'schedule_create': False,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': False,
-        'client_write': False,
-        'client_view_all': False,
-        'food_type_read': False,
-        'food_type_write': False,
-        'fee_manage': False,
-        'estimate_manage': False,
-        'schedule_manage_read': True,
-        'schedule_manage_write': False,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '분원': {
-        'schedule_create': False,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': False,
-        'client_write': False,
-        'client_view_all': False,
-        'food_type_read': False,
-        'food_type_write': False,
-        'fee_manage': False,
-        'estimate_manage': False,
-        'schedule_manage_read': True,
-        'schedule_manage_write': False,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '고객관리팀': {
-        'schedule_create': True,
-        'schedule_view': True,
-        'schedule_view_all': False,  # 자기 것만
-        'client_read': True,
-        'client_write': False,
-        'client_view_all': False,  # 자기 것만
-        'food_type_read': True,
-        'food_type_write': False,
-        'fee_manage': False,
-        'estimate_manage': True,
-        'schedule_manage_read': True,
-        'schedule_manage_write': False,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '고객지원팀': {
-        'schedule_create': True,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': True,
-        'client_write': True,
-        'client_view_all': True,
-        'food_type_read': True,
-        'food_type_write': True,
-        'fee_manage': False,
-        'estimate_manage': True,
-        'schedule_manage_read': True,
-        'schedule_manage_write': True,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '마케팅팀': {
-        'schedule_create': True,
-        'schedule_view': True,
-        'schedule_view_all': True,
-        'client_read': True,
-        'client_write': True,
-        'client_view_all': True,
-        'food_type_read': True,
-        'food_type_write': True,
-        'fee_manage': False,
-        'estimate_manage': True,
-        'schedule_manage_read': True,
-        'schedule_manage_write': True,
-        'user_manage': False,
-        'settings_full': False,
-    },
-    '지사': {
-        'schedule_create': False,
-        'schedule_view': True,
-        'schedule_view_all': False,  # 자기 것만
-        'client_read': True,
-        'client_write': False,
-        'client_view_all': False,  # 자기 것만
-        'food_type_read': True,
-        'food_type_write': False,
-        'fee_manage': False,
-        'estimate_manage': True,
-        'schedule_manage_read': True,
-        'schedule_manage_write': False,
-        'user_manage': False,
-        'settings_full': False,
-    },
+# 권한 카테고리별 설명 (UI 그룹화용)
+PERMISSION_CATEGORIES = {
+    'schedule': '스케줄 작성',
+    'client': '업체 관리',
+    'food_type': '식품 유형 관리',
+    'fee': '수수료 관리',
+    'schedule_mgmt': '스케줄 관리',
+    'system': '시스템'
 }
 
-# 권한 설명
+# 세부 권한 설명 (카테고리별)
 PERMISSION_LABELS = {
-    'schedule_create': '스케줄 작성',
-    'schedule_view': '스케줄 보기',
-    'schedule_view_all': '스케줄 전체 보기',
-    'client_read': '업체 관리 읽기',
-    'client_write': '업체 관리 쓰기',
-    'client_view_all': '업체 전체 보기',
-    'food_type_read': '식품 유형 읽기',
-    'food_type_write': '식품 유형 쓰기',
-    'fee_manage': '수수료 관리',
-    'estimate_manage': '견적서 관리',
-    'schedule_manage_read': '스케줄 관리 읽기',
-    'schedule_manage_write': '스케줄 관리 수정',
+    # 스케줄 작성 TAB
+    'schedule_create': '새 스케줄 작성',
+    'schedule_edit': '수정하기',
+    'schedule_delete': '선택 삭제',
+    'schedule_status_change': '상태변경',
+    'schedule_import_excel': '엑셀 불러오기',
+    'schedule_export_excel': '엑셀 내보내기',
+    # 업체관리
+    'client_view_all': '모든 업체보기',
+    'client_view_own': '해당 업체만 보기',
+    'client_create': '신규업체등록',
+    'client_edit': '업체 수정',
+    'client_delete': '삭제',
+    'client_import_excel': '엑셀 가져오기',
+    'client_export_excel': '엑셀 내보내기',
+    # 식품 유형 관리
+    'food_type_create': '새 식품유형 등록',
+    'food_type_edit': '수정',
+    'food_type_delete': '삭제',
+    'food_type_reset': '전체 초기화',
+    'food_type_import_excel': '엑셀 가져오기',
+    'food_type_update_excel': '엑셀 업데이트',
+    'food_type_export_excel': '엑셀 내보내기',
+    'food_type_db_info': 'DB정보',
+    # 수수료 관리
+    'fee_create': '새 수수료 등록',
+    'fee_edit': '수정',
+    'fee_delete': '삭제',
+    'fee_import_excel': '엑셀 가져오기',
+    'fee_export_excel': '엑셀 내보내기',
+    # 스케줄 관리
+    'schedule_mgmt_view_estimate': '견적서 보기',
+    'schedule_mgmt_display_settings': '표시설정',
+    'schedule_mgmt_select': '스케줄선택',
+    'schedule_mgmt_add_item': '항목추가',
+    'schedule_mgmt_delete_item': '항목삭제',
+    'schedule_mgmt_save': '저장',
+    # 시스템
     'user_manage': '사용자 관리',
     'settings_full': '설정 전체 접근',
 }
+
+# 카테고리별 권한 키 매핑
+PERMISSION_BY_CATEGORY = {
+    'schedule': ['schedule_create', 'schedule_edit', 'schedule_delete',
+                 'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
+    'client': ['client_view_all', 'client_view_own', 'client_create',
+               'client_edit', 'client_delete', 'client_import_excel', 'client_export_excel'],
+    'food_type': ['food_type_create', 'food_type_edit', 'food_type_delete',
+                  'food_type_reset', 'food_type_import_excel', 'food_type_update_excel',
+                  'food_type_export_excel', 'food_type_db_info'],
+    'fee': ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
+    'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
+                      'schedule_mgmt_select', 'schedule_mgmt_add_item',
+                      'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
+    'system': ['user_manage', 'settings_full'],
+}
+
+# 모든 권한 키 가져오기 (기본값 False로)
+def get_all_permission_keys():
+    """모든 권한 키 목록 반환"""
+    return list(PERMISSION_LABELS.keys())
+
+def get_default_permissions(all_true=False):
+    """기본 권한 딕셔너리 반환"""
+    return {key: all_true for key in PERMISSION_LABELS.keys()}
+
+# 기본 권한 설정 (관리자용 - 모든 권한)
+DEFAULT_ADMIN_PERMISSIONS = get_default_permissions(all_true=True)
 
 # 세컨드 비밀번호 (관리자 비밀번호 분실 시)
 SECOND_PASSWORD = 'biofl1411*'
@@ -239,10 +171,14 @@ class User:
                     except:
                         pass
 
-                # 부서 기반 기본 권한 적용 (저장된 권한이 없으면)
-                department = user['department'] or '관리자' if user['role'] == 'admin' else user['department'] or ''
-                if not permissions and department in DEFAULT_PERMISSIONS:
-                    permissions = DEFAULT_PERMISSIONS[department].copy()
+                # 관리자는 모든 권한
+                department = user['department'] or ''
+                if user['role'] == 'admin':
+                    department = '관리자'
+                    permissions = DEFAULT_ADMIN_PERMISSIONS.copy()
+                elif not permissions:
+                    # 권한이 없으면 기본값 (모두 False)
+                    permissions = get_default_permissions(all_true=False)
 
                 return {
                     'id': user['id'],
@@ -326,9 +262,9 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
 
-            # 기본 권한 설정
-            if permissions is None and department in DEFAULT_PERMISSIONS:
-                permissions = DEFAULT_PERMISSIONS[department].copy()
+            # 기본 권한 설정 (모두 False)
+            if permissions is None:
+                permissions = get_default_permissions(all_true=False)
 
             permissions_json = json.dumps(permissions or {}, ensure_ascii=False)
 

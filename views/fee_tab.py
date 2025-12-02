@@ -18,6 +18,14 @@ class FeeTab(QWidget):
         self.all_fees = []  # 전체 수수료 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+        self.current_user = None  # 현재 로그인한 사용자
+
+        # 버튼 참조 저장 (권한 체크용)
+        self.new_fee_btn = None
+        self.edit_btn = None
+        self.delete_btn = None
+        self.import_btn = None
+        self.export_btn = None
 
         # 검색 디바운싱을 위한 타이머 (300ms 지연)
         self.search_timer = QTimer()
@@ -26,6 +34,53 @@ class FeeTab(QWidget):
 
         self.initUI()
         self.load_fees()
+
+    def set_current_user(self, user):
+        """현재 로그인한 사용자 설정 및 권한 적용"""
+        self.current_user = user
+        self.apply_permissions()
+
+    def apply_permissions(self):
+        """사용자 권한에 따라 버튼 활성화/비활성화"""
+        if not self.current_user:
+            return
+
+        from models.users import User
+
+        # 관리자는 모든 권한
+        if self.current_user.get('role') == 'admin':
+            return
+
+        # 각 버튼에 대한 권한 체크
+        if self.new_fee_btn:
+            has_perm = User.has_permission(self.current_user, 'fee_create')
+            self.new_fee_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.new_fee_btn.setToolTip("권한이 없습니다")
+
+        if self.edit_btn:
+            has_perm = User.has_permission(self.current_user, 'fee_edit')
+            self.edit_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.edit_btn.setToolTip("권한이 없습니다")
+
+        if self.delete_btn:
+            has_perm = User.has_permission(self.current_user, 'fee_delete')
+            self.delete_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.delete_btn.setToolTip("권한이 없습니다")
+
+        if self.import_btn:
+            has_perm = User.has_permission(self.current_user, 'fee_import_excel')
+            self.import_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.import_btn.setToolTip("권한이 없습니다")
+
+        if self.export_btn:
+            has_perm = User.has_permission(self.current_user, 'fee_export_excel')
+            self.export_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.export_btn.setToolTip("권한이 없습니다")
     
     def initUI(self):
         """UI 초기화"""
@@ -38,36 +93,36 @@ class FeeTab(QWidget):
         
         button_layout = QHBoxLayout(button_frame)
         
-        new_fee_btn = QPushButton("새 수수료 등록")
-        new_fee_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
-        new_fee_btn.clicked.connect(self.create_new_fee)
-        
-        edit_btn = QPushButton("수정")
-        edit_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
-        edit_btn.clicked.connect(self.edit_fee)
-        
-        delete_btn = QPushButton("삭제")
-        delete_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
-        delete_btn.clicked.connect(self.delete_fee)
-        
+        self.new_fee_btn = QPushButton("새 수수료 등록")
+        self.new_fee_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
+        self.new_fee_btn.clicked.connect(self.create_new_fee)
+
+        self.edit_btn = QPushButton("수정")
+        self.edit_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
+        self.edit_btn.clicked.connect(self.edit_fee)
+
+        self.delete_btn = QPushButton("삭제")
+        self.delete_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
+        self.delete_btn.clicked.connect(self.delete_fee)
+
         # 일괄 선택 체크박스 추가
         self.select_all_checkbox = QCheckBox("전체 선택")
         self.select_all_checkbox.clicked.connect(self.select_all_rows)
-        
-        import_btn = QPushButton("엑셀 가져오기")
-        import_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogStart))
-        import_btn.clicked.connect(self.import_from_excel)
-        
-        export_btn = QPushButton("엑셀 내보내기")
-        export_btn.setIcon(self.style().standardIcon(self.style().SP_DialogSaveButton))
-        export_btn.clicked.connect(self.export_to_excel)
-        
+
+        self.import_btn = QPushButton("엑셀 가져오기")
+        self.import_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogStart))
+        self.import_btn.clicked.connect(self.import_from_excel)
+
+        self.export_btn = QPushButton("엑셀 내보내기")
+        self.export_btn.setIcon(self.style().standardIcon(self.style().SP_DialogSaveButton))
+        self.export_btn.clicked.connect(self.export_to_excel)
+
         button_layout.addWidget(self.select_all_checkbox)
-        button_layout.addWidget(new_fee_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(delete_btn)
-        button_layout.addWidget(import_btn)
-        button_layout.addWidget(export_btn)
+        button_layout.addWidget(self.new_fee_btn)
+        button_layout.addWidget(self.edit_btn)
+        button_layout.addWidget(self.delete_btn)
+        button_layout.addWidget(self.import_btn)
+        button_layout.addWidget(self.export_btn)
         button_layout.addStretch()
         
         layout.addWidget(button_frame)

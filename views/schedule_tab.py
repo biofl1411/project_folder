@@ -176,6 +176,15 @@ class ScheduleTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.all_schedules = []  # 전체 스케줄 목록 저장
+        self.current_user = None  # 현재 로그인한 사용자
+
+        # 버튼 참조 저장 (권한 체크용)
+        self.new_schedule_btn = None
+        self.edit_schedule_btn = None
+        self.delete_schedule_btn = None
+        self.change_status_btn = None
+        self.import_btn = None
+        self.export_btn = None
 
         # 검색 디바운싱을 위한 타이머 (300ms 지연)
         self.search_timer = QTimer()
@@ -183,6 +192,59 @@ class ScheduleTab(QWidget):
         self.search_timer.timeout.connect(self.filter_schedules)
 
         self.initUI()
+
+    def set_current_user(self, user):
+        """현재 로그인한 사용자 설정 및 권한 적용"""
+        self.current_user = user
+        self.apply_permissions()
+
+    def apply_permissions(self):
+        """사용자 권한에 따라 버튼 활성화/비활성화"""
+        if not self.current_user:
+            return
+
+        from models.users import User
+
+        # 관리자는 모든 권한
+        if self.current_user.get('role') == 'admin':
+            return
+
+        # 각 버튼에 대한 권한 체크
+        if self.new_schedule_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_create')
+            self.new_schedule_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.new_schedule_btn.setToolTip("권한이 없습니다")
+
+        if self.edit_schedule_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_edit')
+            self.edit_schedule_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.edit_schedule_btn.setToolTip("권한이 없습니다")
+
+        if self.delete_schedule_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_delete')
+            self.delete_schedule_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.delete_schedule_btn.setToolTip("권한이 없습니다")
+
+        if self.change_status_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_status_change')
+            self.change_status_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.change_status_btn.setToolTip("권한이 없습니다")
+
+        if self.import_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_import_excel')
+            self.import_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.import_btn.setToolTip("권한이 없습니다")
+
+        if self.export_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_export_excel')
+            self.export_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.export_btn.setToolTip("권한이 없습니다")
     
     # 컬럼 정의 (key, header_name, data_key, column_index)
     # column_index는 동적으로 계산되므로 None으로 설정
@@ -233,23 +295,23 @@ class ScheduleTab(QWidget):
 
         button_layout = QHBoxLayout(button_frame)
 
-        new_schedule_btn = QPushButton("새 스케줄 작성")
-        new_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
-        new_schedule_btn.clicked.connect(self.create_new_schedule)
+        self.new_schedule_btn = QPushButton("새 스케줄 작성")
+        self.new_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
+        self.new_schedule_btn.clicked.connect(self.create_new_schedule)
 
-        edit_schedule_btn = QPushButton("수정하기")
-        edit_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogContentsView))
-        edit_schedule_btn.setStyleSheet("background-color: #3498db; color: white;")
-        edit_schedule_btn.clicked.connect(self.edit_selected_schedule)
+        self.edit_schedule_btn = QPushButton("수정하기")
+        self.edit_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogContentsView))
+        self.edit_schedule_btn.setStyleSheet("background-color: #3498db; color: white;")
+        self.edit_schedule_btn.clicked.connect(self.edit_selected_schedule)
 
-        delete_schedule_btn = QPushButton("선택 삭제")
-        delete_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
-        delete_schedule_btn.setStyleSheet("background-color: #e74c3c; color: white;")
-        delete_schedule_btn.clicked.connect(self.delete_selected_schedule)
+        self.delete_schedule_btn = QPushButton("선택 삭제")
+        self.delete_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
+        self.delete_schedule_btn.setStyleSheet("background-color: #e74c3c; color: white;")
+        self.delete_schedule_btn.clicked.connect(self.delete_selected_schedule)
 
-        button_layout.addWidget(new_schedule_btn)
-        button_layout.addWidget(edit_schedule_btn)
-        button_layout.addWidget(delete_schedule_btn)
+        button_layout.addWidget(self.new_schedule_btn)
+        button_layout.addWidget(self.edit_schedule_btn)
+        button_layout.addWidget(self.delete_schedule_btn)
 
         # 구분선
         button_layout.addSpacing(20)
@@ -262,24 +324,24 @@ class ScheduleTab(QWidget):
         self.status_combo.setMinimumWidth(100)
         button_layout.addWidget(self.status_combo)
 
-        change_status_btn = QPushButton("일괄 변경")
-        change_status_btn.setStyleSheet("background-color: #27ae60; color: white;")
-        change_status_btn.clicked.connect(self.change_selected_status)
-        button_layout.addWidget(change_status_btn)
+        self.change_status_btn = QPushButton("일괄 변경")
+        self.change_status_btn.setStyleSheet("background-color: #27ae60; color: white;")
+        self.change_status_btn.clicked.connect(self.change_selected_status)
+        button_layout.addWidget(self.change_status_btn)
 
         button_layout.addStretch()
 
         # 엑셀 불러오기 버튼
-        import_btn = QPushButton("엑셀 불러오기")
-        import_btn.setStyleSheet("background-color: #2e7d32; color: white;")
-        import_btn.clicked.connect(self.import_from_excel)
-        button_layout.addWidget(import_btn)
+        self.import_btn = QPushButton("엑셀 불러오기")
+        self.import_btn.setStyleSheet("background-color: #2e7d32; color: white;")
+        self.import_btn.clicked.connect(self.import_from_excel)
+        button_layout.addWidget(self.import_btn)
 
         # 엑셀 내보내기 버튼
-        export_btn = QPushButton("엑셀 내보내기")
-        export_btn.setStyleSheet("background-color: #217346; color: white;")
-        export_btn.clicked.connect(self.export_to_excel)
-        button_layout.addWidget(export_btn)
+        self.export_btn = QPushButton("엑셀 내보내기")
+        self.export_btn.setStyleSheet("background-color: #217346; color: white;")
+        self.export_btn.clicked.connect(self.export_to_excel)
+        button_layout.addWidget(self.export_btn)
 
         # 표시 설정 버튼
         settings_btn = QPushButton("표시 설정")
