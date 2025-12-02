@@ -5,7 +5,6 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QFont
 
 from .login import LoginWindow
-from .schedule_tab import ScheduleTab
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -93,23 +92,23 @@ class MainWindow(QMainWindow):
         
         # 스케줄 작성 탭
         from .schedule_tab import ScheduleTab
-        self.schedule_create_tab = ScheduleTab()
-        self.tab_widget.addTab(self.schedule_create_tab, "스케줄 작성")
-        
+        self.schedule_tab = ScheduleTab()
+        self.tab_widget.addTab(self.schedule_tab, "스케줄 작성")
+
         # 업체 관리 탭
         from .client_tab import ClientTab
-        clients_tab = ClientTab()
-        self.tab_widget.addTab(clients_tab, "업체 관리")
-        
+        self.client_tab = ClientTab()
+        self.tab_widget.addTab(self.client_tab, "업체 관리")
+
         # 식품 유형 관리 탭
         from .food_type_tab import FoodTypeTab
-        food_type_tab = FoodTypeTab()
-        self.tab_widget.addTab(food_type_tab, "식품 유형 관리")
-        
+        self.food_type_tab = FoodTypeTab()
+        self.tab_widget.addTab(self.food_type_tab, "식품 유형 관리")
+
         # 수수료 관리 탭
         from .fee_tab import FeeTab
-        fee_tab = FeeTab()
-        self.tab_widget.addTab(fee_tab, "수수료 관리")
+        self.fee_tab = FeeTab()
+        self.tab_widget.addTab(self.fee_tab, "수수료 관리")
 
         # 견적서 관리 탭
         from .estimate_tab import EstimateTab
@@ -122,13 +121,13 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.schedule_management_tab, "스케줄 관리")
 
         # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
-        self.schedule_create_tab.schedule_double_clicked.connect(self.show_schedule_detail)
+        self.schedule_tab.schedule_double_clicked.connect(self.show_schedule_detail)
 
         # 스케줄 관리 탭에서 견적서 보기 버튼 연결
         self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
 
         # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 새로고침
-        self.schedule_management_tab.schedule_saved.connect(self.schedule_create_tab.load_schedules)
+        self.schedule_management_tab.schedule_saved.connect(self.schedule_tab.load_schedules)
         
         # 사용자 관리 탭 (관리자만 접근 가능)
         from .user_management_tab import UserManagementTab
