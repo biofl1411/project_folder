@@ -494,7 +494,28 @@ class ScheduleTab(QWidget):
 
             raw_schedules = Schedule.get_all() or []
             # sqlite3.Row를 딕셔너리로 변환하여 .get() 메서드 사용 가능하게 함
-            self.all_schedules = [dict(s) for s in raw_schedules]
+            all_schedules = [dict(s) for s in raw_schedules]
+
+            # 사용자 권한에 따라 스케줄 필터링
+            # 고객지원팀, 마케팅팀은 전체 스케줄 볼 수 있음
+            # 그 외는 본인(sales_rep)의 스케줄만 표시
+            if self.current_user:
+                department = self.current_user.get('department', '')
+                user_name = self.current_user.get('name', '')
+                role = self.current_user.get('role', '')
+
+                # 관리자, 고객지원팀, 마케팅팀은 전체 조회 가능
+                if role == 'admin' or department in ['고객지원팀', '마케팅팀']:
+                    self.all_schedules = all_schedules
+                else:
+                    # 본인 담당 업체의 스케줄만 필터링 (sales_rep과 사용자 이름 일치)
+                    self.all_schedules = [
+                        s for s in all_schedules
+                        if (s.get('sales_rep', '') or '') == user_name
+                    ]
+            else:
+                self.all_schedules = all_schedules
+
             self.display_schedules(self.all_schedules)
             log_message('ScheduleTab', f'스케줄 {len(self.all_schedules)}개 로드 완료')
         except Exception as e:
@@ -863,7 +884,7 @@ class ScheduleTab(QWidget):
         """새 스케줄 작성 다이얼로그 표시"""
         try:
             print("스케줄 생성 시작")  # 디버깅 로그
-            dialog = ScheduleCreateDialog(self)
+            dialog = ScheduleCreateDialog(self, current_user=self.current_user)
             print("ScheduleCreateDialog 인스턴스 생성 성공")  # 디버깅 로그
 
             if dialog.exec_():
@@ -892,7 +913,7 @@ class ScheduleTab(QWidget):
 
         try:
             print(f"스케줄 수정 시작: ID {schedule_id}")
-            dialog = ScheduleCreateDialog(self, schedule_id=schedule_id)
+            dialog = ScheduleCreateDialog(self, schedule_id=schedule_id, current_user=self.current_user)
 
             if dialog.exec_():
                 print("스케줄 수정 완료")

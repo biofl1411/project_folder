@@ -29,13 +29,14 @@ class ClientSearchDialog(QDialog):
         ('notes', '메모', 100),
     ]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sales_rep_filter=None):
         super().__init__(parent)
         self.setWindowTitle("업체 검색")
         self.setMinimumWidth(1100)
         self.setMinimumHeight(500)
         self.selected_client = None
         self.all_clients = []  # 전체 업체 목록 저장
+        self.sales_rep_filter = sales_rep_filter  # 영업담당 필터 (로그인 사용자명)
         self.settings = QSettings("MyApp", "ClientSearchDialog")
         self.initUI()
         self.loadColumnSettings()
@@ -176,7 +177,15 @@ class ClientSearchDialog(QDialog):
     def loadClients(self):
         """데이터베이스에서 업체 정보 불러오기"""
         try:
-            self.all_clients = Client.get_all()
+            all_clients = Client.get_all()
+            # 영업담당 필터가 설정된 경우 필터링
+            if self.sales_rep_filter:
+                self.all_clients = [
+                    c for c in all_clients
+                    if (c.get('sales_rep', '') or '') == self.sales_rep_filter
+                ]
+            else:
+                self.all_clients = all_clients
             self.displayClients(self.all_clients)
         except Exception as e:
             print(f"업체 정보 로드 중 오류 발생: {str(e)}")
@@ -191,6 +200,12 @@ class ClientSearchDialog(QDialog):
 
         try:
             clients = Client.search(search_text)
+            # 영업담당 필터가 설정된 경우 필터링
+            if self.sales_rep_filter:
+                clients = [
+                    c for c in clients
+                    if (c.get('sales_rep', '') or '') == self.sales_rep_filter
+                ]
             self.displayClients(clients)
         except Exception as e:
             print(f"업체 검색 중 오류 발생: {str(e)}")
