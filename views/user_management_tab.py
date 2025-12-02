@@ -14,7 +14,7 @@ from PyQt5.QtGui import QColor, QFont
 
 from models.users import (User, DEPARTMENTS, PERMISSION_LABELS, DEFAULT_PASSWORD,
                          PERMISSION_CATEGORIES, PERMISSION_BY_CATEGORY,
-                         get_default_permissions)
+                         PERMISSION_DESCRIPTIONS, get_default_permissions)
 
 
 class UserManagementTab(QWidget):
@@ -168,9 +168,16 @@ class UserManagementTab(QWidget):
             row = 0
             col = 0
             for perm_key in perm_keys:
-                perm_label = PERMISSION_LABELS.get(perm_key, perm_key)
+                perm_label_text = PERMISSION_LABELS.get(perm_key, perm_key)
+                perm_desc = PERMISSION_DESCRIPTIONS.get(perm_key, '')
 
-                checkbox = QCheckBox(perm_label)
+                # 체크박스 + 도움말 아이콘을 담을 위젯
+                item_widget = QWidget()
+                item_layout = QHBoxLayout(item_widget)
+                item_layout.setContentsMargins(0, 0, 0, 0)
+                item_layout.setSpacing(3)
+
+                checkbox = QCheckBox(perm_label_text)
                 checkbox.setStyleSheet("""
                     QCheckBox::indicator {
                         width: 16px;
@@ -191,8 +198,31 @@ class UserManagementTab(QWidget):
                     lambda state, ck=cat_key: self.update_category_checkbox(ck)
                 )
 
+                # 도움말 아이콘 (?)
+                help_label = QLabel("?")
+                help_label.setStyleSheet("""
+                    QLabel {
+                        color: white;
+                        background-color: #3498db;
+                        border-radius: 8px;
+                        font-size: 10px;
+                        font-weight: bold;
+                        padding: 1px 5px;
+                    }
+                    QLabel:hover {
+                        background-color: #2980b9;
+                    }
+                """)
+                help_label.setToolTip(perm_desc)
+                help_label.setFixedSize(16, 16)
+                help_label.setAlignment(Qt.AlignCenter)
+
+                item_layout.addWidget(checkbox)
+                item_layout.addWidget(help_label)
+                item_layout.addStretch()
+
                 self.permission_checkboxes[perm_key] = checkbox
-                perm_grid.addWidget(checkbox, row, col)
+                perm_grid.addWidget(item_widget, row, col)
 
                 col += 1
                 if col >= 2:  # 2열로 배치
