@@ -72,7 +72,7 @@ def get_korean_holidays(year):
                 if holiday_date.weekday() == 6:
                     substitute = holiday_date + timedelta(days=1)
                     holidays.add(substitute)
-        except:
+        except (ValueError, TypeError):
             pass
 
     # 음력 공휴일 (양력 변환 - 연도별 정확한 날짜)
@@ -137,7 +137,7 @@ def get_korean_holidays(year):
                     hdate = date(year, month, day)
                     holidays.add(hdate)
                     holiday_dates.append(hdate)
-                except:
+                except (ValueError, TypeError):
                     pass
 
             # 대체공휴일 계산: 연휴 중 일요일이 있으면 연휴 다음 첫 평일
@@ -176,7 +176,7 @@ def get_korean_holidays(year):
             if hdate.weekday() == 6:
                 substitute = hdate + timedelta(days=1)
                 holidays.add(substitute)
-        except:
+        except (ValueError, TypeError):
             pass
 
     return holidays
@@ -532,7 +532,7 @@ class DateSelectDialog(QDialog):
                     self.calendar.setSelectedDate(QDate(date_obj.year, date_obj.month, date_obj.day))
                 elif isinstance(self.current_date, datetime):
                     self.calendar.setSelectedDate(QDate(self.current_date.year, self.current_date.month, self.current_date.day))
-            except:
+            except (ValueError, TypeError, AttributeError):
                 pass
 
         layout.addWidget(self.calendar)
@@ -778,7 +778,7 @@ class ScheduleSelectDialog(QDialog):
                                 food_type = ProductType.get_by_id(food_type_id)
                                 if food_type:
                                     food_type_name = food_type.get('type_name', '') or ''
-                            except:
+                            except Exception:
                                 pass
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(food_type_name))
 
@@ -860,7 +860,7 @@ class ScheduleSelectDialog(QDialog):
                                 interval = experiment_days // sampling_count
                                 interim_date = start + timedelta(days=interval * 6)
                                 interim_date_text = interim_date.strftime('%Y-%m-%d')
-                            except:
+                            except (ValueError, TypeError, ZeroDivisionError):
                                 interim_date_text = '-'
 
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(interim_date_text))
@@ -1727,7 +1727,7 @@ class ScheduleManagementTab(QWidget):
                     conn.close()
                     if result and result['value']:
                         interim_offset = int(result['value'])
-                except:
+                except (ValueError, TypeError, Exception):
                     interim_offset = 0
 
                 # 6회차 날짜 + 설정된 오프셋(영업일 기준)을 중간보고일로 설정
@@ -1736,7 +1736,7 @@ class ScheduleManagementTab(QWidget):
                 else:
                     interim_date = sixth_sample_date
                 self.interim_date_value.setText(interim_date.strftime('%Y-%m-%d'))
-            except:
+            except (ValueError, TypeError, AttributeError):
                 self.interim_date_value.setText('-')
         else:
             self.interim_date_value.setText('-')
@@ -1747,7 +1747,7 @@ class ScheduleManagementTab(QWidget):
                 start = datetime.strptime(start_date, '%Y-%m-%d')
                 last_date = start + timedelta(days=experiment_days)
                 self.last_test_date_value.setText(last_date.strftime('%Y-%m-%d'))
-            except:
+            except (ValueError, TypeError):
                 self.last_test_date_value.setText('-')
         else:
             self.last_test_date_value.setText('-')
@@ -2076,7 +2076,7 @@ class ScheduleManagementTab(QWidget):
         if start_date_str:
             try:
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # 식품유형에서 검사항목 가져오기 + 추가된 항목
@@ -2090,7 +2090,7 @@ class ScheduleManagementTab(QWidget):
             for fee in all_fees:
                 fees[fee['test_item']] = fee['price']
                 sample_quantities[fee['test_item']] = fee['sample_quantity'] or 0
-        except:
+        except Exception:
             pass
 
         # 단일 테이블 업데이트
@@ -2318,6 +2318,8 @@ class ScheduleManagementTab(QWidget):
             schedule_id = self.current_schedule.get('id')
             if schedule_id:
                 Schedule.update_amounts(schedule_id, supply_amount, tax_amount, total_amount)
+                # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+                self.schedule_saved.emit()
         except Exception as e:
             print(f"금액 저장 오류: {e}")
 
@@ -2360,7 +2362,7 @@ class ScheduleManagementTab(QWidget):
                 if additional_json:
                     try:
                         additional_items = json.loads(additional_json)
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         additional_items = self.additional_test_items
                 else:
                     additional_items = self.additional_test_items
@@ -2368,7 +2370,7 @@ class ScheduleManagementTab(QWidget):
                 if removed_json:
                     try:
                         removed_items = json.loads(removed_json)
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         removed_items = self.removed_base_items
                 else:
                     removed_items = self.removed_base_items
@@ -2757,6 +2759,15 @@ class ScheduleManagementTab(QWidget):
             self.current_schedule['report_interim'] = 1 if is_requested else 0
             self.interim_report_value.setText(new_value)
 
+            # DB에 저장
+            try:
+                from models.schedules import Schedule
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    Schedule.update(schedule_id, report_interim=1 if is_requested else 0)
+            except Exception as e:
+                print(f"중간보고서 저장 오류: {e}")
+
             # 활동 로그 기록
             self.log_activity(
                 'schedule_edit',
@@ -2768,6 +2779,9 @@ class ScheduleManagementTab(QWidget):
 
             # 비용 요약 업데이트
             self._update_cost_after_interim_change()
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
 
     def _update_interim_date(self):
         """중간보고일 계산 및 업데이트"""
@@ -2820,7 +2834,7 @@ class ScheduleManagementTab(QWidget):
                 conn.close()
                 if result and result['value']:
                     interim_offset = int(result['value'])
-            except:
+            except (ValueError, TypeError, Exception):
                 interim_offset = 0
 
             if experiment_days > 0 and sampling_count > 0:
@@ -2875,7 +2889,7 @@ class ScheduleManagementTab(QWidget):
             try:
                 from datetime import datetime
                 current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 current_date = None
 
         # 날짜 선택 다이얼로그 표시
@@ -2897,6 +2911,9 @@ class ScheduleManagementTab(QWidget):
 
             # 현재 스케줄에도 저장 (저장 시 반영됨)
             self.current_schedule['interim_report_date_custom'] = new_date_str
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
@@ -2968,7 +2985,7 @@ class ScheduleManagementTab(QWidget):
         if start_date_str:
             try:
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
@@ -2977,7 +2994,7 @@ class ScheduleManagementTab(QWidget):
             try:
                 # YYYY-MM-DD 형식 파싱
                 current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 try:
                     # MM-DD 형식이면 현재 연도 추가
                     if len(current_date_text) == 5:
@@ -2985,7 +3002,7 @@ class ScheduleManagementTab(QWidget):
                         if start_date:
                             year = start_date.year
                         current_date = datetime.strptime(f"{year}-{current_date_text}", '%Y-%m-%d')
-                except:
+                except (ValueError, TypeError):
                     current_date = start_date
 
         # 날짜 선택 다이얼로그 표시
@@ -3037,6 +3054,9 @@ class ScheduleManagementTab(QWidget):
 
                 # 실험기간 업데이트 (날짜 변경 반영)
                 self._update_experiment_period_display()
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
 
     def _recalculate_all_dates(self, new_start_date):
         """시작일 변경 시 모든 날짜 재계산"""
@@ -3180,7 +3200,7 @@ class ScheduleManagementTab(QWidget):
             all_fees = Fee.get_all()
             for fee in all_fees:
                 fees[fee['test_item']] = fee['price']
-        except:
+        except Exception:
             pass
 
         # 식품유형에서 검사항목 가져오기 + 추가된 항목
@@ -3248,7 +3268,7 @@ class ScheduleManagementTab(QWidget):
         # 3. 보고서 비용 (입력 필드에서 값 가져오기)
         try:
             report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
-        except:
+        except (ValueError, TypeError):
             report_cost = 200000
 
         # 3-1. 중간 보고서 비용 (표시 중인 경우에만 계산에 포함)
@@ -3256,7 +3276,7 @@ class ScheduleManagementTab(QWidget):
         if self.interim_report_cost_input.isVisible():
             try:
                 interim_report_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
-            except:
+            except (ValueError, TypeError):
                 interim_report_cost = 200000
 
         # 4. 최종비용 (부가세별도) - 계산식 표시
@@ -3286,7 +3306,7 @@ class ScheduleManagementTab(QWidget):
         try:
             total_rounds_text = self.total_rounds_cost.text().replace(',', '').replace('원', '')
             total_rounds_cost = int(total_rounds_text)
-        except:
+        except (ValueError, TypeError, AttributeError):
             return
 
         # 실험 방법에 따른 구간 수 결정
@@ -3299,7 +3319,7 @@ class ScheduleManagementTab(QWidget):
         # 보고서 비용 가져오기
         try:
             report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
-        except:
+        except (ValueError, TypeError):
             report_cost = 0
 
         # 중간 보고서 비용 가져오기 (표시 중인 경우에만)
@@ -3307,7 +3327,7 @@ class ScheduleManagementTab(QWidget):
         if self.interim_report_cost_input.isVisible():
             try:
                 interim_report_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
-            except:
+            except (ValueError, TypeError):
                 interim_report_cost = 0
 
         # 최종비용 계산 및 표시
@@ -3740,7 +3760,7 @@ class ScheduleMailDialog(QDialog):
                 start_dt = datetime.strptime(start_date, '%Y-%m-%d')
                 last_dt = start_dt + timedelta(days=total_days)
                 last_test_date = last_dt.strftime('%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 pass
 
         content = f"""안녕하세요.

@@ -168,7 +168,7 @@ class StorageUnitWidget(QFrame):
                 return "color: #f39c12; background-color: #fef9e7; padding: 5px; border-radius: 5px;"
             else:
                 return "color: #e74c3c; background-color: #fdedec; padding: 5px; border-radius: 5px;"
-        except:
+        except (ValueError, TypeError):
             return "color: #333; background-color: #eee; padding: 5px; border-radius: 5px;"
 
     def edit_storage(self):
@@ -497,7 +497,7 @@ class StorageTab(QWidget):
             if btn.text() == "저장":
                 try:
                     btn.clicked.disconnect()
-                except:
+                except (TypeError, RuntimeError):
                     pass
                 btn.clicked.connect(save_new)
                 break

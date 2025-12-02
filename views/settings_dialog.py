@@ -910,7 +910,7 @@ class SettingsDialog(QDialog):
                     self.company_manager_input.setText(user['name'])
                 elif 'company_manager' in settings_dict:
                     self.company_manager_input.setText(settings_dict['company_manager'])
-            except:
+            except Exception:
                 if 'company_manager' in settings_dict:
                     self.company_manager_input.setText(settings_dict['company_manager'])
 
@@ -974,7 +974,7 @@ class SettingsDialog(QDialog):
             if 'interim_report_offset' in settings_dict:
                 try:
                     self.interim_report_offset_spin.setValue(int(settings_dict['interim_report_offset']))
-                except:
+                except (ValueError, TypeError):
                     self.interim_report_offset_spin.setValue(0)
 
             # 상태 목록 로드

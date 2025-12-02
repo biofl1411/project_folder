@@ -181,6 +181,7 @@ class User:
                 'department': 'TEXT DEFAULT ""',
                 'permissions': 'TEXT DEFAULT "{}"',
                 'email': 'TEXT DEFAULT ""',
+                'phone': 'TEXT DEFAULT ""',
             }
 
             for col_name, col_type in new_columns.items():
@@ -232,7 +233,7 @@ class User:
                 if user['permissions']:
                     try:
                         permissions = json.loads(user['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         pass
 
                 # 관리자는 모든 권한
@@ -265,7 +266,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, last_login, created_at
                 FROM users
                 WHERE id = ?
             """, (user_id,))
@@ -277,7 +278,7 @@ class User:
                 if result.get('permissions'):
                     try:
                         result['permissions'] = json.loads(result['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         result['permissions'] = {}
                 else:
                     result['permissions'] = {}
@@ -295,7 +296,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, last_login, created_at
                 FROM users
                 ORDER BY name
             """)
@@ -308,7 +309,7 @@ class User:
                 if user_dict.get('permissions'):
                     try:
                         user_dict['permissions'] = json.loads(user_dict['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         user_dict['permissions'] = {}
                 else:
                     user_dict['permissions'] = {}
@@ -319,7 +320,7 @@ class User:
             return []
 
     @staticmethod
-    def create(username, password, name, role='user', department='', permissions=None, email=''):
+    def create(username, password, name, role='user', department='', permissions=None, email='', phone=''):
         """새 사용자 생성"""
         try:
             User._ensure_columns()
@@ -333,9 +334,9 @@ class User:
             permissions_json = json.dumps(permissions or {}, ensure_ascii=False)
 
             cursor.execute("""
-                INSERT INTO users (username, password, name, role, department, permissions, email)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (username, password, name, role, department, permissions_json, email))
+                INSERT INTO users (username, password, name, role, department, permissions, email, phone)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (username, password, name, role, department, permissions_json, email, phone))
             user_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -345,7 +346,7 @@ class User:
             return None
 
     @staticmethod
-    def update(user_id, name=None, department=None, permissions=None, email=None):
+    def update(user_id, name=None, department=None, permissions=None, email=None, phone=None):
         """사용자 정보 업데이트"""
         try:
             User._ensure_columns()
@@ -370,6 +371,10 @@ class User:
             if email is not None:
                 updates.append("email = ?")
                 params.append(email)
+
+            if phone is not None:
+                updates.append("phone = ?")
+                params.append(phone)
 
             if updates:
                 params.append(user_id)

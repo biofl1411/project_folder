@@ -515,7 +515,7 @@ class MainWindow(QMainWindow):
                                 food_type = ProductType.get_by_id(food_type_id)
                                 if food_type:
                                     value = food_type.get('type_name', '') or ''
-                            except:
+                            except Exception:
                                 pass
                     elif col_key == 'test_method':
                         method = schedule.get('test_method', '') or ''
@@ -569,7 +569,7 @@ class MainWindow(QMainWindow):
                                 interval = experiment_days // sampling_count
                                 interim_date = start + timedelta(days=interval * 6)
                                 value = interim_date.strftime('%Y-%m-%d')
-                            except:
+                            except (ValueError, TypeError, ZeroDivisionError):
                                 value = '-'
                     elif col_key == 'extension_test':
                         ext = schedule.get('extension_test', False)
