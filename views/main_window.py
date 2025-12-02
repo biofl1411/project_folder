@@ -155,8 +155,9 @@ class MainWindow(QMainWindow):
         # 스케줄 관리 탭에서 견적서 보기 버튼 연결
         self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
 
-        # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 새로고침
+        # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 및 대시보드 새로고침
         self.schedule_management_tab.schedule_saved.connect(self.schedule_tab.load_schedules)
+        self.schedule_management_tab.schedule_saved.connect(self.load_dashboard_data)
 
         # 보관구 현황 탭 (모든 사용자 조회 가능, 수정은 권한 필요)
         from .storage_tab import StorageTab
@@ -190,6 +191,9 @@ class MainWindow(QMainWindow):
 
         # 탭 이동 시 순서 저장
         self.tab_widget.tabBar().tabMoved.connect(self.save_tab_order)
+
+        # 탭 변경 시 대시보드 새로고침
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         # 메인 레이아웃에 탭 위젯 추가
         self.main_layout.addWidget(self.tab_widget)
@@ -308,6 +312,14 @@ class MainWindow(QMainWindow):
         estimate_layout.addWidget(self.dashboard_estimate_table)
 
         layout.addWidget(estimate_frame)
+
+    def on_tab_changed(self, index):
+        """탭 변경 시 호출 - 대시보드 탭이면 데이터 새로고침"""
+        current_widget = self.tab_widget.widget(index)
+        dashboard_widget = self.tab_widgets.get('dashboard')
+
+        if current_widget == dashboard_widget:
+            self.load_dashboard_data()
 
     def load_dashboard_data(self):
         """대시보드 데이터 로드 및 카드 업데이트"""
