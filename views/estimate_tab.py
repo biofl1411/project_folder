@@ -123,18 +123,25 @@ class EstimateTab(QWidget):
         self.estimate_layout.addLayout(header_layout)
 
         # 회사명 (설정에서 불러옴)
-        self.header_company_label = QLabel("(주) 바이오푸드랩")
+        self.header_company_label = QLabel("(주)바이오푸드랩")
         self.header_company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.estimate_layout.addWidget(self.header_company_label)
 
-        # 주소/연락처 (설정에서 불러옴)
+        # 주소 + 홈페이지 (한 줄로 배치)
+        address_website_layout = QHBoxLayout()
+        address_website_layout.setSpacing(10)
+
         self.header_address_label = QLabel("")
         self.header_address_label.setStyleSheet("font-size: 10px; color: #666;")
-        self.estimate_layout.addWidget(self.header_address_label)
 
-        website_label = QLabel("http://www.biofl.co.kr")
-        website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
-        self.estimate_layout.addWidget(website_label)
+        self.website_label = QLabel("https://www.biofl.co.kr")
+        self.website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
+
+        address_website_layout.addWidget(self.header_address_label)
+        address_website_layout.addWidget(self.website_label)
+        address_website_layout.addStretch()
+
+        self.estimate_layout.addLayout(address_website_layout)
 
         # 구분선
         self.add_separator()
@@ -190,11 +197,12 @@ class EstimateTab(QWidget):
 
         # 오른쪽 정보 (회사 정보 - 설정에서 불러옴) + 직인
         right_info_widget = QWidget()
-        right_info_widget.setFixedWidth(280)
+        right_info_widget.setFixedSize(280, 130)
 
         # 회사 정보 라벨
         self.right_company_info = QLabel("")
         self.right_company_info.setStyleSheet("font-size: 11px;")
+        self.right_company_info.setFixedSize(280, 130)
         self.right_company_info.setParent(right_info_widget)
         self.right_company_info.move(0, 0)
 
@@ -203,7 +211,7 @@ class EstimateTab(QWidget):
         self.stamp_label.setFixedSize(60, 60)
         self.stamp_label.setStyleSheet("border: none; background: transparent;")
         self.stamp_label.setParent(right_info_widget)
-        self.stamp_label.move(95, 5)  # 대표자 이름 옆에 위치
+        self.stamp_label.move(100, 2)  # 대표자 이름 옆에 위치 (2번째 줄)
         self.stamp_label.raise_()  # 위로 올려서 텍스트 위에 표시
 
         # 그리드 레이아웃에 배치
