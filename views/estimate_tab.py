@@ -122,14 +122,12 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addLayout(header_layout)
 
-        # 회사명 (설정에서 불러옴)
-        self.header_company_label = QLabel("(주)바이오푸드랩")
-        self.header_company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        self.estimate_layout.addWidget(self.header_company_label)
+        # 회사명 + 주소 + 홈페이지 (한 줄로 배치, 같은 크기)
+        company_address_layout = QHBoxLayout()
+        company_address_layout.setSpacing(15)
 
-        # 주소 + 홈페이지 (한 줄로 배치)
-        address_website_layout = QHBoxLayout()
-        address_website_layout.setSpacing(10)
+        self.header_company_label = QLabel("(주)바이오푸드랩")
+        self.header_company_label.setStyleSheet("font-size: 10px; color: #666;")
 
         self.header_address_label = QLabel("")
         self.header_address_label.setStyleSheet("font-size: 10px; color: #666;")
@@ -137,11 +135,12 @@ class EstimateTab(QWidget):
         self.website_label = QLabel("https://www.biofl.co.kr")
         self.website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
 
-        address_website_layout.addWidget(self.header_address_label)
-        address_website_layout.addWidget(self.website_label)
-        address_website_layout.addStretch()
+        company_address_layout.addWidget(self.header_company_label)
+        company_address_layout.addWidget(self.header_address_label)
+        company_address_layout.addWidget(self.website_label)
+        company_address_layout.addStretch()
 
-        self.estimate_layout.addLayout(address_website_layout)
+        self.estimate_layout.addLayout(company_address_layout)
 
         # 구분선
         self.add_separator()
@@ -197,22 +196,23 @@ class EstimateTab(QWidget):
 
         # 오른쪽 정보 (회사 정보 - 설정에서 불러옴) + 직인
         right_info_widget = QWidget()
-        right_info_widget.setFixedSize(280, 130)
+        right_info_widget.setFixedSize(320, 140)
 
-        # 회사 정보 라벨
-        self.right_company_info = QLabel("")
-        self.right_company_info.setStyleSheet("font-size: 11px;")
-        self.right_company_info.setFixedSize(280, 130)
-        self.right_company_info.setParent(right_info_widget)
-        self.right_company_info.move(0, 0)
-
-        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정)
+        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정) - 먼저 생성하여 글 뒤로
         self.stamp_label = QLabel("")
         self.stamp_label.setFixedSize(60, 60)
         self.stamp_label.setStyleSheet("border: none; background: transparent;")
         self.stamp_label.setParent(right_info_widget)
-        self.stamp_label.move(100, 2)  # 대표자 이름 옆에 위치 (2번째 줄)
-        self.stamp_label.raise_()  # 위로 올려서 텍스트 위에 표시
+        self.stamp_label.move(140, 5)  # 대표자 이름 옆에 위치
+        self.stamp_label.lower()  # 글 뒤로 이동
+
+        # 회사 정보 라벨 (글씨 2포인트 크게: 11px → 13px, 왼쪽 여백 추가)
+        self.right_company_info = QLabel("")
+        self.right_company_info.setStyleSheet("font-size: 13px; padding-left: 40px;")
+        self.right_company_info.setFixedSize(320, 140)
+        self.right_company_info.setParent(right_info_widget)
+        self.right_company_info.move(0, 0)
+        self.right_company_info.setAttribute(Qt.WA_TranslucentBackground)  # 배경 투명
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
