@@ -291,8 +291,16 @@ class MainWindow(QMainWindow):
         self.dashboard_detail_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.dashboard_detail_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.dashboard_detail_table.horizontalHeader().setStretchLastSection(True)
+        # 헤더 이동(드래그) 및 정렬 기능 추가
+        self.dashboard_detail_table.horizontalHeader().setSectionsMovable(True)
+        self.dashboard_detail_table.setSortingEnabled(True)
+        self.dashboard_detail_table.horizontalHeader().sortIndicatorChanged.connect(self.on_dashboard_sort_changed)
         self.dashboard_detail_table.doubleClicked.connect(self.on_dashboard_detail_double_click)
         detail_layout.addWidget(self.dashboard_detail_table)
+
+        # 현재 정렬 상태 저장
+        self.dashboard_sort_column = -1
+        self.dashboard_sort_order = Qt.AscendingOrder
 
         layout.addWidget(detail_frame)
 
@@ -597,6 +605,11 @@ class MainWindow(QMainWindow):
         if id_item:
             schedule_id = int(id_item.text())
             self.show_schedule_detail(schedule_id)
+
+    def on_dashboard_sort_changed(self, logical_index, order):
+        """대시보드 세부 내역 정렬 변경 시"""
+        self.dashboard_sort_column = logical_index
+        self.dashboard_sort_order = order
 
     def open_dashboard_display_settings(self):
         """대시보드 세부 내역 표시 설정 다이얼로그"""
