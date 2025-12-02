@@ -90,14 +90,36 @@ class StorageUnitWidget(QFrame):
         remaining_label.setStyleSheet(f"font-size: 10px; color: {progress_color}; font-weight: bold;")
         layout.addWidget(remaining_label)
 
-        # 메모가 있으면 표시
+        # 메모 표시 (? 아이콘)
         notes = self.storage_data.get('notes', '')
+        help_label = QLabel("?")
+        help_label.setAlignment(Qt.AlignCenter)
+        help_label.setFixedSize(18, 18)
+        help_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                background-color: #3498db;
+                border-radius: 9px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QLabel:hover {
+                background-color: #2980b9;
+            }
+        """)
         if notes:
-            notes_label = QLabel(notes[:20] + '...' if len(notes) > 20 else notes)
-            notes_label.setAlignment(Qt.AlignCenter)
-            notes_label.setStyleSheet("font-size: 9px; color: #888;")
-            notes_label.setToolTip(notes)
-            layout.addWidget(notes_label)
+            help_label.setToolTip(notes)
+        else:
+            help_label.setToolTip("메모 없음")
+
+        # ? 아이콘 중앙 정렬을 위한 컨테이너
+        help_container = QWidget()
+        help_layout = QHBoxLayout(help_container)
+        help_layout.setContentsMargins(0, 0, 0, 0)
+        help_layout.addStretch()
+        help_layout.addWidget(help_label)
+        help_layout.addStretch()
+        layout.addWidget(help_container)
 
         # 수정 버튼 (권한 있는 경우만)
         if self.can_edit:
@@ -130,7 +152,7 @@ class StorageUnitWidget(QFrame):
             }
         """)
 
-        self.setFixedSize(120, 180 if self.can_edit else 150)
+        self.setFixedSize(120, 200 if self.can_edit else 170)
 
     def get_temp_style(self, temp):
         """온도에 따른 스타일 반환"""
@@ -210,6 +232,7 @@ class StorageEditDialog(QDialog):
         # 변경 사유
         self.reason_input = QLineEdit()
         self.reason_input.setPlaceholderText("사용량 변경 시 사유 입력")
+        self.reason_input.returnPressed.connect(self.save)  # Enter 키로 저장
         form.addRow("변경 사유:", self.reason_input)
 
         # 메모
@@ -228,10 +251,12 @@ class StorageEditDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("저장")
-        save_btn.setStyleSheet("background-color: #27ae60; color: white;")
-        save_btn.clicked.connect(self.save)
-        btn_layout.addWidget(save_btn)
+        self.save_btn = QPushButton("저장")
+        self.save_btn.setStyleSheet("background-color: #27ae60; color: white;")
+        self.save_btn.clicked.connect(self.save)
+        self.save_btn.setDefault(True)  # 기본 버튼으로 설정 (Enter 키)
+        self.save_btn.setAutoDefault(True)
+        btn_layout.addWidget(self.save_btn)
 
         layout.addLayout(btn_layout)
 
