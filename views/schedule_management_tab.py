@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QBrush, QCursor
 import pandas as pd
+import os
 from datetime import datetime
 
 from models.schedules import Schedule
@@ -991,6 +992,11 @@ class ScheduleManagementTab(QWidget):
         self.remove_item_btn = None
         self.save_schedule_btn = None
 
+        # 그룹 참조 저장 (JPG 저장용)
+        self.info_group = None
+        self.memo_group = None
+        self.experiment_group = None
+
         self.initUI()
 
     def set_current_user(self, user):
@@ -1154,6 +1160,18 @@ class ScheduleManagementTab(QWidget):
 
         layout.addStretch()
 
+        # JPG 저장 버튼
+        self.save_jpg_btn = QPushButton("JPG 저장")
+        self.save_jpg_btn.setStyleSheet("background-color: #e67e22; color: white; padding: 8px 15px; font-weight: bold;")
+        self.save_jpg_btn.clicked.connect(self.save_as_jpg)
+        layout.addWidget(self.save_jpg_btn)
+
+        # 메일 발송 버튼
+        self.send_mail_btn = QPushButton("메일 발송")
+        self.send_mail_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 8px 15px; font-weight: bold;")
+        self.send_mail_btn.clicked.connect(self.open_mail_dialog)
+        layout.addWidget(self.send_mail_btn)
+
         # 견적서 보기 버튼
         self.estimate_btn = QPushButton("견적서 보기")
         self.estimate_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 8px 15px; font-weight: bold;")
@@ -1176,7 +1194,8 @@ class ScheduleManagementTab(QWidget):
 
     def create_info_summary_panel(self, parent_layout):
         """소비기한 설정 실험 계획 (안) - 4열 레이아웃"""
-        group = QGroupBox("1. 소비기한 설정 실험 계획 (안)")
+        self.info_group = QGroupBox("1. 소비기한 설정 실험 계획 (안)")
+        group = self.info_group
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #3498db; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #2980b9; }
@@ -1312,7 +1331,8 @@ class ScheduleManagementTab(QWidget):
 
     def create_memo_panel(self, parent_layout):
         """메모 입력 (1/3) + 메모 이력 (2/3)"""
-        group = QGroupBox("2. 메모")
+        self.memo_group = QGroupBox("2. 메모")
+        group = self.memo_group
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #9b59b6; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #9b59b6; }
@@ -1369,7 +1389,8 @@ class ScheduleManagementTab(QWidget):
 
     def create_experiment_schedule_panel(self, parent_layout):
         """온도조건별 실험 스케줄"""
-        group = QGroupBox("3. 온도조건별 실험 스케줄")
+        self.experiment_group = QGroupBox("3. 온도조건별 실험 스케줄")
+        group = self.experiment_group
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #e67e22; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #e67e22; }
@@ -3304,3 +3325,521 @@ class ScheduleManagementTab(QWidget):
 
         # 금액을 DB에 저장
         self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
+    def save_as_jpg(self):
+        """스케줄 관리 화면을 JPG로 저장"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "먼저 스케줄을 선택하세요.")
+            return
+
+        # 파일명 생성: 접수일자+업체명+식품유형+실험방법+보관방법
+        start_date = self.current_schedule.get('start_date', '') or ''
+        company = self.current_schedule.get('company_name', '') or ''
+        food_type = self.current_schedule.get('food_type', '') or ''
+        test_method = self.current_schedule.get('test_method', '') or ''
+        storage_condition = self.current_schedule.get('storage_condition', '') or ''
+
+        # 파일명에 사용할 수 없는 문자 제거
+        def sanitize_filename(name):
+            import re
+            return re.sub(r'[\\/*?:"<>|]', '', name).strip()
+
+        filename_parts = [
+            start_date.replace('-', ''),
+            sanitize_filename(company),
+            sanitize_filename(food_type),
+            sanitize_filename(test_method),
+            sanitize_filename(storage_condition)
+        ]
+        filename = '_'.join([p for p in filename_parts if p]) + '.jpg'
+
+        # 저장 폴더 선택
+        import os
+        default_folder = os.path.join(os.getcwd(), '스케줄관리')
+        if not os.path.exists(default_folder):
+            os.makedirs(default_folder)
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "JPG 파일 저장",
+            os.path.join(default_folder, filename),
+            "JPEG Files (*.jpg)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            from PyQt5.QtGui import QPixmap, QPainter, QImage
+            from PyQt5.QtCore import QRect
+
+            # 캡처할 위젯들의 총 높이와 최대 너비 계산
+            widgets_to_capture = []
+            if self.info_group:
+                widgets_to_capture.append(self.info_group)
+            if self.memo_group:
+                widgets_to_capture.append(self.memo_group)
+            if self.experiment_group:
+                widgets_to_capture.append(self.experiment_group)
+
+            if not widgets_to_capture:
+                QMessageBox.warning(self, "오류", "캡처할 영역이 없습니다.")
+                return
+
+            # 각 위젯의 크기 계산
+            total_height = sum(w.height() for w in widgets_to_capture) + 20  # 여백
+            max_width = max(w.width() for w in widgets_to_capture)
+
+            # 이미지 생성
+            image = QImage(max_width, total_height, QImage.Format_RGB32)
+            image.fill(Qt.white)
+
+            painter = QPainter(image)
+            current_y = 0
+
+            for widget in widgets_to_capture:
+                # 위젯을 픽스맵으로 렌더링
+                pixmap = widget.grab()
+                painter.drawPixmap(0, current_y, pixmap)
+                current_y += widget.height() + 5
+
+            painter.end()
+
+            # JPG로 저장
+            if image.save(file_path, "JPEG", 95):
+                QMessageBox.information(self, "저장 완료", f"이미지가 저장되었습니다.\n{file_path}")
+                # 저장된 파일 경로 기억 (메일 발송용)
+                self.last_saved_image_path = file_path
+            else:
+                QMessageBox.critical(self, "저장 실패", "이미지 저장에 실패했습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"이미지 저장 중 오류가 발생했습니다.\n{str(e)}")
+
+    def open_mail_dialog(self):
+        """스케줄 관리 메일 발송 다이얼로그 열기"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "먼저 스케줄을 선택하세요.")
+            return
+
+        dialog = ScheduleMailDialog(self, self.current_schedule, self.current_user)
+        if dialog.exec_():
+            QMessageBox.information(self, "완료", "메일이 전송되었습니다.")
+
+
+class ScheduleMailDialog(QDialog):
+    """스케줄 관리 메일 발송 다이얼로그"""
+
+    def __init__(self, parent, schedule, current_user):
+        super().__init__(parent)
+        self.setWindowTitle("스케줄 메일 발송")
+        self.setMinimumSize(700, 800)
+        self.schedule = schedule
+        self.current_user = current_user
+        self.to_checkboxes = {}
+        self.cc_checkboxes = {}
+        self.attachment_files = []
+
+        # 사용자 목록 로드
+        self.users = self._load_users()
+        self.initUI()
+
+    def _load_users(self):
+        """사용자 목록 로드"""
+        try:
+            from models.users import User
+            all_users = User.get_all() or []
+            # 현재 사용자 제외
+            if self.current_user:
+                return [u for u in all_users if u.get('id') != self.current_user.get('id')]
+            return all_users
+        except Exception as e:
+            print(f"사용자 목록 로드 오류: {e}")
+            return []
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        # 자주 사용하는 수신자 영역
+        freq_group = QGroupBox("자주 사용하는 수신자")
+        freq_layout = QHBoxLayout(freq_group)
+
+        self.freq_combo = QComboBox()
+        self.freq_combo.addItem("-- 선택 --")
+        self._load_frequent_recipients()
+        self.freq_combo.currentIndexChanged.connect(self.apply_frequent_recipients)
+        freq_layout.addWidget(self.freq_combo)
+
+        save_freq_btn = QPushButton("현재 선택 저장")
+        save_freq_btn.setStyleSheet("padding: 5px 10px;")
+        save_freq_btn.clicked.connect(self.save_frequent_recipients)
+        freq_layout.addWidget(save_freq_btn)
+
+        delete_freq_btn = QPushButton("삭제")
+        delete_freq_btn.setStyleSheet("padding: 5px 10px;")
+        delete_freq_btn.clicked.connect(self.delete_frequent_recipients)
+        freq_layout.addWidget(delete_freq_btn)
+
+        freq_layout.addStretch()
+        layout.addWidget(freq_group)
+
+        # 수신자 선택
+        to_group = QGroupBox("수신자 (To) - 필수")
+        to_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        to_main_layout = QVBoxLayout(to_group)
+
+        to_btn_layout = QHBoxLayout()
+        to_select_all_btn = QPushButton("전체 선택")
+        to_select_all_btn.clicked.connect(lambda: self.select_all_users('to'))
+        to_deselect_all_btn = QPushButton("전체 해제")
+        to_deselect_all_btn.clicked.connect(lambda: self.deselect_all_users('to'))
+        to_btn_layout.addWidget(to_select_all_btn)
+        to_btn_layout.addWidget(to_deselect_all_btn)
+        to_btn_layout.addStretch()
+        to_main_layout.addLayout(to_btn_layout)
+
+        to_scroll = QScrollArea()
+        to_scroll.setWidgetResizable(True)
+        to_scroll.setMaximumHeight(100)
+        to_widget = QWidget()
+        to_grid = QVBoxLayout(to_widget)
+        to_grid.setSpacing(3)
+
+        for user in self.users:
+            name = user.get('name', '')
+            dept = user.get('department', '')
+            display_text = f"{name} ({dept})" if dept else name
+            cb = QCheckBox(display_text)
+            cb.setProperty('user_id', user.get('id'))
+            self.to_checkboxes[user.get('id')] = cb
+            to_grid.addWidget(cb)
+        to_grid.addStretch()
+
+        to_scroll.setWidget(to_widget)
+        to_main_layout.addWidget(to_scroll)
+        layout.addWidget(to_group)
+
+        # 참조자 선택
+        cc_group = QGroupBox("참조 (CC) - 선택사항")
+        cc_main_layout = QVBoxLayout(cc_group)
+
+        cc_btn_layout = QHBoxLayout()
+        cc_select_all_btn = QPushButton("전체 선택")
+        cc_select_all_btn.clicked.connect(lambda: self.select_all_users('cc'))
+        cc_deselect_all_btn = QPushButton("전체 해제")
+        cc_deselect_all_btn.clicked.connect(lambda: self.deselect_all_users('cc'))
+        cc_btn_layout.addWidget(cc_select_all_btn)
+        cc_btn_layout.addWidget(cc_deselect_all_btn)
+        cc_btn_layout.addStretch()
+        cc_main_layout.addLayout(cc_btn_layout)
+
+        cc_scroll = QScrollArea()
+        cc_scroll.setWidgetResizable(True)
+        cc_scroll.setMaximumHeight(100)
+        cc_widget = QWidget()
+        cc_grid = QVBoxLayout(cc_widget)
+        cc_grid.setSpacing(3)
+
+        for user in self.users:
+            name = user.get('name', '')
+            dept = user.get('department', '')
+            display_text = f"{name} ({dept})" if dept else name
+            cb = QCheckBox(display_text)
+            cb.setProperty('user_id', user.get('id'))
+            self.cc_checkboxes[user.get('id')] = cb
+            cc_grid.addWidget(cb)
+        cc_grid.addStretch()
+
+        cc_scroll.setWidget(cc_widget)
+        cc_main_layout.addWidget(cc_scroll)
+        layout.addWidget(cc_group)
+
+        # 제목
+        subject_layout = QHBoxLayout()
+        subject_layout.addWidget(QLabel("제목:"))
+        self.subject_input = QLineEdit()
+        self._set_default_subject()
+        subject_layout.addWidget(self.subject_input)
+        layout.addLayout(subject_layout)
+
+        # 내용
+        layout.addWidget(QLabel("내용:"))
+        self.content_input = QTextEdit()
+        self._set_default_content()
+        self.content_input.setMaximumHeight(200)
+        layout.addWidget(self.content_input)
+
+        # 첨부파일
+        attach_group = QGroupBox("첨부파일")
+        attach_layout = QVBoxLayout(attach_group)
+
+        attach_btn_layout = QHBoxLayout()
+        add_attach_btn = QPushButton("파일 추가")
+        add_attach_btn.clicked.connect(self.add_attachment)
+        remove_attach_btn = QPushButton("선택 삭제")
+        remove_attach_btn.clicked.connect(self.remove_attachment)
+        attach_btn_layout.addWidget(add_attach_btn)
+        attach_btn_layout.addWidget(remove_attach_btn)
+        attach_btn_layout.addStretch()
+        attach_layout.addLayout(attach_btn_layout)
+
+        self.attachment_list = QListWidget()
+        self.attachment_list.setMaximumHeight(60)
+        attach_layout.addWidget(self.attachment_list)
+
+        # 마지막 저장된 JPG 자동 추가
+        if hasattr(self.parent(), 'last_saved_image_path'):
+            last_path = self.parent().last_saved_image_path
+            if last_path and os.path.exists(last_path):
+                self._add_attachment_file(last_path)
+
+        layout.addWidget(attach_group)
+
+        # 버튼
+        btn_layout = QHBoxLayout()
+        send_btn = QPushButton("보내기")
+        send_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 8px 20px; font-weight: bold;")
+        send_btn.clicked.connect(self.send_mail)
+        cancel_btn = QPushButton("취소")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(send_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _load_frequent_recipients(self):
+        """자주 사용하는 수신자 목록 로드"""
+        try:
+            from models.frequent_recipients import FrequentRecipient
+            if self.current_user:
+                freq_list = FrequentRecipient.get_all(self.current_user.get('id'))
+                for item in freq_list:
+                    self.freq_combo.addItem(item['name'], item['id'])
+        except Exception as e:
+            print(f"자주 사용하는 수신자 로드 오류: {e}")
+
+    def apply_frequent_recipients(self, index):
+        """자주 사용하는 수신자 적용"""
+        if index <= 0:
+            return
+
+        try:
+            from models.frequent_recipients import FrequentRecipient
+            freq_id = self.freq_combo.itemData(index)
+            freq_data = FrequentRecipient.get_by_id(freq_id)
+
+            if freq_data:
+                # 모든 체크 해제
+                self.deselect_all_users('to')
+                self.deselect_all_users('cc')
+
+                # 수신자 체크
+                for uid in freq_data.get('recipient_ids', []):
+                    if uid in self.to_checkboxes:
+                        self.to_checkboxes[uid].setChecked(True)
+
+                # 참조자 체크
+                for uid in freq_data.get('cc_ids', []):
+                    if uid in self.cc_checkboxes:
+                        self.cc_checkboxes[uid].setChecked(True)
+
+        except Exception as e:
+            print(f"수신자 적용 오류: {e}")
+
+    def save_frequent_recipients(self):
+        """현재 선택을 자주 사용하는 수신자로 저장"""
+        to_ids = [uid for uid, cb in self.to_checkboxes.items() if cb.isChecked()]
+        cc_ids = [uid for uid, cb in self.cc_checkboxes.items() if cb.isChecked()]
+
+        if not to_ids:
+            QMessageBox.warning(self, "알림", "저장할 수신자를 선택하세요.")
+            return
+
+        from PyQt5.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "이름 입력", "자주 사용하는 수신자 이름:")
+
+        if ok and name:
+            try:
+                from models.frequent_recipients import FrequentRecipient
+                FrequentRecipient.create(
+                    self.current_user.get('id'),
+                    name,
+                    to_ids,
+                    cc_ids
+                )
+                # 콤보박스 새로고침
+                self.freq_combo.clear()
+                self.freq_combo.addItem("-- 선택 --")
+                self._load_frequent_recipients()
+                QMessageBox.information(self, "저장 완료", "자주 사용하는 수신자가 저장되었습니다.")
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"저장 실패: {e}")
+
+    def delete_frequent_recipients(self):
+        """선택된 자주 사용하는 수신자 삭제"""
+        index = self.freq_combo.currentIndex()
+        if index <= 0:
+            QMessageBox.warning(self, "알림", "삭제할 항목을 선택하세요.")
+            return
+
+        reply = QMessageBox.question(
+            self, "삭제 확인",
+            f"'{self.freq_combo.currentText()}'을(를) 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                from models.frequent_recipients import FrequentRecipient
+                freq_id = self.freq_combo.itemData(index)
+                FrequentRecipient.delete(freq_id)
+                # 콤보박스 새로고침
+                self.freq_combo.clear()
+                self.freq_combo.addItem("-- 선택 --")
+                self._load_frequent_recipients()
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"삭제 실패: {e}")
+
+    def _set_default_subject(self):
+        """기본 메일 제목 설정"""
+        company = self.schedule.get('company_name', '') or ''
+        self.subject_input.setText(f"[{company}] 소비기한 입고 알림")
+
+    def _set_default_content(self):
+        """기본 메일 내용 설정"""
+        # 스케줄 정보 추출
+        start_date = self.schedule.get('start_date', '') or '-'
+        company = self.schedule.get('company_name', '') or '-'
+        food_type = self.schedule.get('food_type', '') or '-'
+        test_method = self.schedule.get('test_method', '') or '-'
+        storage_condition = self.schedule.get('storage_condition', '') or '-'
+        product_name = self.schedule.get('product_name', '') or '-'
+
+        # 검사 항목
+        test_items = self.schedule.get('test_items', []) or []
+        test_items_str = ', '.join(test_items) if test_items else '-'
+
+        # 중간보고서
+        report_interim = self.schedule.get('report_interim', 0)
+        interim_date = self.schedule.get('interim_report_date', '') or ''
+        if report_interim:
+            interim_str = f"있음 ({interim_date})" if interim_date else "있음"
+        else:
+            interim_str = "없음"
+
+        # 완료일 (마지막 실험일)
+        # 실험 일수 계산
+        test_period_days = self.schedule.get('test_period_days', 0) or 0
+        test_period_months = self.schedule.get('test_period_months', 0) or 0
+        test_period_years = self.schedule.get('test_period_years', 0) or 0
+        total_days = test_period_days + test_period_months * 30 + test_period_years * 365
+
+        last_test_date = '-'
+        if start_date and start_date != '-':
+            try:
+                from datetime import datetime, timedelta
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                last_dt = start_dt + timedelta(days=total_days)
+                last_test_date = last_dt.strftime('%Y-%m-%d')
+            except:
+                pass
+
+        content = f"""안녕하세요.
+
+소비기한 설정 실험 입고 건에 대해 안내드립니다.
+
+■ 접수일자: {start_date}
+■ 업체명: {company}
+■ 제품명: {product_name}
+■ 식품유형: {food_type}
+■ 실험방법: {test_method}
+■ 보관방법: {storage_condition}
+■ 검사항목: {test_items_str}
+■ 중간보고서: {interim_str}
+■ 완료예정일: {last_test_date}
+
+첨부파일을 확인해주시기 바랍니다.
+
+감사합니다."""
+
+        self.content_input.setPlainText(content)
+
+    def select_all_users(self, target):
+        """전체 선택"""
+        checkboxes = self.to_checkboxes if target == 'to' else self.cc_checkboxes
+        for cb in checkboxes.values():
+            cb.setChecked(True)
+
+    def deselect_all_users(self, target):
+        """전체 해제"""
+        checkboxes = self.to_checkboxes if target == 'to' else self.cc_checkboxes
+        for cb in checkboxes.values():
+            cb.setChecked(False)
+
+    def add_attachment(self):
+        """첨부파일 추가"""
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "첨부파일 선택", "",
+            "All Files (*);;Images (*.jpg *.png);;PDF (*.pdf)"
+        )
+        for file_path in files:
+            self._add_attachment_file(file_path)
+
+    def _add_attachment_file(self, file_path):
+        """첨부파일 목록에 추가"""
+        import os
+        if file_path not in self.attachment_files:
+            self.attachment_files.append(file_path)
+            filename = os.path.basename(file_path)
+            item = QListWidgetItem(filename)
+            item.setData(Qt.UserRole, file_path)
+            self.attachment_list.addItem(item)
+
+    def remove_attachment(self):
+        """선택된 첨부파일 삭제"""
+        selected_items = self.attachment_list.selectedItems()
+        for item in selected_items:
+            file_path = item.data(Qt.UserRole)
+            if file_path in self.attachment_files:
+                self.attachment_files.remove(file_path)
+            self.attachment_list.takeItem(self.attachment_list.row(item))
+
+    def send_mail(self):
+        """메일 전송"""
+        to_ids = [uid for uid, cb in self.to_checkboxes.items() if cb.isChecked()]
+        cc_ids = [uid for uid, cb in self.cc_checkboxes.items() if cb.isChecked()]
+        subject = self.subject_input.text().strip()
+        content = self.content_input.toPlainText().strip()
+
+        if not to_ids:
+            QMessageBox.warning(self, "알림", "수신자를 선택하세요.")
+            return
+
+        if not subject:
+            QMessageBox.warning(self, "알림", "제목을 입력하세요.")
+            return
+
+        if not self.attachment_files:
+            reply = QMessageBox.question(
+                self, "첨부파일 없음",
+                "첨부파일이 없습니다. 그래도 보내시겠습니까?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        try:
+            from models.communications import MailNotice
+
+            # 시스템 내 메일 전송
+            MailNotice.send(
+                self.current_user['id'],
+                subject,
+                content,
+                to_ids,
+                cc_ids if cc_ids else None
+            )
+
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"메일 전송 실패: {e}")

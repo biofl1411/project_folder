@@ -291,8 +291,16 @@ class MainWindow(QMainWindow):
         self.dashboard_detail_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.dashboard_detail_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.dashboard_detail_table.horizontalHeader().setStretchLastSection(True)
+        # 헤더 이동(드래그) 및 정렬 기능 추가
+        self.dashboard_detail_table.horizontalHeader().setSectionsMovable(True)
+        self.dashboard_detail_table.setSortingEnabled(True)
+        self.dashboard_detail_table.horizontalHeader().sortIndicatorChanged.connect(self.on_dashboard_sort_changed)
         self.dashboard_detail_table.doubleClicked.connect(self.on_dashboard_detail_double_click)
         detail_layout.addWidget(self.dashboard_detail_table)
+
+        # 현재 정렬 상태 저장
+        self.dashboard_sort_column = -1
+        self.dashboard_sort_order = Qt.AscendingOrder
 
         layout.addWidget(detail_frame)
 
@@ -345,9 +353,13 @@ class MainWindow(QMainWindow):
 
             # 각 카드별 건수 계산
             scheduled_count = sum(1 for s in self.dashboard_all_schedules if s.get('status') == 'scheduled')
-            interim_count = sum(1 for s in self.dashboard_all_schedules if s.get('report_interim'))
+            # 중간보고: 입고 상태이면서 report_interim=True인 경우
+            interim_count = sum(1 for s in self.dashboard_all_schedules
+                              if s.get('status') == 'received' and s.get('report_interim'))
             received_count = sum(1 for s in self.dashboard_all_schedules if s.get('status') == 'received')
-            extension_count = sum(1 for s in self.dashboard_all_schedules if s.get('extension_test'))
+            # 연장실험: 입고 상태이면서 extension_test=True인 경우
+            extension_count = sum(1 for s in self.dashboard_all_schedules
+                                if s.get('status') == 'received' and s.get('extension_test'))
 
             # 카드 값 업데이트
             if hasattr(self, 'dashboard_cards') and self.dashboard_cards:
@@ -406,11 +418,15 @@ class MainWindow(QMainWindow):
         if card_key == 'scheduled':
             filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('status') == 'scheduled']
         elif card_key == 'interim':
-            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('report_interim')]
+            # 입고 상태이면서 중간보고가 있는 경우
+            filtered_schedules = [s for s in self.dashboard_all_schedules
+                                if s.get('status') == 'received' and s.get('report_interim')]
         elif card_key == 'received':
             filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('status') == 'received']
         elif card_key == 'extension':
-            filtered_schedules = [s for s in self.dashboard_all_schedules if s.get('extension_test')]
+            # 입고 상태이면서 연장실험이 있는 경우
+            filtered_schedules = [s for s in self.dashboard_all_schedules
+                                if s.get('status') == 'received' and s.get('extension_test')]
 
         # 테이블에 데이터 표시
         self.display_dashboard_detail(filtered_schedules)
@@ -589,6 +605,11 @@ class MainWindow(QMainWindow):
         if id_item:
             schedule_id = int(id_item.text())
             self.show_schedule_detail(schedule_id)
+
+    def on_dashboard_sort_changed(self, logical_index, order):
+        """대시보드 세부 내역 정렬 변경 시"""
+        self.dashboard_sort_column = logical_index
+        self.dashboard_sort_order = order
 
     def open_dashboard_display_settings(self):
         """대시보드 세부 내역 표시 설정 다이얼로그"""

@@ -51,8 +51,8 @@ class UserManagementTab(QWidget):
 
         # 사용자 테이블
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(5)
-        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '마지막 로그인'])
+        self.user_table.setColumnCount(6)
+        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '이메일', '마지막 로그인'])
         self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -115,6 +115,10 @@ class UserManagementTab(QWidget):
         self.department_combo = QComboBox()
         self.department_combo.addItems([d for d in DEPARTMENTS if d != '관리자'])
         info_layout.addRow("부서:", self.department_combo)
+
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("이메일 주소 (메일 발송에 사용)")
+        info_layout.addRow("이메일:", self.email_input)
 
         # 초기 비밀번호 안내
         pwd_label = QLabel(f"초기 비밀번호: {DEFAULT_PASSWORD}")
@@ -315,7 +319,8 @@ class UserManagementTab(QWidget):
             self.user_table.setItem(row, 1, QTableWidgetItem(user.get('username', '')))
             self.user_table.setItem(row, 2, QTableWidgetItem(user.get('name', '')))
             self.user_table.setItem(row, 3, QTableWidgetItem(user.get('department', '')))
-            self.user_table.setItem(row, 4, QTableWidgetItem(user.get('last_login', '') or ''))
+            self.user_table.setItem(row, 4, QTableWidgetItem(user.get('email', '') or ''))
+            self.user_table.setItem(row, 5, QTableWidgetItem(user.get('last_login', '') or ''))
 
     def on_user_selected(self):
         """사용자 선택 시"""
@@ -338,6 +343,8 @@ class UserManagementTab(QWidget):
             if index >= 0:
                 self.department_combo.setCurrentIndex(index)
 
+            self.email_input.setText(user.get('email', '') or '')
+
             # 권한 체크박스 설정
             permissions = user.get('permissions', {})
             for perm_key, checkbox in self.permission_checkboxes.items():
@@ -354,6 +361,7 @@ class UserManagementTab(QWidget):
         self.username_input.clear()
         self.username_input.setEnabled(True)
         self.department_combo.setCurrentIndex(0)
+        self.email_input.clear()
 
         # 권한 체크박스 초기화 (모두 해제)
         for checkbox in self.permission_checkboxes.values():
@@ -370,6 +378,7 @@ class UserManagementTab(QWidget):
         name = self.name_input.text().strip()
         username = self.username_input.text().strip()
         department = self.department_combo.currentText()
+        email = self.email_input.text().strip()
 
         if not name:
             QMessageBox.warning(self, "입력 오류", "이름을 입력하세요.")
@@ -390,7 +399,8 @@ class UserManagementTab(QWidget):
                 self.selected_user_id,
                 name=name,
                 department=department,
-                permissions=permissions
+                permissions=permissions,
+                email=email
             )
             if success:
                 QMessageBox.information(self, "성공", "사용자 정보가 수정되었습니다.")
@@ -405,7 +415,8 @@ class UserManagementTab(QWidget):
                 name=name,
                 role='user',
                 department=department,
-                permissions=permissions
+                permissions=permissions,
+                email=email
             )
             if user_id:
                 QMessageBox.information(self, "성공",

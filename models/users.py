@@ -180,6 +180,7 @@ class User:
             new_columns = {
                 'department': 'TEXT DEFAULT ""',
                 'permissions': 'TEXT DEFAULT "{}"',
+                'email': 'TEXT DEFAULT ""',
             }
 
             for col_name, col_type in new_columns.items():
@@ -264,7 +265,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, last_login, created_at
                 FROM users
                 WHERE id = ?
             """, (user_id,))
@@ -294,7 +295,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, last_login, created_at
                 FROM users
                 ORDER BY name
             """)
@@ -318,7 +319,7 @@ class User:
             return []
 
     @staticmethod
-    def create(username, password, name, role='user', department='', permissions=None):
+    def create(username, password, name, role='user', department='', permissions=None, email=''):
         """새 사용자 생성"""
         try:
             User._ensure_columns()
@@ -332,9 +333,9 @@ class User:
             permissions_json = json.dumps(permissions or {}, ensure_ascii=False)
 
             cursor.execute("""
-                INSERT INTO users (username, password, name, role, department, permissions)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (username, password, name, role, department, permissions_json))
+                INSERT INTO users (username, password, name, role, department, permissions, email)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (username, password, name, role, department, permissions_json, email))
             user_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -344,7 +345,7 @@ class User:
             return None
 
     @staticmethod
-    def update(user_id, name=None, department=None, permissions=None):
+    def update(user_id, name=None, department=None, permissions=None, email=None):
         """사용자 정보 업데이트"""
         try:
             User._ensure_columns()
@@ -365,6 +366,10 @@ class User:
             if permissions is not None:
                 updates.append("permissions = ?")
                 params.append(json.dumps(permissions, ensure_ascii=False))
+
+            if email is not None:
+                updates.append("email = ?")
+                params.append(email)
 
             if updates:
                 params.append(user_id)
