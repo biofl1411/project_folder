@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                            QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
                            QDialog, QCheckBox, QScrollArea, QGroupBox,
                            QDialogButtonBox)
-from PyQt5.QtCore import Qt, QSize, QSettings
+from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QFont, QColor, QCursor
 
 from .login import LoginWindow
@@ -18,6 +18,7 @@ TAB_IDS = {
     'estimate': '견적서 관리',
     'schedule_mgmt': '스케줄 관리',
     'storage': '보관구 현황',
+    'communication': '커뮤니케이션',
     'user_mgmt': '사용자 관리',
 }
 
@@ -162,6 +163,21 @@ class MainWindow(QMainWindow):
         self.storage_tab = StorageTab()
         self.tab_widgets['storage'] = self.storage_tab
         self.tab_widget.addTab(self.storage_tab, TAB_IDS['storage'])
+
+        # 커뮤니케이션 탭
+        from .communication_tab import CommunicationTab
+        self.communication_tab = CommunicationTab()
+        self.tab_widgets['communication'] = self.communication_tab
+        self.tab_widget.addTab(self.communication_tab, TAB_IDS['communication'])
+
+        # 커뮤니케이션 탭 새 메시지 알림 연결
+        self.communication_tab.unread_changed.connect(self.on_unread_changed)
+
+        # 새 메시지 알림 깜빡임 타이머
+        self.blink_timer = QTimer()
+        self.blink_timer.timeout.connect(self.toggle_blink)
+        self.blink_state = False
+        self.unread_count = 0
 
         # 사용자 관리 탭 (관리자만 접근 가능)
         from .user_management_tab import UserManagementTab
@@ -744,6 +760,8 @@ class DashboardDisplaySettingsDialog(QDialog):
             self.schedule_management_tab.set_current_user(user_data)
         if hasattr(self, 'storage_tab') and self.storage_tab:
             self.storage_tab.set_current_user(user_data)
+        if hasattr(self, 'communication_tab') and self.communication_tab:
+            self.communication_tab.set_current_user(user_data)
         if hasattr(self, 'user_management_tab') and self.user_management_tab:
             self.user_management_tab.set_current_user(user_data)
 
@@ -755,6 +773,48 @@ class DashboardDisplaySettingsDialog(QDialog):
 
         self.status_label.setText(f"{user_data['name']}님으로 로그인됨")
         self.show()
+
+    def on_unread_changed(self, unread_count):
+        """미읽은 메시지 수 변경 시 탭 이름 업데이트"""
+        self.unread_count = unread_count
+
+        comm_widget = self.tab_widgets.get('communication')
+        if not comm_widget:
+            return
+
+        tab_index = self.tab_widget.indexOf(comm_widget)
+        if tab_index < 0:
+            return
+
+        if unread_count > 0:
+            # 깜빡임 시작
+            if not self.blink_timer.isActive():
+                self.blink_timer.start(500)  # 500ms 간격으로 깜빡임
+        else:
+            # 깜빡임 중지
+            self.blink_timer.stop()
+            self.tab_widget.setTabText(tab_index, TAB_IDS['communication'])
+
+    def toggle_blink(self):
+        """탭 이름 깜빡임 토글"""
+        comm_widget = self.tab_widgets.get('communication')
+        if not comm_widget:
+            return
+
+        tab_index = self.tab_widget.indexOf(comm_widget)
+        if tab_index < 0:
+            return
+
+        self.blink_state = not self.blink_state
+
+        if self.blink_state:
+            # N 표시 (보라색 스타일은 탭 스타일시트로 제한적이므로 텍스트로 표현)
+            self.tab_widget.setTabText(tab_index, f"커뮤니케이션 [N:{self.unread_count}]")
+            # 탭 색상 변경 시도
+            self.tab_widget.tabBar().setTabTextColor(tab_index, QColor("#9b59b6"))
+        else:
+            self.tab_widget.setTabText(tab_index, TAB_IDS['communication'])
+            self.tab_widget.tabBar().setTabTextColor(tab_index, QColor("#000000"))
 
     def apply_tab_permissions(self, user_data):
         """권한에 따라 탭 활성화/비활성화"""
