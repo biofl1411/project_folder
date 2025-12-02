@@ -979,7 +979,70 @@ class ScheduleManagementTab(QWidget):
         super().__init__(parent)
         self.current_schedule = None
         self.memo_history = []  # 메모 이력
+        self.current_user = None  # 현재 로그인한 사용자
+
+        # 버튼 참조 저장 (권한 체크용)
+        self.estimate_btn = None
+        self.settings_btn = None
+        self.select_btn = None
+        self.add_item_btn = None
+        self.remove_item_btn = None
+        self.save_schedule_btn = None
+
         self.initUI()
+
+    def set_current_user(self, user):
+        """현재 로그인한 사용자 설정 및 권한 적용"""
+        self.current_user = user
+        self.apply_permissions()
+
+    def apply_permissions(self):
+        """사용자 권한에 따라 버튼 활성화/비활성화"""
+        if not self.current_user:
+            return
+
+        from models.users import User
+
+        # 관리자는 모든 권한
+        if self.current_user.get('role') == 'admin':
+            return
+
+        # 각 버튼에 대한 권한 체크
+        if self.estimate_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_view_estimate')
+            self.estimate_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.estimate_btn.setToolTip("권한이 없습니다")
+
+        if self.settings_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_display_settings')
+            self.settings_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.settings_btn.setToolTip("권한이 없습니다")
+
+        if self.select_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_select')
+            self.select_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.select_btn.setToolTip("권한이 없습니다")
+
+        if self.add_item_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_add_item')
+            self.add_item_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.add_item_btn.setToolTip("권한이 없습니다")
+
+        if self.remove_item_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_delete_item')
+            self.remove_item_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.remove_item_btn.setToolTip("권한이 없습니다")
+
+        if self.save_schedule_btn:
+            has_perm = User.has_permission(self.current_user, 'schedule_mgmt_save')
+            self.save_schedule_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.save_schedule_btn.setToolTip("권한이 없습니다")
 
     def initUI(self):
         """UI 초기화"""
@@ -1033,22 +1096,22 @@ class ScheduleManagementTab(QWidget):
         layout.addStretch()
 
         # 견적서 보기 버튼
-        estimate_btn = QPushButton("견적서 보기")
-        estimate_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 8px 15px; font-weight: bold;")
-        estimate_btn.clicked.connect(self.show_estimate)
-        layout.addWidget(estimate_btn)
+        self.estimate_btn = QPushButton("견적서 보기")
+        self.estimate_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 8px 15px; font-weight: bold;")
+        self.estimate_btn.clicked.connect(self.show_estimate)
+        layout.addWidget(self.estimate_btn)
 
         # 표시 설정 버튼
-        settings_btn = QPushButton("표시 설정")
-        settings_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 15px; font-weight: bold;")
-        settings_btn.clicked.connect(self.open_display_settings)
-        layout.addWidget(settings_btn)
+        self.settings_btn = QPushButton("표시 설정")
+        self.settings_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 15px; font-weight: bold;")
+        self.settings_btn.clicked.connect(self.open_display_settings)
+        layout.addWidget(self.settings_btn)
 
         # 스케줄 선택 버튼
-        select_btn = QPushButton("스케줄 선택")
-        select_btn.setStyleSheet("background-color: #3498db; color: white; padding: 8px 20px; font-weight: bold;")
-        select_btn.clicked.connect(self.open_schedule_selector)
-        layout.addWidget(select_btn)
+        self.select_btn = QPushButton("스케줄 선택")
+        self.select_btn.setStyleSheet("background-color: #3498db; color: white; padding: 8px 20px; font-weight: bold;")
+        self.select_btn.clicked.connect(self.open_schedule_selector)
+        layout.addWidget(self.select_btn)
 
         parent_layout.addWidget(frame)
 

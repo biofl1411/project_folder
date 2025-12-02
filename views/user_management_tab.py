@@ -10,10 +10,11 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QHeaderView, QMessageBox, QComboBox, QGroupBox,
                            QFormLayout, QCheckBox, QScrollArea, QFrame, QGridLayout)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QFont
 
-from models.users import (User, DEPARTMENTS, DEFAULT_PERMISSIONS,
-                         PERMISSION_LABELS, DEFAULT_PASSWORD)
+from models.users import (User, DEPARTMENTS, PERMISSION_LABELS, DEFAULT_PASSWORD,
+                         PERMISSION_CATEGORIES, PERMISSION_BY_CATEGORY,
+                         get_default_permissions)
 
 
 class UserManagementTab(QWidget):
@@ -22,6 +23,7 @@ class UserManagementTab(QWidget):
         self.current_user = current_user
         self.selected_user_id = None
         self.permission_checkboxes = {}
+        self.category_checkboxes = {}  # 카테고리 전체선택 체크박스
         self.initUI()
         self.load_users()
 
@@ -94,7 +96,6 @@ class UserManagementTab(QWidget):
 
         self.department_combo = QComboBox()
         self.department_combo.addItems([d for d in DEPARTMENTS if d != '관리자'])
-        self.department_combo.currentTextChanged.connect(self.on_department_changed)
         info_layout.addRow("부서:", self.department_combo)
 
         # 초기 비밀번호 안내
@@ -105,8 +106,19 @@ class UserManagementTab(QWidget):
         right_layout.addWidget(info_group)
 
         # 권한 설정 그룹
-        perm_group = QGroupBox("권한 설정 (O: 권한 있음, X: 권한 없음)")
+        perm_group = QGroupBox("권한 설정")
         perm_layout = QVBoxLayout(perm_group)
+
+        # 전체 선택/해제 버튼
+        all_btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(lambda: self.toggle_all_permissions(True))
+        all_btn_layout.addWidget(select_all_btn)
+
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(lambda: self.toggle_all_permissions(False))
+        all_btn_layout.addWidget(deselect_all_btn)
+        perm_layout.addLayout(all_btn_layout)
 
         # 스크롤 영역
         scroll = QScrollArea()
@@ -114,47 +126,83 @@ class UserManagementTab(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
 
         perm_widget = QWidget()
-        perm_grid = QGridLayout(perm_widget)
-        perm_grid.setSpacing(5)
+        perm_main_layout = QVBoxLayout(perm_widget)
+        perm_main_layout.setSpacing(10)
 
-        row = 0
-        for perm_key, perm_label in PERMISSION_LABELS.items():
-            label = QLabel(perm_label)
-            checkbox = QCheckBox()
-            checkbox.setStyleSheet("""
-                QCheckBox::indicator {
-                    width: 20px;
-                    height: 20px;
+        # 카테고리별 권한 그룹 생성
+        for cat_key, cat_name in PERMISSION_CATEGORIES.items():
+            cat_group = QGroupBox(cat_name)
+            cat_group.setStyleSheet("""
+                QGroupBox {
+                    font-weight: bold;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                    margin-top: 10px;
+                    padding-top: 10px;
                 }
-                QCheckBox::indicator:unchecked {
-                    background-color: #ffcccc;
-                    border: 1px solid #999;
-                    border-radius: 3px;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #ccffcc;
-                    border: 1px solid #999;
-                    border-radius: 3px;
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 5px;
                 }
             """)
+            cat_layout = QVBoxLayout(cat_group)
 
-            # O/X 표시 라벨
-            status_label = QLabel("X")
-            status_label.setStyleSheet("color: red; font-weight: bold;")
-            status_label.setFixedWidth(20)
-
-            checkbox.stateChanged.connect(
-                lambda state, lbl=status_label: self.update_permission_label(state, lbl)
+            # 카테고리 전체 선택 체크박스
+            cat_header = QHBoxLayout()
+            cat_all_checkbox = QCheckBox("전체")
+            cat_all_checkbox.setStyleSheet("font-weight: bold; color: #2196F3;")
+            cat_all_checkbox.stateChanged.connect(
+                lambda state, ck=cat_key: self.toggle_category_permissions(ck, state == Qt.Checked)
             )
+            self.category_checkboxes[cat_key] = cat_all_checkbox
+            cat_header.addWidget(cat_all_checkbox)
+            cat_header.addStretch()
+            cat_layout.addLayout(cat_header)
 
-            self.permission_checkboxes[perm_key] = checkbox
+            # 권한 체크박스들
+            perm_keys = PERMISSION_BY_CATEGORY.get(cat_key, [])
+            perm_grid = QGridLayout()
+            perm_grid.setSpacing(5)
 
-            perm_grid.addWidget(label, row, 0)
-            perm_grid.addWidget(checkbox, row, 1)
-            perm_grid.addWidget(status_label, row, 2)
-            row += 1
+            row = 0
+            col = 0
+            for perm_key in perm_keys:
+                perm_label = PERMISSION_LABELS.get(perm_key, perm_key)
 
-        perm_grid.setRowStretch(row, 1)
+                checkbox = QCheckBox(perm_label)
+                checkbox.setStyleSheet("""
+                    QCheckBox::indicator {
+                        width: 16px;
+                        height: 16px;
+                    }
+                    QCheckBox::indicator:unchecked {
+                        background-color: #ffcccc;
+                        border: 1px solid #999;
+                        border-radius: 3px;
+                    }
+                    QCheckBox::indicator:checked {
+                        background-color: #ccffcc;
+                        border: 1px solid #999;
+                        border-radius: 3px;
+                    }
+                """)
+                checkbox.stateChanged.connect(
+                    lambda state, ck=cat_key: self.update_category_checkbox(ck)
+                )
+
+                self.permission_checkboxes[perm_key] = checkbox
+                perm_grid.addWidget(checkbox, row, col)
+
+                col += 1
+                if col >= 2:  # 2열로 배치
+                    col = 0
+                    row += 1
+
+            cat_layout.addLayout(perm_grid)
+            perm_main_layout.addWidget(cat_group)
+
+        perm_main_layout.addStretch()
         scroll.setWidget(perm_widget)
         perm_layout.addWidget(scroll)
 
@@ -176,14 +224,31 @@ class UserManagementTab(QWidget):
 
         layout.addWidget(right_widget, 1)
 
-    def update_permission_label(self, state, label):
-        """체크박스 상태에 따라 O/X 라벨 업데이트"""
-        if state == Qt.Checked:
-            label.setText("O")
-            label.setStyleSheet("color: green; font-weight: bold;")
-        else:
-            label.setText("X")
-            label.setStyleSheet("color: red; font-weight: bold;")
+    def toggle_all_permissions(self, checked):
+        """모든 권한 전체 선택/해제"""
+        for checkbox in self.permission_checkboxes.values():
+            checkbox.setChecked(checked)
+
+    def toggle_category_permissions(self, category_key, checked):
+        """카테고리별 권한 전체 선택/해제"""
+        perm_keys = PERMISSION_BY_CATEGORY.get(category_key, [])
+        for perm_key in perm_keys:
+            if perm_key in self.permission_checkboxes:
+                self.permission_checkboxes[perm_key].setChecked(checked)
+
+    def update_category_checkbox(self, category_key):
+        """카테고리 내 개별 체크박스 상태에 따라 전체 체크박스 업데이트"""
+        perm_keys = PERMISSION_BY_CATEGORY.get(category_key, [])
+        all_checked = all(
+            self.permission_checkboxes.get(pk, QCheckBox()).isChecked()
+            for pk in perm_keys
+        )
+
+        if category_key in self.category_checkboxes:
+            # 시그널 순환 방지
+            self.category_checkboxes[category_key].blockSignals(True)
+            self.category_checkboxes[category_key].setChecked(all_checked)
+            self.category_checkboxes[category_key].blockSignals(False)
 
     def load_users(self):
         """사용자 목록 로드"""
@@ -230,17 +295,9 @@ class UserManagementTab(QWidget):
             for perm_key, checkbox in self.permission_checkboxes.items():
                 checkbox.setChecked(permissions.get(perm_key, False))
 
-    def on_department_changed(self, department):
-        """부서 변경 시 기본 권한 설정"""
-        if self.selected_user_id:
-            # 기존 사용자 수정 시에는 자동 변경하지 않음
-            return
-
-        # 새 사용자 추가 시에만 기본 권한 적용
-        if department in DEFAULT_PERMISSIONS:
-            default_perms = DEFAULT_PERMISSIONS[department]
-            for perm_key, checkbox in self.permission_checkboxes.items():
-                checkbox.setChecked(default_perms.get(perm_key, False))
+            # 카테고리 체크박스 업데이트
+            for cat_key in PERMISSION_CATEGORIES.keys():
+                self.update_category_checkbox(cat_key)
 
     def clear_form(self):
         """입력 폼 초기화"""
@@ -250,12 +307,13 @@ class UserManagementTab(QWidget):
         self.username_input.setEnabled(True)
         self.department_combo.setCurrentIndex(0)
 
-        # 권한 체크박스 초기화
+        # 권한 체크박스 초기화 (모두 해제)
         for checkbox in self.permission_checkboxes.values():
             checkbox.setChecked(False)
 
-        # 부서 변경 이벤트 트리거
-        self.on_department_changed(self.department_combo.currentText())
+        # 카테고리 체크박스 업데이트
+        for cat_key in PERMISSION_CATEGORIES.keys():
+            self.update_category_checkbox(cat_key)
 
         self.user_table.clearSelection()
 

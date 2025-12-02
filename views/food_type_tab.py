@@ -20,6 +20,17 @@ class FoodTypeTab(QWidget):
         self.all_food_types = []  # 전체 식품유형 목록 저장
         self.current_sort_column = -1
         self.current_sort_order = Qt.AscendingOrder
+        self.current_user = None  # 현재 로그인한 사용자
+
+        # 버튼 참조 저장 (권한 체크용)
+        self.new_type_btn = None
+        self.edit_btn = None
+        self.delete_btn = None
+        self.clear_btn = None
+        self.import_btn = None
+        self.update_btn = None
+        self.export_btn = None
+        self.db_info_btn = None
 
         # 검색 디바운싱을 위한 타이머 (300ms 지연)
         self.search_timer = QTimer()
@@ -28,6 +39,71 @@ class FoodTypeTab(QWidget):
 
         self.initUI()
         self.load_food_types()
+
+    def set_current_user(self, user):
+        """현재 로그인한 사용자 설정 및 권한 적용"""
+        self.current_user = user
+        self.apply_permissions()
+
+    def apply_permissions(self):
+        """사용자 권한에 따라 버튼 활성화/비활성화"""
+        if not self.current_user:
+            return
+
+        from models.users import User
+
+        # 관리자는 모든 권한
+        if self.current_user.get('role') == 'admin':
+            return
+
+        # 각 버튼에 대한 권한 체크
+        if self.new_type_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_create')
+            self.new_type_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.new_type_btn.setToolTip("권한이 없습니다")
+
+        if self.edit_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_edit')
+            self.edit_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.edit_btn.setToolTip("권한이 없습니다")
+
+        if self.delete_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_delete')
+            self.delete_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.delete_btn.setToolTip("권한이 없습니다")
+
+        if self.clear_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_reset')
+            self.clear_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.clear_btn.setToolTip("권한이 없습니다")
+
+        if self.import_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_import_excel')
+            self.import_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.import_btn.setToolTip("권한이 없습니다")
+
+        if self.update_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_update_excel')
+            self.update_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.update_btn.setToolTip("권한이 없습니다")
+
+        if self.export_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_export_excel')
+            self.export_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.export_btn.setToolTip("권한이 없습니다")
+
+        if self.db_info_btn:
+            has_perm = User.has_permission(self.current_user, 'food_type_db_info')
+            self.db_info_btn.setEnabled(has_perm)
+            if not has_perm:
+                self.db_info_btn.setToolTip("권한이 없습니다")
         
     
     def initUI(self):
@@ -45,50 +121,50 @@ class FoodTypeTab(QWidget):
         self.select_all_checkbox = QCheckBox("전체 선택")
         self.select_all_checkbox.clicked.connect(self.select_all_rows)
         
-        new_type_btn = QPushButton("새 식품유형 등록")
-        new_type_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
-        new_type_btn.clicked.connect(self.create_new_food_type)
-        
-        edit_btn = QPushButton("수정")
-        edit_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
-        edit_btn.clicked.connect(self.edit_food_type)
-        
-        delete_btn = QPushButton("삭제")
-        delete_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
-        delete_btn.clicked.connect(self.delete_food_type)
-        
+        self.new_type_btn = QPushButton("새 식품유형 등록")
+        self.new_type_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogNewFolder))
+        self.new_type_btn.clicked.connect(self.create_new_food_type)
+
+        self.edit_btn = QPushButton("수정")
+        self.edit_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
+        self.edit_btn.clicked.connect(self.edit_food_type)
+
+        self.delete_btn = QPushButton("삭제")
+        self.delete_btn.setIcon(self.style().standardIcon(self.style().SP_TrashIcon))
+        self.delete_btn.clicked.connect(self.delete_food_type)
+
         # 전체 초기화 버튼 추가
-        clear_btn = QPushButton("전체 초기화")
-        clear_btn.setIcon(self.style().standardIcon(self.style().SP_DialogResetButton))
-        clear_btn.clicked.connect(self.clear_all_food_types)
-        
-        import_btn = QPushButton("엑셀 가져오기")
-        import_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogStart))
-        import_btn.clicked.connect(self.import_from_excel)
-        
+        self.clear_btn = QPushButton("전체 초기화")
+        self.clear_btn.setIcon(self.style().standardIcon(self.style().SP_DialogResetButton))
+        self.clear_btn.clicked.connect(self.clear_all_food_types)
+
+        self.import_btn = QPushButton("엑셀 가져오기")
+        self.import_btn.setIcon(self.style().standardIcon(self.style().SP_FileDialogStart))
+        self.import_btn.clicked.connect(self.import_from_excel)
+
         # 엑셀 업데이트 버튼 추가
-        update_btn = QPushButton("엑셀 업데이트")
-        update_btn.setIcon(self.style().standardIcon(self.style().SP_BrowserReload))
-        update_btn.clicked.connect(self.update_from_excel)
-        
-        export_btn = QPushButton("엑셀 내보내기")
-        export_btn.setIcon(self.style().standardIcon(self.style().SP_DialogSaveButton))
-        export_btn.clicked.connect(self.export_to_excel)
-        
+        self.update_btn = QPushButton("엑셀 업데이트")
+        self.update_btn.setIcon(self.style().standardIcon(self.style().SP_BrowserReload))
+        self.update_btn.clicked.connect(self.update_from_excel)
+
+        self.export_btn = QPushButton("엑셀 내보내기")
+        self.export_btn.setIcon(self.style().standardIcon(self.style().SP_DialogSaveButton))
+        self.export_btn.clicked.connect(self.export_to_excel)
+
         # 데이터베이스 정보 버튼
-        db_info_btn = QPushButton("DB 정보")
-        db_info_btn.setIcon(self.style().standardIcon(self.style().SP_FileIcon))
-        db_info_btn.clicked.connect(self.check_database_location)
-        
+        self.db_info_btn = QPushButton("DB 정보")
+        self.db_info_btn.setIcon(self.style().standardIcon(self.style().SP_FileIcon))
+        self.db_info_btn.clicked.connect(self.check_database_location)
+
         button_layout.addWidget(self.select_all_checkbox)
-        button_layout.addWidget(new_type_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(delete_btn)
-        button_layout.addWidget(clear_btn)
-        button_layout.addWidget(import_btn)
-        button_layout.addWidget(update_btn)
-        button_layout.addWidget(export_btn)
-        button_layout.addWidget(db_info_btn)
+        button_layout.addWidget(self.new_type_btn)
+        button_layout.addWidget(self.edit_btn)
+        button_layout.addWidget(self.delete_btn)
+        button_layout.addWidget(self.clear_btn)
+        button_layout.addWidget(self.import_btn)
+        button_layout.addWidget(self.update_btn)
+        button_layout.addWidget(self.export_btn)
+        button_layout.addWidget(self.db_info_btn)
         button_layout.addStretch()
         
         layout.addWidget(button_frame)

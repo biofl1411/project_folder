@@ -247,8 +247,19 @@ class MainWindow(QMainWindow):
         department = user_data.get('department', '')
         self.user_label.setText(f"사용자: {user_data['name']} ({department or user_data['role']})")
 
-        # 사용자 관리 탭에 현재 사용자 설정
-        self.user_management_tab.set_current_user(user_data)
+        # 각 탭에 현재 사용자 설정 (권한 적용)
+        if hasattr(self, 'schedule_tab') and self.schedule_tab:
+            self.schedule_tab.set_current_user(user_data)
+        if hasattr(self, 'client_tab') and self.client_tab:
+            self.client_tab.set_current_user(user_data)
+        if hasattr(self, 'food_type_tab') and self.food_type_tab:
+            self.food_type_tab.set_current_user(user_data)
+        if hasattr(self, 'fee_tab') and self.fee_tab:
+            self.fee_tab.set_current_user(user_data)
+        if hasattr(self, 'schedule_management_tab') and self.schedule_management_tab:
+            self.schedule_management_tab.set_current_user(user_data)
+        if hasattr(self, 'user_management_tab') and self.user_management_tab:
+            self.user_management_tab.set_current_user(user_data)
 
         # 권한 기반 탭 활성화/비활성화
         self.apply_tab_permissions(user_data)
@@ -260,22 +271,34 @@ class MainWindow(QMainWindow):
         """권한에 따라 탭 활성화/비활성화"""
         from models.users import User
 
-        # 탭 인덱스: 0:대시보드, 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:사용자관리
-        tab_permissions = {
-            1: 'schedule_create',      # 스케줄 작성
-            2: 'client_read',          # 업체 관리
-            3: 'food_type_read',       # 식품 유형
-            4: 'fee_manage',           # 수수료 관리
-            5: 'estimate_manage',      # 견적서 관리
-            6: 'schedule_manage_read', # 스케줄 관리
-            7: 'user_manage',          # 사용자 관리
+        # 관리자는 모든 탭 접근 가능
+        if user_data.get('role') == 'admin':
+            return
+
+        # 탭 인덱스별 필요 권한 (하나라도 있으면 탭 접근 가능)
+        # 0:대시보드 (항상 접근), 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:사용자관리
+        tab_permission_groups = {
+            1: ['schedule_create', 'schedule_edit', 'schedule_delete',
+                'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
+            2: ['client_view_all', 'client_view_own', 'client_create',
+                'client_edit', 'client_delete', 'client_import_excel', 'client_export_excel'],
+            3: ['food_type_create', 'food_type_edit', 'food_type_delete',
+                'food_type_reset', 'food_type_import_excel', 'food_type_update_excel',
+                'food_type_export_excel', 'food_type_db_info'],
+            4: ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
+            5: ['schedule_mgmt_view_estimate'],  # 견적서 탭
+            6: ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
+                'schedule_mgmt_select', 'schedule_mgmt_add_item',
+                'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
+            7: ['user_manage'],
         }
 
-        for tab_index, permission_key in tab_permissions.items():
-            has_perm = User.has_permission(user_data, permission_key)
-            self.tab_widget.setTabEnabled(tab_index, has_perm)
+        for tab_index, permissions in tab_permission_groups.items():
+            # 권한 목록 중 하나라도 있으면 탭 접근 가능
+            has_any_perm = any(User.has_permission(user_data, perm) for perm in permissions)
+            self.tab_widget.setTabEnabled(tab_index, has_any_perm)
 
-            if not has_perm:
+            if not has_any_perm:
                 current_text = self.tab_widget.tabText(tab_index)
                 if not current_text.startswith("🔒"):
                     self.tab_widget.setTabText(tab_index, f"🔒 {current_text}")
