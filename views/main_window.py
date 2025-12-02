@@ -586,130 +586,6 @@ class MainWindow(QMainWindow):
             if self.dashboard_current_filter:
                 self.on_dashboard_card_click(self.dashboard_current_filter)
 
-
-class DashboardDisplaySettingsDialog(QDialog):
-    """대시보드 세부 내역 표시 설정 다이얼로그"""
-
-    COLUMN_OPTIONS = [
-        ('client_name', '업체명', True),
-        ('product_name', '샘플명', True),
-        ('sales_rep', '영업담당', False),
-        ('food_type', '식품유형', False),
-        ('test_method', '실험방법', False),
-        ('storage_condition', '보관조건', False),
-        ('expiry_period', '소비기한', False),
-        ('sampling_count', '샘플링횟수', False),
-        ('start_date', '시작일', True),
-        ('end_date', '종료일', True),
-        ('interim_date', '중간보고일', True),
-        ('extension_test', '연장실험', False),
-        ('status', '상태', True),
-        ('memo', '메모', False),
-    ]
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("세부 내역 표시 설정")
-        self.setMinimumSize(350, 450)
-        self.checkboxes = {}
-        self.initUI()
-        self.load_settings()
-
-    def initUI(self):
-        layout = QVBoxLayout(self)
-
-        info_label = QLabel("세부 내역에서 표시할 컬럼을 선택하세요:")
-        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
-        layout.addWidget(info_label)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-
-        column_group = QGroupBox("표시 컬럼")
-        column_layout = QVBoxLayout(column_group)
-
-        for col_key, col_name, default_visible in self.COLUMN_OPTIONS:
-            checkbox = QCheckBox(col_name)
-            checkbox.setChecked(default_visible)
-            self.checkboxes[col_key] = checkbox
-            column_layout.addWidget(checkbox)
-
-        scroll_layout.addWidget(column_group)
-        scroll_layout.addStretch()
-
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
-
-        btn_layout = QHBoxLayout()
-        select_all_btn = QPushButton("전체 선택")
-        select_all_btn.clicked.connect(self.select_all)
-        deselect_all_btn = QPushButton("전체 해제")
-        deselect_all_btn.clicked.connect(self.deselect_all)
-        btn_layout.addWidget(select_all_btn)
-        btn_layout.addWidget(deselect_all_btn)
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
-
-        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.save_settings)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-
-    def select_all(self):
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(True)
-
-    def deselect_all(self):
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(False)
-
-    def load_settings(self):
-        try:
-            from database import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
-            result = cursor.fetchone()
-            conn.close()
-
-            if result and result['value']:
-                visible_columns = result['value'].split(',')
-                for col_key, checkbox in self.checkboxes.items():
-                    checkbox.setChecked(col_key in visible_columns)
-        except Exception as e:
-            print(f"설정 로드 오류: {e}")
-
-    def save_settings(self):
-        try:
-            from database import get_connection
-
-            visible_columns = [key for key, cb in self.checkboxes.items() if cb.isChecked()]
-            value = ','.join(visible_columns)
-
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE key = 'dashboard_detail_columns'
-            """, (value,))
-
-            if cursor.rowcount == 0:
-                cursor.execute("""
-                    INSERT INTO settings (key, value, description)
-                    VALUES ('dashboard_detail_columns', ?, '대시보드 세부 내역 표시 컬럼')
-                """, (value,))
-
-            conn.commit()
-            conn.close()
-
-            QMessageBox.information(self, "저장 완료", "표시 설정이 저장되었습니다.")
-            self.accept()
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
-    
     def create_status_bar(self):
         """하단 상태 바 생성"""
         status_frame = QFrame()
@@ -944,3 +820,127 @@ class DashboardDisplaySettingsDialog(QDialog):
             current_index = self.tab_widget.indexOf(widget)
             if current_index >= 0 and current_index != target_index:
                 tab_bar.moveTab(current_index, target_index)
+
+
+class DashboardDisplaySettingsDialog(QDialog):
+    """대시보드 세부 내역 표시 설정 다이얼로그"""
+
+    COLUMN_OPTIONS = [
+        ('client_name', '업체명', True),
+        ('product_name', '샘플명', True),
+        ('sales_rep', '영업담당', False),
+        ('food_type', '식품유형', False),
+        ('test_method', '실험방법', False),
+        ('storage_condition', '보관조건', False),
+        ('expiry_period', '소비기한', False),
+        ('sampling_count', '샘플링횟수', False),
+        ('start_date', '시작일', True),
+        ('end_date', '종료일', True),
+        ('interim_date', '중간보고일', True),
+        ('extension_test', '연장실험', False),
+        ('status', '상태', True),
+        ('memo', '메모', False),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("세부 내역 표시 설정")
+        self.setMinimumSize(350, 450)
+        self.checkboxes = {}
+        self.initUI()
+        self.load_settings()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        info_label = QLabel("세부 내역에서 표시할 컬럼을 선택하세요:")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        column_group = QGroupBox("표시 컬럼")
+        column_layout = QVBoxLayout(column_group)
+
+        for col_key, col_name, default_visible in self.COLUMN_OPTIONS:
+            checkbox = QCheckBox(col_name)
+            checkbox.setChecked(default_visible)
+            self.checkboxes[col_key] = checkbox
+            column_layout.addWidget(checkbox)
+
+        scroll_layout.addWidget(column_group)
+        scroll_layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("전체 선택")
+        select_all_btn.clicked.connect(self.select_all)
+        deselect_all_btn = QPushButton("전체 해제")
+        deselect_all_btn.clicked.connect(self.deselect_all)
+        btn_layout.addWidget(select_all_btn)
+        btn_layout.addWidget(deselect_all_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.save_settings)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def select_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(True)
+
+    def deselect_all(self):
+        for checkbox in self.checkboxes.values():
+            checkbox.setChecked(False)
+
+    def load_settings(self):
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result and result['value']:
+                visible_columns = result['value'].split(',')
+                for col_key, checkbox in self.checkboxes.items():
+                    checkbox.setChecked(col_key in visible_columns)
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
+    def save_settings(self):
+        try:
+            from database import get_connection
+
+            visible_columns = [key for key, cb in self.checkboxes.items() if cb.isChecked()]
+            value = ','.join(visible_columns)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE key = 'dashboard_detail_columns'
+            """, (value,))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (key, value, description)
+                    VALUES ('dashboard_detail_columns', ?, '대시보드 세부 내역 표시 컬럼')
+                """, (value,))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "표시 설정이 저장되었습니다.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 저장 중 오류: {str(e)}")
