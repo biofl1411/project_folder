@@ -1,10 +1,23 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                            QTabWidget, QPushButton, QLabel, QMessageBox,
                            QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QSettings
 from PyQt5.QtGui import QIcon, QFont
 
 from .login import LoginWindow
+
+# 탭 식별자 상수
+TAB_IDS = {
+    'dashboard': '대시보드',
+    'schedule': '스케줄 작성',
+    'client': '업체 관리',
+    'food_type': '식품 유형 관리',
+    'fee': '수수료 관리',
+    'estimate': '견적서 관리',
+    'schedule_mgmt': '스케줄 관리',
+    'storage': '보관구 현황',
+    'user_mgmt': '사용자 관리',
+}
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -84,41 +97,54 @@ class MainWindow(QMainWindow):
         """탭 위젯 생성"""
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet("QTabBar::tab { height: 30px; width: 120px; }")
+
+        # 탭 이동 가능하게 설정
+        self.tab_widget.setMovable(True)
+
+        # 탭 위젯 저장용 딕셔너리 (탭 ID -> 위젯)
+        self.tab_widgets = {}
         
         # 대시보드 탭
         dashboard_tab = QWidget()
         self.create_dashboard_tab(dashboard_tab)
-        self.tab_widget.addTab(dashboard_tab, "대시보드")
-        
+        self.tab_widgets['dashboard'] = dashboard_tab
+        self.tab_widget.addTab(dashboard_tab, TAB_IDS['dashboard'])
+
         # 스케줄 작성 탭
         from .schedule_tab import ScheduleTab
         self.schedule_tab = ScheduleTab()
-        self.tab_widget.addTab(self.schedule_tab, "스케줄 작성")
+        self.tab_widgets['schedule'] = self.schedule_tab
+        self.tab_widget.addTab(self.schedule_tab, TAB_IDS['schedule'])
 
         # 업체 관리 탭
         from .client_tab import ClientTab
         self.client_tab = ClientTab()
-        self.tab_widget.addTab(self.client_tab, "업체 관리")
+        self.tab_widgets['client'] = self.client_tab
+        self.tab_widget.addTab(self.client_tab, TAB_IDS['client'])
 
         # 식품 유형 관리 탭
         from .food_type_tab import FoodTypeTab
         self.food_type_tab = FoodTypeTab()
-        self.tab_widget.addTab(self.food_type_tab, "식품 유형 관리")
+        self.tab_widgets['food_type'] = self.food_type_tab
+        self.tab_widget.addTab(self.food_type_tab, TAB_IDS['food_type'])
 
         # 수수료 관리 탭
         from .fee_tab import FeeTab
         self.fee_tab = FeeTab()
-        self.tab_widget.addTab(self.fee_tab, "수수료 관리")
+        self.tab_widgets['fee'] = self.fee_tab
+        self.tab_widget.addTab(self.fee_tab, TAB_IDS['fee'])
 
         # 견적서 관리 탭
         from .estimate_tab import EstimateTab
         self.estimate_tab = EstimateTab()
-        self.tab_widget.addTab(self.estimate_tab, "견적서 관리")
+        self.tab_widgets['estimate'] = self.estimate_tab
+        self.tab_widget.addTab(self.estimate_tab, TAB_IDS['estimate'])
 
         # 스케줄 관리 탭
         from .schedule_management_tab import ScheduleManagementTab
         self.schedule_management_tab = ScheduleManagementTab()
-        self.tab_widget.addTab(self.schedule_management_tab, "스케줄 관리")
+        self.tab_widgets['schedule_mgmt'] = self.schedule_management_tab
+        self.tab_widget.addTab(self.schedule_management_tab, TAB_IDS['schedule_mgmt'])
 
         # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
         self.schedule_tab.schedule_double_clicked.connect(self.show_schedule_detail)
@@ -132,13 +158,21 @@ class MainWindow(QMainWindow):
         # 보관구 현황 탭 (모든 사용자 조회 가능, 수정은 권한 필요)
         from .storage_tab import StorageTab
         self.storage_tab = StorageTab()
-        self.tab_widget.addTab(self.storage_tab, "보관구 현황")
+        self.tab_widgets['storage'] = self.storage_tab
+        self.tab_widget.addTab(self.storage_tab, TAB_IDS['storage'])
 
         # 사용자 관리 탭 (관리자만 접근 가능)
         from .user_management_tab import UserManagementTab
         self.user_management_tab = UserManagementTab()
-        self.tab_widget.addTab(self.user_management_tab, "사용자 관리")
-        
+        self.tab_widgets['user_mgmt'] = self.user_management_tab
+        self.tab_widget.addTab(self.user_management_tab, TAB_IDS['user_mgmt'])
+
+        # 저장된 탭 순서 복원
+        self.restore_tab_order()
+
+        # 탭 이동 시 순서 저장
+        self.tab_widget.tabBar().tabMoved.connect(self.save_tab_order)
+
         # 메인 레이아웃에 탭 위젯 추가
         self.main_layout.addWidget(self.tab_widget)
     
@@ -281,26 +315,33 @@ class MainWindow(QMainWindow):
         if user_data.get('role') == 'admin':
             return
 
-        # 탭 인덱스별 필요 권한 (하나라도 있으면 탭 접근 가능)
-        # 0:대시보드 (항상 접근), 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:보관구현황 (모든 사용자), 8:사용자관리
+        # 탭 ID별 필요 권한 (하나라도 있으면 탭 접근 가능)
         tab_permission_groups = {
-            1: ['schedule_create', 'schedule_edit', 'schedule_delete',
-                'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
-            2: ['client_view_all', 'client_view_own', 'client_create',
-                'client_edit', 'client_delete', 'client_import_excel', 'client_export_excel'],
-            3: ['food_type_create', 'food_type_edit', 'food_type_delete',
-                'food_type_reset', 'food_type_import_excel', 'food_type_update_excel',
-                'food_type_export_excel', 'food_type_db_info'],
-            4: ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
-            5: ['schedule_mgmt_view_estimate'],  # 견적서 탭
-            6: ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
-                'schedule_mgmt_select', 'schedule_mgmt_add_item',
-                'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
-            # 7:보관구현황 - 모든 사용자 접근 가능 (권한은 내부에서 수정 기능만 제한)
-            8: ['user_manage'],
+            'schedule': ['schedule_create', 'schedule_edit', 'schedule_delete',
+                        'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
+            'client': ['client_view_all', 'client_view_own', 'client_create',
+                      'client_edit', 'client_delete', 'client_import_excel', 'client_export_excel'],
+            'food_type': ['food_type_create', 'food_type_edit', 'food_type_delete',
+                         'food_type_reset', 'food_type_import_excel', 'food_type_update_excel',
+                         'food_type_export_excel', 'food_type_db_info'],
+            'fee': ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
+            'estimate': ['schedule_mgmt_view_estimate'],
+            'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
+                             'schedule_mgmt_select', 'schedule_mgmt_add_item',
+                             'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
+            # storage - 모든 사용자 접근 가능 (권한은 내부에서 수정 기능만 제한)
+            'user_mgmt': ['user_manage'],
         }
 
-        for tab_index, permissions in tab_permission_groups.items():
+        for tab_id, permissions in tab_permission_groups.items():
+            widget = self.tab_widgets.get(tab_id)
+            if not widget:
+                continue
+
+            tab_index = self.tab_widget.indexOf(widget)
+            if tab_index < 0:
+                continue
+
             # 권한 목록 중 하나라도 있으면 탭 접근 가능
             has_any_perm = any(User.has_permission(user_data, perm) for perm in permissions)
             self.tab_widget.setTabEnabled(tab_index, has_any_perm)
@@ -337,14 +378,60 @@ class MainWindow(QMainWindow):
 
     def show_schedule_detail(self, schedule_id):
         """스케줄 관리 탭으로 이동하고 해당 스케줄 선택"""
-        # 스케줄 관리 탭으로 전환 (탭 인덱스 6)
-        self.tab_widget.setCurrentIndex(6)
+        # 스케줄 관리 탭으로 전환 (위젯으로 인덱스 찾기)
+        tab_index = self.tab_widget.indexOf(self.tab_widgets.get('schedule_mgmt'))
+        if tab_index >= 0:
+            self.tab_widget.setCurrentIndex(tab_index)
         # 스케줄 관리 탭에서 해당 스케줄 선택
         self.schedule_management_tab.select_schedule_by_id(schedule_id)
 
     def show_estimate(self, schedule_data):
         """견적서 관리 탭으로 이동하고 해당 스케줄의 견적서 표시"""
-        # 견적서 관리 탭으로 전환 (탭 인덱스 5)
-        self.tab_widget.setCurrentIndex(5)
+        # 견적서 관리 탭으로 전환 (위젯으로 인덱스 찾기)
+        tab_index = self.tab_widget.indexOf(self.tab_widgets.get('estimate'))
+        if tab_index >= 0:
+            self.tab_widget.setCurrentIndex(tab_index)
         # 견적서 탭에 스케줄 데이터 로드
         self.estimate_tab.load_schedule_data(schedule_data)
+
+    def get_tab_index(self, tab_id):
+        """탭 ID로 현재 인덱스 조회"""
+        widget = self.tab_widgets.get(tab_id)
+        if widget:
+            return self.tab_widget.indexOf(widget)
+        return -1
+
+    def save_tab_order(self):
+        """현재 탭 순서 저장"""
+        settings = QSettings('BioFL', 'FoodLabManager')
+        tab_order = []
+
+        for i in range(self.tab_widget.count()):
+            widget = self.tab_widget.widget(i)
+            # 위젯으로 탭 ID 찾기
+            for tab_id, tab_widget in self.tab_widgets.items():
+                if tab_widget is widget:
+                    tab_order.append(tab_id)
+                    break
+
+        settings.setValue('tab_order', tab_order)
+
+    def restore_tab_order(self):
+        """저장된 탭 순서 복원"""
+        settings = QSettings('BioFL', 'FoodLabManager')
+        saved_order = settings.value('tab_order', [])
+
+        if not saved_order:
+            return
+
+        # 저장된 순서대로 탭 재배치
+        tab_bar = self.tab_widget.tabBar()
+
+        for target_index, tab_id in enumerate(saved_order):
+            widget = self.tab_widgets.get(tab_id)
+            if not widget:
+                continue
+
+            current_index = self.tab_widget.indexOf(widget)
+            if current_index >= 0 and current_index != target_index:
+                tab_bar.moveTab(current_index, target_index)
