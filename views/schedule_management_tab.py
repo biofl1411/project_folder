@@ -980,6 +980,7 @@ class ScheduleManagementTab(QWidget):
         self.current_schedule = None
         self.memo_history = []  # 메모 이력
         self.current_user = None  # 현재 로그인한 사용자
+        self.editing_memo_index = -1  # 수정 중인 메모 인덱스 (-1이면 새 메모)
 
         # 버튼 참조 저장 (권한 체크용)
         self.estimate_btn = None
@@ -1287,10 +1288,20 @@ class ScheduleManagementTab(QWidget):
         self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
         right_layout.addWidget(self.memo_history_list)
 
+        # 메모 수정/삭제 버튼 레이아웃
+        memo_btn_layout = QHBoxLayout()
+
         edit_memo_btn = QPushButton("메모 수정")
         edit_memo_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px;")
         edit_memo_btn.clicked.connect(self.edit_selected_memo)
-        right_layout.addWidget(edit_memo_btn)
+        memo_btn_layout.addWidget(edit_memo_btn)
+
+        delete_memo_btn = QPushButton("메모 삭제")
+        delete_memo_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px;")
+        delete_memo_btn.clicked.connect(self.delete_selected_memo)
+        memo_btn_layout.addWidget(delete_memo_btn)
+
+        right_layout.addLayout(memo_btn_layout)
 
         # 비율 설정 (1:2 - 메모 입력 1/3, 메모 이력 2/3)
         layout.addWidget(left_widget, 1)
@@ -1816,6 +1827,7 @@ class ScheduleManagementTab(QWidget):
     def load_memo_history(self):
         """메모 이력 로드"""
         self.memo_history_list.clear()
+        self.editing_memo_index = -1  # 수정 모드 초기화
         if not self.current_schedule:
             return
 
@@ -1830,15 +1842,66 @@ class ScheduleManagementTab(QWidget):
 
     def edit_memo_history(self, item):
         """메모 이력 더블클릭 시 편집"""
+        self.editing_memo_index = self.memo_history_list.row(item)
         self.memo_edit.setText(item.text())
 
     def edit_selected_memo(self):
         """선택된 메모를 수정창에 로드"""
         current_item = self.memo_history_list.currentItem()
         if current_item:
+            self.editing_memo_index = self.memo_history_list.currentRow()
             self.memo_edit.setText(current_item.text())
         else:
             QMessageBox.warning(self, "선택 필요", "수정할 메모를 선택하세요.")
+
+    def delete_selected_memo(self):
+        """선택된 메모 삭제"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "삭제 실패", "먼저 스케줄을 선택하세요.")
+            return
+
+        current_item = self.memo_history_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "선택 필요", "삭제할 메모를 선택하세요.")
+            return
+
+        reply = QMessageBox.question(
+            self, "메모 삭제",
+            "선택된 메모를 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        schedule_id = self.current_schedule.get('id')
+        existing_memo = self.current_schedule.get('memo', '') or ''
+
+        # 메모를 줄 단위로 분리
+        lines = existing_memo.strip().split('\n')
+        current_index = self.memo_history_list.currentRow()
+
+        # 해당 인덱스의 메모 삭제
+        if 0 <= current_index < len(lines):
+            del lines[current_index]
+
+        # 나머지 메모들을 다시 합침
+        updated_memo = '\n'.join(lines)
+
+        try:
+            success = Schedule.update_memo(schedule_id, updated_memo)
+            if success:
+                self.current_schedule['memo'] = updated_memo
+                self.memo_edit.clear()
+                self.editing_memo_index = -1
+                self.load_memo_history()
+                QMessageBox.information(self, "삭제 완료", "메모가 삭제되었습니다.")
+                self.schedule_saved.emit()
+            else:
+                QMessageBox.warning(self, "삭제 실패", "메모 삭제에 실패했습니다.")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"메모 삭제 중 오류:\n{str(e)}")
 
     def save_memo(self):
         """메모 저장"""
@@ -1854,23 +1917,38 @@ class ScheduleManagementTab(QWidget):
         schedule_id = self.current_schedule.get('id')
         existing_memo = self.current_schedule.get('memo', '') or ''
 
-        # 타임스탬프 추가하여 저장
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-        formatted_memo = f"[{timestamp}] {new_memo}"
+        # 메모를 줄 단위로 분리
+        lines = existing_memo.strip().split('\n') if existing_memo.strip() else []
 
-        # 기존 메모에 추가
-        if existing_memo:
-            updated_memo = f"{existing_memo}\n{formatted_memo}"
+        # 수정 모드인 경우 기존 메모 업데이트
+        if self.editing_memo_index >= 0 and self.editing_memo_index < len(lines):
+            # 타임스탬프 추가하여 수정
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+            # 기존 타임스탬프 제거 후 새 타임스탬프 추가
+            import re
+            memo_text = re.sub(r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\]\s*', '', new_memo)
+            formatted_memo = f"[{timestamp}] {memo_text}"
+            lines[self.editing_memo_index] = formatted_memo
+            updated_memo = '\n'.join(lines)
+            message = "메모가 수정되었습니다."
         else:
-            updated_memo = formatted_memo
+            # 새 메모 추가
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+            formatted_memo = f"[{timestamp}] {new_memo}"
+            if existing_memo:
+                updated_memo = f"{existing_memo}\n{formatted_memo}"
+            else:
+                updated_memo = formatted_memo
+            message = "메모가 저장되었습니다."
 
         try:
             success = Schedule.update_memo(schedule_id, updated_memo)
             if success:
                 self.current_schedule['memo'] = updated_memo
                 self.memo_edit.clear()
+                self.editing_memo_index = -1  # 수정 모드 해제
                 self.load_memo_history()
-                QMessageBox.information(self, "저장 완료", "메모가 저장되었습니다.")
+                QMessageBox.information(self, "저장 완료", message)
                 # 스케줄 작성 탭 새로고침을 위해 시그널 발생
                 self.schedule_saved.emit()
             else:

@@ -459,10 +459,11 @@ class FoodTypeSelectionDialog(QDialog):
 
 class ScheduleCreateDialog(QDialog):
     """스케줄 생성/수정 다이얼로그 - 제품 정보 자동 채우기 기능 개선"""
-    def __init__(self, parent=None, schedule_id=None):
+    def __init__(self, parent=None, schedule_id=None, current_user=None):
         super().__init__(parent)
         self.schedule_id = schedule_id  # 수정 모드일 경우 스케줄 ID
         self.is_edit_mode = schedule_id is not None
+        self.current_user = current_user  # 현재 로그인한 사용자
         self.setWindowTitle("스케줄 수정" if self.is_edit_mode else "스케줄 작성")
         self.resize(750, 600)  # 높이를 2/3로 줄임
         self.setMinimumSize(700, 500)  # 최소 높이도 줄임
@@ -1104,7 +1105,7 @@ class ScheduleCreateDialog(QDialog):
         """업체 검색 다이얼로그 표시"""
         try:
             print("업체 검색 시작")  # 로그 기록
-            
+
             # 안전하게 ClientSearchDialog 클래스 존재 여부 확인
             try:
                 # 상대 경로 임포트 시도
@@ -1114,10 +1115,15 @@ class ScheduleCreateDialog(QDialog):
             except (ImportError, ModuleNotFoundError):
                 dialog_exists = False
                 print("ClientSearchDialog 클래스를 찾을 수 없음 - 임시 모드 사용")
-            
+
             if dialog_exists:
+                # 현재 사용자의 이름으로 업체 필터링 (영업담당과 일치하는 업체만 표시)
+                sales_rep_filter = None
+                if self.current_user:
+                    sales_rep_filter = self.current_user.get('name', '')
+
                 # 실제 다이얼로그 사용
-                dialog = ClientSearchDialog(self)
+                dialog = ClientSearchDialog(self, sales_rep_filter=sales_rep_filter)
                 if dialog.exec_():
                     # 선택된 업체 정보 가져오기
                     client_id, client_data = dialog.selected_client
@@ -1569,6 +1575,12 @@ class ScheduleCreateDialog(QDialog):
 
             if not self.product_name_input.text().strip():
                 QMessageBox.warning(self, "입력 오류", "제품명을 입력해주세요.")
+                return
+
+            # 샘플링 횟수 유효성 검사 (6~15 사이)
+            sampling_count = self.get_default_sampling_count() if self.default_sampling_check.isChecked() else self.sampling_spin.value()
+            if sampling_count < 6 or sampling_count > 15:
+                QMessageBox.warning(self, "입력 오류", "샘플링 횟수는 6미만으로 설정할 수 없습니다.\n6~15회 사이로 설정해 주세요.")
                 return
 
             # 의뢰자 요청 온도인 경우 온도 값 수집
