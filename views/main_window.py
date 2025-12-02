@@ -131,8 +131,9 @@ class MainWindow(QMainWindow):
         self.schedule_management_tab.schedule_saved.connect(self.schedule_create_tab.load_schedules)
         
         # 사용자 관리 탭 (관리자만 접근 가능)
-        users_tab = QWidget()
-        self.tab_widget.addTab(users_tab, "사용자 관리")
+        from .user_management_tab import UserManagementTab
+        self.user_management_tab = UserManagementTab()
+        self.tab_widget.addTab(self.user_management_tab, "사용자 관리")
         
         # 메인 레이아웃에 탭 위젯 추가
         self.main_layout.addWidget(self.tab_widget)
@@ -243,21 +244,48 @@ class MainWindow(QMainWindow):
     def on_login_successful(self, user_data):
         """로그인 성공 시 처리"""
         self.current_user = user_data
-        self.user_label.setText(f"사용자: {user_data['name']} ({user_data['role']})")
-        
-        # 관리자가 아닌 경우 사용자 관리 탭 비활성화
-        if user_data['role'] != 'admin':
-            self.tab_widget.setTabEnabled(5, False)  # 사용자 관리 탭 비활성화
-        
+        department = user_data.get('department', '')
+        self.user_label.setText(f"사용자: {user_data['name']} ({department or user_data['role']})")
+
+        # 사용자 관리 탭에 현재 사용자 설정
+        self.user_management_tab.set_current_user(user_data)
+
+        # 권한 기반 탭 활성화/비활성화
+        self.apply_tab_permissions(user_data)
+
         self.status_label.setText(f"{user_data['name']}님으로 로그인됨")
         self.show()
+
+    def apply_tab_permissions(self, user_data):
+        """권한에 따라 탭 활성화/비활성화"""
+        from models.users import User
+
+        # 탭 인덱스: 0:대시보드, 1:스케줄작성, 2:업체관리, 3:식품유형, 4:수수료, 5:견적서, 6:스케줄관리, 7:사용자관리
+        tab_permissions = {
+            1: 'schedule_create',      # 스케줄 작성
+            2: 'client_read',          # 업체 관리
+            3: 'food_type_read',       # 식품 유형
+            4: 'fee_manage',           # 수수료 관리
+            5: 'estimate_manage',      # 견적서 관리
+            6: 'schedule_manage_read', # 스케줄 관리
+            7: 'user_manage',          # 사용자 관리
+        }
+
+        for tab_index, permission_key in tab_permissions.items():
+            has_perm = User.has_permission(user_data, permission_key)
+            self.tab_widget.setTabEnabled(tab_index, has_perm)
+
+            if not has_perm:
+                current_text = self.tab_widget.tabText(tab_index)
+                if not current_text.startswith("🔒"):
+                    self.tab_widget.setTabText(tab_index, f"🔒 {current_text}")
     
     def show_settings(self):
         """설정 창 표시"""
         try:
             from .settings_dialog import SettingsDialog
 
-            dialog = SettingsDialog(self)
+            dialog = SettingsDialog(self, current_user=self.current_user)
             dialog.exec_()
         except Exception as e:
             import traceback
