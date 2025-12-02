@@ -116,63 +116,68 @@ class Client:
             return 0
 
     @staticmethod
-    def get_paginated(page=1, per_page=100, search_keyword=None, search_field=None):
-        """페이지네이션 업체 조회"""
+    def get_paginated(page=1, per_page=100, search_keyword=None, search_field=None, sales_rep_filter=None):
+        """페이지네이션 업체 조회
+
+        Args:
+            page: 페이지 번호
+            per_page: 페이지당 항목 수
+            search_keyword: 검색어
+            search_field: 검색 필드
+            sales_rep_filter: 영업담당 필터 (해당 업체만 보기용)
+        """
         try:
             Client._ensure_detail_address_column()
             conn = get_connection()
             cursor = conn.cursor()
 
             offset = (page - 1) * per_page
+            where_conditions = []
+            params = []
+
+            # 영업담당 필터 (해당 업체만 보기)
+            if sales_rep_filter:
+                where_conditions.append("sales_rep = ?")
+                params.append(sales_rep_filter)
 
             # 검색 조건이 있는 경우
             if search_keyword:
                 if search_field == "고객/회사명":
-                    where_clause = "WHERE name LIKE ?"
-                    params = (f"%{search_keyword}%",)
+                    where_conditions.append("name LIKE ?")
+                    params.append(f"%{search_keyword}%")
                 elif search_field == "대표자":
-                    where_clause = "WHERE ceo LIKE ?"
-                    params = (f"%{search_keyword}%",)
+                    where_conditions.append("ceo LIKE ?")
+                    params.append(f"%{search_keyword}%")
                 elif search_field == "담당자":
-                    where_clause = "WHERE contact_person LIKE ?"
-                    params = (f"%{search_keyword}%",)
+                    where_conditions.append("contact_person LIKE ?")
+                    params.append(f"%{search_keyword}%")
                 elif search_field == "사업자번호":
-                    where_clause = "WHERE business_no LIKE ?"
-                    params = (f"%{search_keyword}%",)
+                    where_conditions.append("business_no LIKE ?")
+                    params.append(f"%{search_keyword}%")
                 else:  # 전체
-                    where_clause = "WHERE name LIKE ? OR ceo LIKE ? OR contact_person LIKE ? OR business_no LIKE ?"
-                    params = (f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%")
+                    where_conditions.append("(name LIKE ? OR ceo LIKE ? OR contact_person LIKE ? OR business_no LIKE ?)")
+                    params.extend([f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%"])
 
-                # 총 개수 조회
-                cursor.execute(f"SELECT COUNT(*) FROM clients {where_clause}", params)
-                total_count = cursor.fetchone()[0]
+            # WHERE 절 생성
+            where_clause = ""
+            if where_conditions:
+                where_clause = "WHERE " + " AND ".join(where_conditions)
 
-                # 데이터 조회
-                cursor.execute(f"""
-                    SELECT id, name, ceo, business_no, category, phone, fax,
-                        contact_person, email, sales_rep, toll_free, zip_code,
-                        address, detail_address, notes, sales_business, sales_phone, sales_mobile,
-                        sales_address, mobile, created_at
-                    FROM clients
-                    {where_clause}
-                    ORDER BY name
-                    LIMIT ? OFFSET ?
-                """, params + (per_page, offset))
-            else:
-                # 총 개수 조회
-                cursor.execute("SELECT COUNT(*) FROM clients")
-                total_count = cursor.fetchone()[0]
+            # 총 개수 조회
+            cursor.execute(f"SELECT COUNT(*) FROM clients {where_clause}", params)
+            total_count = cursor.fetchone()[0]
 
-                # 데이터 조회
-                cursor.execute("""
-                    SELECT id, name, ceo, business_no, category, phone, fax,
-                        contact_person, email, sales_rep, toll_free, zip_code,
-                        address, detail_address, notes, sales_business, sales_phone, sales_mobile,
-                        sales_address, mobile, created_at
-                    FROM clients
-                    ORDER BY name
-                    LIMIT ? OFFSET ?
-                """, (per_page, offset))
+            # 데이터 조회
+            cursor.execute(f"""
+                SELECT id, name, ceo, business_no, category, phone, fax,
+                    contact_person, email, sales_rep, toll_free, zip_code,
+                    address, detail_address, notes, sales_business, sales_phone, sales_mobile,
+                    sales_address, mobile, created_at
+                FROM clients
+                {where_clause}
+                ORDER BY name
+                LIMIT ? OFFSET ?
+            """, params + [per_page, offset])
 
             clients = cursor.fetchall()
             conn.close()
