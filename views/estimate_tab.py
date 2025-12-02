@@ -327,6 +327,47 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addWidget(remark_group)
 
+        # 6. 메모 섹션 (사용자 입력 가능)
+        memo_group = QGroupBox("※ 메모")
+        memo_layout = QVBoxLayout(memo_group)
+
+        # 메모 입력 영역
+        self.memo_text = QTextEdit()
+        self.memo_text.setPlaceholderText("추가 메모를 입력하세요 (선택사항)")
+        self.memo_text.setMaximumHeight(80)
+        self.memo_text.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                padding: 5px;
+                font-size: 11px;
+            }
+        """)
+        memo_layout.addWidget(self.memo_text)
+
+        # 메모 버튼 영역
+        memo_btn_layout = QHBoxLayout()
+        memo_btn_layout.addStretch()
+
+        self.memo_delete_btn = QPushButton("메모 삭제")
+        self.memo_delete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 5px 15px;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        self.memo_delete_btn.clicked.connect(self.delete_memo)
+        memo_btn_layout.addWidget(self.memo_delete_btn)
+
+        memo_layout.addLayout(memo_btn_layout)
+        self.estimate_layout.addWidget(memo_group)
+
         # 6. 합계 금액
         total_frame = QFrame()
         total_frame.setStyleSheet("border-top: 2px solid #333;")
@@ -1525,3 +1566,20 @@ class EstimateTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"PDF 저장 중 오류: {str(e)}")
             return None
+
+    def delete_memo(self):
+        """메모 삭제"""
+        if not self.memo_text.toPlainText().strip():
+            QMessageBox.information(self, "알림", "삭제할 메모가 없습니다.")
+            return
+
+        reply = QMessageBox.question(
+            self, "메모 삭제",
+            "작성된 메모를 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            self.memo_text.clear()
+            QMessageBox.information(self, "완료", "메모가 삭제되었습니다.")

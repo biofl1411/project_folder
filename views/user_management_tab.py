@@ -8,13 +8,16 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
                            QHeaderView, QMessageBox, QComboBox, QGroupBox,
-                           QFormLayout, QCheckBox, QScrollArea, QFrame, QGridLayout)
+                           QFormLayout, QCheckBox, QScrollArea, QFrame, QGridLayout,
+                           QFileDialog)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 
 from models.users import (User, DEPARTMENTS, PERMISSION_LABELS, DEFAULT_PASSWORD,
                          PERMISSION_CATEGORIES, PERMISSION_BY_CATEGORY,
                          PERMISSION_DESCRIPTIONS, get_default_permissions)
+
+import os
 
 
 class UserManagementTab(QWidget):
@@ -57,7 +60,7 @@ class UserManagementTab(QWidget):
         self.user_table.setColumnHidden(0, True)  # ID 컬럼 숨김
         left_layout.addWidget(self.user_table)
 
-        # 버튼 영역
+        # 버튼 영역 1 (기본 기능)
         btn_layout = QHBoxLayout()
 
         refresh_btn = QPushButton("새로고침")
@@ -74,6 +77,21 @@ class UserManagementTab(QWidget):
         btn_layout.addWidget(reset_pwd_btn)
 
         left_layout.addLayout(btn_layout)
+
+        # 버튼 영역 2 (엑셀 기능)
+        excel_btn_layout = QHBoxLayout()
+
+        import_btn = QPushButton("엑셀 불러오기")
+        import_btn.setStyleSheet("background-color: #2196F3; color: white;")
+        import_btn.clicked.connect(self.import_excel)
+        excel_btn_layout.addWidget(import_btn)
+
+        template_btn = QPushButton("엑셀 양식 다운로드")
+        template_btn.setStyleSheet("background-color: #4CAF50; color: white;")
+        template_btn.clicked.connect(self.download_template)
+        excel_btn_layout.addWidget(template_btn)
+
+        left_layout.addLayout(excel_btn_layout)
 
         layout.addWidget(left_widget, 1)
 
@@ -435,3 +453,182 @@ class UserManagementTab(QWidget):
                     f"비밀번호가 초기화되었습니다.\n새 비밀번호: {DEFAULT_PASSWORD}")
             else:
                 QMessageBox.critical(self, "오류", "비밀번호 초기화에 실패했습니다.")
+
+    def download_template(self):
+        """엑셀 양식 다운로드"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+            # 저장 경로 선택
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "엑셀 양식 저장",
+                "사용자_등록_양식.xlsx",
+                "Excel Files (*.xlsx)"
+            )
+
+            if not file_path:
+                return
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "사용자 등록"
+
+            # 헤더 스타일
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+            # 헤더 작성
+            headers = ['아이디*', '이름*', '부서']
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = thin_border
+
+            # 예시 데이터
+            examples = [
+                ['user001', '홍길동', '이화학팀'],
+                ['user002', '김철수', '미생물팀'],
+                ['user003', '이영희', '고객관리팀'],
+            ]
+
+            for row_idx, example in enumerate(examples, 2):
+                for col_idx, value in enumerate(example, 1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = thin_border
+
+            # 열 너비 조정
+            ws.column_dimensions['A'].width = 15
+            ws.column_dimensions['B'].width = 15
+            ws.column_dimensions['C'].width = 15
+
+            # 부서 목록 시트 추가
+            ws2 = wb.create_sheet(title="부서목록")
+            ws2.cell(row=1, column=1, value="사용 가능한 부서 목록")
+            ws2['A1'].font = Font(bold=True)
+            for idx, dept in enumerate([d for d in DEPARTMENTS if d != '관리자'], 2):
+                ws2.cell(row=idx, column=1, value=dept)
+
+            # 안내 시트 추가
+            ws3 = wb.create_sheet(title="안내사항")
+            instructions = [
+                "[ 사용자 일괄 등록 양식 안내 ]",
+                "",
+                "1. '사용자 등록' 시트에 데이터를 입력하세요.",
+                "2. 아이디와 이름은 필수 입력 항목입니다. (*표시)",
+                "3. 부서는 '부서목록' 시트를 참고하세요.",
+                "4. 아이디는 영문/숫자 조합을 권장합니다.",
+                f"5. 초기 비밀번호는 '{DEFAULT_PASSWORD}'로 설정됩니다.",
+                "6. 예시 데이터(2~4행)는 삭제 후 실제 데이터를 입력하세요.",
+            ]
+            for idx, text in enumerate(instructions, 1):
+                ws3.cell(row=idx, column=1, value=text)
+            ws3.column_dimensions['A'].width = 60
+
+            wb.save(file_path)
+            QMessageBox.information(self, "성공", f"엑셀 양식이 저장되었습니다.\n{file_path}")
+
+        except ImportError:
+            QMessageBox.critical(self, "오류", "openpyxl 라이브러리가 설치되지 않았습니다.\npip install openpyxl")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"양식 다운로드 중 오류 발생: {str(e)}")
+
+    def import_excel(self):
+        """엑셀 파일에서 사용자 일괄 등록"""
+        try:
+            import openpyxl
+
+            # 파일 선택
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "엑셀 파일 선택",
+                "",
+                "Excel Files (*.xlsx *.xls)"
+            )
+
+            if not file_path:
+                return
+
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb.active
+
+            # 헤더 확인 (첫 번째 행)
+            headers = [cell.value for cell in ws[1]]
+
+            # 필수 컬럼 확인
+            required = ['아이디', '이름']
+            id_col = None
+            name_col = None
+            dept_col = None
+
+            for idx, header in enumerate(headers):
+                if header and '아이디' in str(header):
+                    id_col = idx
+                elif header and '이름' in str(header):
+                    name_col = idx
+                elif header and '부서' in str(header):
+                    dept_col = idx
+
+            if id_col is None or name_col is None:
+                QMessageBox.warning(self, "형식 오류",
+                    "엑셀 파일에 '아이디'와 '이름' 컬럼이 필요합니다.")
+                return
+
+            # 데이터 읽기 및 등록
+            success_count = 0
+            fail_count = 0
+            fail_list = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
+                username = str(row[id_col]).strip() if row[id_col] else ''
+                name = str(row[name_col]).strip() if row[name_col] else ''
+                department = str(row[dept_col]).strip() if dept_col is not None and row[dept_col] else ''
+
+                # 빈 행 스킵
+                if not username or not name:
+                    continue
+
+                # 부서 유효성 확인
+                valid_depts = [d for d in DEPARTMENTS if d != '관리자']
+                if department and department not in valid_depts:
+                    department = valid_depts[0] if valid_depts else ''
+
+                # 사용자 생성
+                user_id = User.create(
+                    username=username,
+                    password=DEFAULT_PASSWORD,
+                    name=name,
+                    role='user',
+                    department=department,
+                    permissions=get_default_permissions(all_true=False)
+                )
+
+                if user_id:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                    fail_list.append(f"행 {row_idx}: {username} ({name})")
+
+            # 결과 메시지
+            msg = f"등록 완료: {success_count}명"
+            if fail_count > 0:
+                msg += f"\n등록 실패: {fail_count}명 (아이디 중복 등)"
+                if fail_list[:5]:  # 최대 5개만 표시
+                    msg += "\n\n실패 목록:\n" + "\n".join(fail_list[:5])
+                    if len(fail_list) > 5:
+                        msg += f"\n... 외 {len(fail_list) - 5}건"
+
+            QMessageBox.information(self, "엑셀 불러오기 완료", msg)
+            self.load_users()
+
+        except ImportError:
+            QMessageBox.critical(self, "오류", "openpyxl 라이브러리가 설치되지 않았습니다.\npip install openpyxl")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"엑셀 불러오기 중 오류 발생: {str(e)}")

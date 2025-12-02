@@ -325,7 +325,7 @@ class MainWindow(QMainWindow):
                          'food_type_reset', 'food_type_import_excel', 'food_type_update_excel',
                          'food_type_export_excel', 'food_type_db_info'],
             'fee': ['fee_create', 'fee_edit', 'fee_delete', 'fee_import_excel', 'fee_export_excel'],
-            'estimate': ['schedule_mgmt_view_estimate'],
+            'estimate': ['estimate_print', 'estimate_pdf', 'estimate_email'],
             'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
                              'schedule_mgmt_select', 'schedule_mgmt_add_item',
                              'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
