@@ -622,74 +622,138 @@ class ComposeMailDialog(QDialog):
     def __init__(self, parent, users, current_user):
         super().__init__(parent)
         self.setWindowTitle("새 메일 작성")
-        self.setMinimumSize(500, 500)
-        self.users = [u for u in users if u['id'] != current_user['id']]
+        self.setMinimumSize(600, 600)
         self.current_user = current_user
         self.to_checkboxes = {}
         self.cc_checkboxes = {}
+
+        # 사용자 목록 로드 (DB에서 직접)
+        self.users = self._load_users()
         self.initUI()
+
+    def _load_users(self):
+        """사용자 관리에서 등록된 사용자 목록 로드"""
+        try:
+            from models.users import User
+            all_users = User.get_all() or []
+            # 현재 사용자 제외
+            return [u for u in all_users if u.get('id') != self.current_user.get('id')]
+        except Exception as e:
+            print(f"사용자 목록 로드 오류: {e}")
+            return []
 
     def initUI(self):
         layout = QVBoxLayout(self)
 
+        # 사용자가 없는 경우 안내
+        if not self.users:
+            no_user_label = QLabel("등록된 사용자가 없습니다.\n사용자 관리에서 사용자를 먼저 등록해주세요.")
+            no_user_label.setStyleSheet("color: #e74c3c; font-weight: bold; padding: 20px;")
+            no_user_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(no_user_label)
+
+            close_btn = QPushButton("닫기")
+            close_btn.clicked.connect(self.reject)
+            layout.addWidget(close_btn)
+            return
+
         # 수신자 선택
-        to_group = QGroupBox("수신자 (To)")
-        to_layout = QVBoxLayout(to_group)
+        to_group = QGroupBox("수신자 (To) - 필수")
+        to_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        to_main_layout = QVBoxLayout(to_group)
+
+        # 수신자 버튼
+        to_btn_layout = QHBoxLayout()
+        to_select_all_btn = QPushButton("전체 선택")
+        to_select_all_btn.setStyleSheet("padding: 3px 10px;")
+        to_select_all_btn.clicked.connect(lambda: self.select_all_users('to'))
+        to_deselect_all_btn = QPushButton("전체 해제")
+        to_deselect_all_btn.setStyleSheet("padding: 3px 10px;")
+        to_deselect_all_btn.clicked.connect(lambda: self.deselect_all_users('to'))
+        to_btn_layout.addWidget(to_select_all_btn)
+        to_btn_layout.addWidget(to_deselect_all_btn)
+        to_btn_layout.addStretch()
+        to_main_layout.addLayout(to_btn_layout)
+
+        # 수신자 스크롤 영역
         to_scroll = QScrollArea()
         to_scroll.setWidgetResizable(True)
-        to_scroll.setMaximumHeight(120)
+        to_scroll.setMaximumHeight(150)
         to_widget = QWidget()
-        to_grid = QHBoxLayout(to_widget)
-        to_grid.setSpacing(5)
+        to_grid = QVBoxLayout(to_widget)
+        to_grid.setSpacing(3)
 
         for user in self.users:
-            cb = QCheckBox(f"{user['name']}")
-            cb.setProperty('user_id', user['id'])
-            self.to_checkboxes[user['id']] = cb
+            name = user.get('name', '')
+            dept = user.get('department', '')
+            display_text = f"{name} ({dept})" if dept else name
+            cb = QCheckBox(display_text)
+            cb.setProperty('user_id', user.get('id'))
+            self.to_checkboxes[user.get('id')] = cb
             to_grid.addWidget(cb)
         to_grid.addStretch()
 
         to_scroll.setWidget(to_widget)
-        to_layout.addWidget(to_scroll)
+        to_main_layout.addWidget(to_scroll)
         layout.addWidget(to_group)
 
         # 참조자 선택
-        cc_group = QGroupBox("참조 (CC)")
-        cc_layout = QVBoxLayout(cc_group)
+        cc_group = QGroupBox("참조 (CC) - 선택사항")
+        cc_main_layout = QVBoxLayout(cc_group)
+
+        # 참조자 버튼
+        cc_btn_layout = QHBoxLayout()
+        cc_select_all_btn = QPushButton("전체 선택")
+        cc_select_all_btn.setStyleSheet("padding: 3px 10px;")
+        cc_select_all_btn.clicked.connect(lambda: self.select_all_users('cc'))
+        cc_deselect_all_btn = QPushButton("전체 해제")
+        cc_deselect_all_btn.setStyleSheet("padding: 3px 10px;")
+        cc_deselect_all_btn.clicked.connect(lambda: self.deselect_all_users('cc'))
+        cc_btn_layout.addWidget(cc_select_all_btn)
+        cc_btn_layout.addWidget(cc_deselect_all_btn)
+        cc_btn_layout.addStretch()
+        cc_main_layout.addLayout(cc_btn_layout)
+
+        # 참조자 스크롤 영역
         cc_scroll = QScrollArea()
         cc_scroll.setWidgetResizable(True)
-        cc_scroll.setMaximumHeight(120)
+        cc_scroll.setMaximumHeight(150)
         cc_widget = QWidget()
-        cc_grid = QHBoxLayout(cc_widget)
-        cc_grid.setSpacing(5)
+        cc_grid = QVBoxLayout(cc_widget)
+        cc_grid.setSpacing(3)
 
         for user in self.users:
-            cb = QCheckBox(f"{user['name']}")
-            cb.setProperty('user_id', user['id'])
-            self.cc_checkboxes[user['id']] = cb
+            name = user.get('name', '')
+            dept = user.get('department', '')
+            display_text = f"{name} ({dept})" if dept else name
+            cb = QCheckBox(display_text)
+            cb.setProperty('user_id', user.get('id'))
+            self.cc_checkboxes[user.get('id')] = cb
             cc_grid.addWidget(cb)
         cc_grid.addStretch()
 
         cc_scroll.setWidget(cc_widget)
-        cc_layout.addWidget(cc_scroll)
+        cc_main_layout.addWidget(cc_scroll)
         layout.addWidget(cc_group)
 
         # 제목
         subject_layout = QHBoxLayout()
         subject_layout.addWidget(QLabel("제목:"))
         self.subject_input = QLineEdit()
+        self.subject_input.setPlaceholderText("메일 제목을 입력하세요")
         subject_layout.addWidget(self.subject_input)
         layout.addLayout(subject_layout)
 
         # 내용
         layout.addWidget(QLabel("내용:"))
         self.content_input = QPlainTextEdit()
+        self.content_input.setPlaceholderText("메일 내용을 입력하세요")
         layout.addWidget(self.content_input)
 
         # 버튼
         btn_layout = QHBoxLayout()
         send_btn = QPushButton("보내기")
-        send_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 20px;")
+        send_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 20px; font-weight: bold;")
         send_btn.clicked.connect(self.send_mail)
         cancel_btn = QPushButton("취소")
         cancel_btn.clicked.connect(self.reject)
@@ -697,6 +761,18 @@ class ComposeMailDialog(QDialog):
         btn_layout.addWidget(send_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def select_all_users(self, target):
+        """전체 선택"""
+        checkboxes = self.to_checkboxes if target == 'to' else self.cc_checkboxes
+        for cb in checkboxes.values():
+            cb.setChecked(True)
+
+    def deselect_all_users(self, target):
+        """전체 해제"""
+        checkboxes = self.to_checkboxes if target == 'to' else self.cc_checkboxes
+        for cb in checkboxes.values():
+            cb.setChecked(False)
 
     def send_mail(self):
         to_ids = [uid for uid, cb in self.to_checkboxes.items() if cb.isChecked()]
