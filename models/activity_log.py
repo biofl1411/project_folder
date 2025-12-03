@@ -44,9 +44,6 @@ ACTION_TYPES = {
     'estimate_pdf': '견적서 PDF 저장',
     'estimate_email': '견적서 이메일 전송',
 
-    # 보관구 관련
-    'storage_edit': '보관구 수정',
-
     # 사용자 관련
     'user_login': '로그인',
     'user_logout': '로그아웃',
