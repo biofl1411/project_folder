@@ -762,12 +762,18 @@ class MainWindow(QMainWindow):
 
             # 권한 목록 중 하나라도 있으면 탭 접근 가능
             has_any_perm = any(User.has_permission(user_data, perm) for perm in permissions)
-            self.tab_widget.setTabEnabled(tab_index, has_any_perm)
+            # 탭 이동은 항상 허용 (내부 기능은 각 탭에서 권한 체크)
+            self.tab_widget.setTabEnabled(tab_index, True)
 
+            # 권한이 없으면 잠금 표시만 추가
+            current_text = self.tab_widget.tabText(tab_index)
             if not has_any_perm:
-                current_text = self.tab_widget.tabText(tab_index)
                 if not current_text.startswith("🔒"):
                     self.tab_widget.setTabText(tab_index, f"🔒 {current_text}")
+            else:
+                # 권한이 있으면 잠금 표시 제거
+                if current_text.startswith("🔒 "):
+                    self.tab_widget.setTabText(tab_index, current_text[3:])
     
     def show_settings(self):
         """설정 창 표시"""

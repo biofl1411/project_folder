@@ -97,7 +97,7 @@ def init_database():
     for col_name, col_type in new_columns:
         try:
             cursor.execute(f'ALTER TABLE clients ADD COLUMN {col_name} {col_type}')
-        except:
+        except Exception:
             pass  # 컬럼이 이미 존재하면 무시
     
     # 스케줄 및 견적 테이블
