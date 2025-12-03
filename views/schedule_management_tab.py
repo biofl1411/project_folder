@@ -1401,7 +1401,8 @@ class ScheduleManagementTab(QWidget):
         # 단일 테이블
         self.experiment_table = QTableWidget()
         self.experiment_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.experiment_table.setMinimumHeight(250)
+        # 동적 높이 조절을 위해 고정 최소 높이 제거, 대신 SizePolicy 설정
+        self.experiment_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.experiment_table.cellClicked.connect(self.on_experiment_cell_clicked)
         layout.addWidget(self.experiment_table)
 
@@ -1409,21 +1410,27 @@ class ScheduleManagementTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
+        # 버튼들을 담을 위젯 (JPG 저장 시 숨김용)
+        self.experiment_btn_widget = QWidget()
+        btn_widget_layout = QHBoxLayout(self.experiment_btn_widget)
+        btn_widget_layout.setContentsMargins(0, 0, 0, 0)
+
         self.add_item_btn = QPushButton("+ 항목 추가")
         self.add_item_btn.setStyleSheet("background-color: #27ae60; color: white; padding: 5px 15px; font-weight: bold;")
         self.add_item_btn.clicked.connect(self.add_test_item)
-        btn_layout.addWidget(self.add_item_btn)
+        btn_widget_layout.addWidget(self.add_item_btn)
 
         self.remove_item_btn = QPushButton("- 항목 삭제")
         self.remove_item_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px 15px; font-weight: bold;")
         self.remove_item_btn.clicked.connect(self.remove_test_item)
-        btn_layout.addWidget(self.remove_item_btn)
+        btn_widget_layout.addWidget(self.remove_item_btn)
 
         self.save_schedule_btn = QPushButton("저장")
         self.save_schedule_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px 15px; font-weight: bold;")
         self.save_schedule_btn.clicked.connect(self.save_schedule_changes)
-        btn_layout.addWidget(self.save_schedule_btn)
+        btn_widget_layout.addWidget(self.save_schedule_btn)
 
+        btn_layout.addWidget(self.experiment_btn_widget)
         layout.addLayout(btn_layout)
 
         # 추가/삭제된 항목 저장용 리스트
@@ -1443,7 +1450,8 @@ class ScheduleManagementTab(QWidget):
 
     def create_cost_summary(self, parent_layout):
         """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
-        cost_frame = QFrame()
+        self.cost_frame = QFrame()
+        cost_frame = self.cost_frame  # 기존 코드 호환을 위한 로컬 참조
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(3)
@@ -2308,6 +2316,31 @@ class ScheduleManagementTab(QWidget):
 
         # 금액을 DB에 저장
         self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
+        # 테이블 높이를 내용에 맞게 조절
+        self._adjust_table_height()
+
+    def _adjust_table_height(self):
+        """테이블 높이를 내용(행 수)에 맞게 자동 조절"""
+        table = self.experiment_table
+        if table.rowCount() == 0:
+            table.setFixedHeight(100)  # 최소 높이
+            return
+
+        # 헤더 높이 + 모든 행 높이 + 여백
+        header_height = table.horizontalHeader().height()
+        rows_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
+        # 스크롤바, 테두리 등을 위한 여백
+        margin = 10
+
+        total_height = header_height + rows_height + margin
+
+        # 최소/최대 높이 제한
+        min_height = 150
+        max_height = 500
+
+        adjusted_height = max(min_height, min(total_height, max_height))
+        table.setFixedHeight(adjusted_height)
 
     def _save_amounts_to_db(self, supply_amount, tax_amount, total_amount):
         """금액을 DB에 저장"""
@@ -3392,6 +3425,26 @@ class ScheduleManagementTab(QWidget):
             from PyQt5.QtGui import QPixmap, QPainter, QImage
             from PyQt5.QtCore import QRect
 
+            # JPG 저장 시 버튼과 금액 영역 숨기기
+            hidden_widgets = []
+            if hasattr(self, 'experiment_btn_widget') and self.experiment_btn_widget:
+                self.experiment_btn_widget.hide()
+                hidden_widgets.append(self.experiment_btn_widget)
+            if hasattr(self, 'cost_frame') and self.cost_frame:
+                self.cost_frame.hide()
+                hidden_widgets.append(self.cost_frame)
+
+            # 테이블의 마지막 행 "(1회 기준)" 숨기기
+            last_row_hidden = False
+            if hasattr(self, 'experiment_table') and self.experiment_table.rowCount() > 0:
+                last_row = self.experiment_table.rowCount() - 1
+                self.experiment_table.hideRow(last_row)
+                last_row_hidden = True
+
+            # 레이아웃 업데이트를 위해 잠시 대기
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+
             # 캡처할 위젯들의 총 높이와 최대 너비 계산
             widgets_to_capture = []
             if self.info_group:
@@ -3402,6 +3455,12 @@ class ScheduleManagementTab(QWidget):
                 widgets_to_capture.append(self.experiment_group)
 
             if not widgets_to_capture:
+                # 숨긴 위젯 복원
+                for w in hidden_widgets:
+                    w.show()
+                # 테이블 마지막 행 복원
+                if last_row_hidden:
+                    self.experiment_table.showRow(last_row)
                 QMessageBox.warning(self, "오류", "캡처할 영역이 없습니다.")
                 return
 
@@ -3424,6 +3483,13 @@ class ScheduleManagementTab(QWidget):
 
             painter.end()
 
+            # 숨긴 위젯 복원
+            for w in hidden_widgets:
+                w.show()
+            # 테이블 마지막 행 복원
+            if last_row_hidden:
+                self.experiment_table.showRow(last_row)
+
             # JPG로 저장
             if image.save(file_path, "JPEG", 95):
                 QMessageBox.information(self, "저장 완료", f"이미지가 저장되었습니다.\n{file_path}")
@@ -3433,6 +3499,13 @@ class ScheduleManagementTab(QWidget):
                 QMessageBox.critical(self, "저장 실패", "이미지 저장에 실패했습니다.")
 
         except Exception as e:
+            # 숨긴 위젯 복원
+            if 'hidden_widgets' in locals():
+                for w in hidden_widgets:
+                    w.show()
+            # 테이블 마지막 행 복원
+            if 'last_row_hidden' in locals() and last_row_hidden:
+                self.experiment_table.showRow(last_row)
             QMessageBox.critical(self, "오류", f"이미지 저장 중 오류가 발생했습니다.\n{str(e)}")
 
     def open_mail_dialog(self):
@@ -3441,9 +3514,117 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.warning(self, "알림", "먼저 스케줄을 선택하세요.")
             return
 
+        # 메일 발송 전 자동으로 JPG 스크린샷 생성
+        self._create_temp_screenshot()
+
         dialog = ScheduleMailDialog(self, self.current_schedule, self.current_user)
         if dialog.exec_():
             QMessageBox.information(self, "완료", "메일이 전송되었습니다.")
+
+    def _create_temp_screenshot(self):
+        """메일 첨부용 임시 스크린샷 생성"""
+        try:
+            import os
+            import tempfile
+            from PyQt5.QtGui import QPixmap, QPainter, QImage
+            from PyQt5.QtWidgets import QApplication
+
+            # JPG 저장 시 버튼과 금액 영역 숨기기
+            hidden_widgets = []
+            if hasattr(self, 'experiment_btn_widget') and self.experiment_btn_widget:
+                self.experiment_btn_widget.hide()
+                hidden_widgets.append(self.experiment_btn_widget)
+            if hasattr(self, 'cost_frame') and self.cost_frame:
+                self.cost_frame.hide()
+                hidden_widgets.append(self.cost_frame)
+
+            # 테이블의 마지막 행 "(1회 기준)" 숨기기
+            last_row_hidden = False
+            last_row = 0
+            if hasattr(self, 'experiment_table') and self.experiment_table.rowCount() > 0:
+                last_row = self.experiment_table.rowCount() - 1
+                self.experiment_table.hideRow(last_row)
+                last_row_hidden = True
+
+            # 레이아웃 업데이트를 위해 잠시 대기
+            QApplication.processEvents()
+
+            # 캡처할 위젯들의 총 높이와 최대 너비 계산
+            widgets_to_capture = []
+            if self.info_group:
+                widgets_to_capture.append(self.info_group)
+            if self.memo_group:
+                widgets_to_capture.append(self.memo_group)
+            if self.experiment_group:
+                widgets_to_capture.append(self.experiment_group)
+
+            if not widgets_to_capture:
+                for w in hidden_widgets:
+                    w.show()
+                if last_row_hidden:
+                    self.experiment_table.showRow(last_row)
+                return
+
+            # 각 위젯의 크기 계산
+            total_height = sum(w.height() for w in widgets_to_capture) + 20
+            max_width = max(w.width() for w in widgets_to_capture)
+
+            # 이미지 생성
+            image = QImage(max_width, total_height, QImage.Format_RGB32)
+            image.fill(Qt.white)
+
+            painter = QPainter(image)
+            current_y = 0
+
+            for widget in widgets_to_capture:
+                pixmap = widget.grab()
+                painter.drawPixmap(0, current_y, pixmap)
+                current_y += widget.height() + 5
+
+            painter.end()
+
+            # 숨긴 위젯 복원
+            for w in hidden_widgets:
+                w.show()
+            # 테이블 마지막 행 복원
+            if last_row_hidden:
+                self.experiment_table.showRow(last_row)
+
+            # 파일명 생성
+            start_date = self.current_schedule.get('start_date', '') or ''
+            company = self.current_schedule.get('company_name', '') or ''
+            food_type = self.current_schedule.get('food_type', '') or ''
+
+            import re
+            def sanitize_filename(name):
+                return re.sub(r'[\\/*?:"<>|]', '', name).strip()
+
+            filename_parts = [
+                start_date.replace('-', ''),
+                sanitize_filename(company),
+                sanitize_filename(food_type)
+            ]
+            filename = '_'.join([p for p in filename_parts if p]) + '.jpg'
+
+            # 임시 폴더에 저장
+            temp_dir = os.path.join(os.getcwd(), '스케줄관리')
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+            file_path = os.path.join(temp_dir, filename)
+
+            # JPG로 저장
+            if image.save(file_path, "JPEG", 95):
+                self.last_saved_image_path = file_path
+
+        except Exception as e:
+            print(f"스크린샷 생성 오류: {e}")
+            # 숨긴 위젯 복원
+            if 'hidden_widgets' in locals():
+                for w in hidden_widgets:
+                    w.show()
+            # 테이블 마지막 행 복원
+            if 'last_row_hidden' in locals() and last_row_hidden:
+                self.experiment_table.showRow(last_row)
 
 
 class ScheduleMailDialog(QDialog):
