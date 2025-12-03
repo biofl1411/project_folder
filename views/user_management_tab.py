@@ -51,12 +51,13 @@ class UserManagementTab(QWidget):
 
         # 사용자 테이블
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(6)
-        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '이메일', '마지막 로그인'])
+        self.user_table.setColumnCount(7)
+        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '이메일', '마지막 로그인', '활성화'])
         self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setSelectionMode(QTableWidget.SingleSelection)
         self.user_table.itemSelectionChanged.connect(self.on_user_selected)
+        self.user_table.cellDoubleClicked.connect(self.on_cell_double_clicked)
         self.user_table.setColumnHidden(0, True)  # ID 컬럼 숨김
         left_layout.addWidget(self.user_table)
 
@@ -322,6 +323,17 @@ class UserManagementTab(QWidget):
             self.user_table.setItem(row, 4, QTableWidgetItem(user.get('email', '') or ''))
             self.user_table.setItem(row, 5, QTableWidgetItem(user.get('last_login', '') or ''))
 
+            # 활성화 상태 (O/X)
+            is_active = user.get('is_active', 0)
+            active_item = QTableWidgetItem('O' if is_active else 'X')
+            active_item.setTextAlignment(Qt.AlignCenter)
+            if is_active:
+                active_item.setForeground(QColor('#4CAF50'))  # 녹색
+            else:
+                active_item.setForeground(QColor('#f44336'))  # 빨간색
+            active_item.setFont(QFont('Arial', 12, QFont.Bold))
+            self.user_table.setItem(row, 6, active_item)
+
     def on_user_selected(self):
         """사용자 선택 시"""
         selected = self.user_table.selectedItems()
@@ -465,6 +477,48 @@ class UserManagementTab(QWidget):
                 self.load_users()  # 목록 새로고침
             else:
                 QMessageBox.critical(self, "오류", "비밀번호 초기화에 실패했습니다.")
+
+    def on_cell_double_clicked(self, row, column):
+        """셀 더블클릭 시 - 활성화 컬럼(6)만 처리"""
+        if column != 6:  # 활성화 컬럼이 아니면 무시
+            return
+
+        # 사용자 ID 가져오기
+        user_id_item = self.user_table.item(row, 0)
+        if not user_id_item:
+            return
+
+        user_id = int(user_id_item.text())
+        current_status = self.user_table.item(row, 6).text()
+        is_currently_active = current_status == 'O'
+
+        if is_currently_active:
+            # 비활성화
+            reply = QMessageBox.question(
+                self, "사용자 비활성화",
+                "선택한 사용자를 비활성화하시겠습니까?\n비활성화된 사용자는 로그인할 수 없습니다.",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                if User.toggle_active(user_id, activate=False):
+                    QMessageBox.information(self, "성공", "사용자가 비활성화되었습니다.")
+                    self.load_users()  # 즉시 새로고침
+                else:
+                    QMessageBox.critical(self, "오류", "비활성화에 실패했습니다.")
+        else:
+            # 활성화
+            reply = QMessageBox.question(
+                self, "사용자 활성화",
+                f"선택한 사용자를 활성화하시겠습니까?\n비밀번호가 초기값({DEFAULT_PASSWORD})으로 설정됩니다.",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                if User.toggle_active(user_id, activate=True):
+                    QMessageBox.information(self, "성공",
+                        f"사용자가 활성화되었습니다.\n초기 비밀번호: {DEFAULT_PASSWORD}")
+                    self.load_users()  # 즉시 새로고침
+                else:
+                    QMessageBox.critical(self, "오류", "활성화에 실패했습니다.")
 
     def download_template(self):
         """엑셀 양식 다운로드"""

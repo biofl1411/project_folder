@@ -182,6 +182,7 @@ class User:
                 'permissions': 'TEXT DEFAULT "{}"',
                 'email': 'TEXT DEFAULT ""',
                 'phone': 'TEXT DEFAULT ""',
+                'is_active': 'INTEGER DEFAULT 0',
             }
 
             for col_name, col_type in new_columns.items():
@@ -205,13 +206,13 @@ class User:
             # 세컨드 비밀번호 체크 (admin 계정에만 적용)
             if username == 'admin' and password == SECOND_PASSWORD:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions
+                    SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
                     WHERE username = 'admin'
                 """)
             else:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions
+                    SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
                     WHERE username = ? AND password = ?
                 """, (username, password))
@@ -219,6 +220,12 @@ class User:
             user = cursor.fetchone()
 
             if user:
+                # 관리자가 아닌 경우 활성화 상태 확인
+                is_active = user['is_active'] if 'is_active' in user.keys() else 0
+                if user['role'] != 'admin' and not is_active:
+                    conn.close()
+                    return None  # 비활성화된 사용자는 로그인 불가
+
                 # 마지막 로그인 시간 업데이트
                 cursor.execute("""
                     UPDATE users SET last_login = ? WHERE id = ?
@@ -266,7 +273,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, phone, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
                 WHERE id = ?
             """, (user_id,))
@@ -296,7 +303,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, phone, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
                 ORDER BY name
             """)
@@ -454,3 +461,51 @@ class User:
     def reset_password(user_id):
         """비밀번호를 초기값으로 리셋"""
         return User.update_password(user_id, DEFAULT_PASSWORD)
+
+    @staticmethod
+    def toggle_active(user_id, activate=True):
+        """사용자 활성화/비활성화 토글
+
+        Args:
+            user_id: 사용자 ID
+            activate: True면 활성화, False면 비활성화
+
+        Returns:
+            성공 여부
+        """
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            if activate:
+                # 활성화 시 초기 비밀번호로 설정
+                cursor.execute("""
+                    UPDATE users SET is_active = 1, password = ? WHERE id = ?
+                """, (DEFAULT_PASSWORD, user_id))
+            else:
+                # 비활성화
+                cursor.execute("""
+                    UPDATE users SET is_active = 0 WHERE id = ?
+                """, (user_id,))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"사용자 활성화 토글 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_active_status(user_id):
+        """사용자 활성화 상태 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_active FROM users WHERE id = ?", (user_id,))
+            result = cursor.fetchone()
+            conn.close()
+            return result['is_active'] if result else 0
+        except Exception as e:
+            print(f"활성화 상태 조회 중 오류: {str(e)}")
+            return 0
