@@ -1143,7 +1143,9 @@ class ScheduleManagementTab(QWidget):
         """스케줄 선택 버튼 영역"""
         frame = QFrame()
         frame.setStyleSheet("background-color: #34495e; border-radius: 5px; padding: 5px;")
+        frame.setFixedHeight(50)  # 높이 고정
         layout = QHBoxLayout(frame)
+        layout.setContentsMargins(10, 5, 10, 5)  # 여백 최소화
 
         # 현재 선택된 스케줄 표시
         self.selected_schedule_label = QLabel("선택된 스케줄 없음")
