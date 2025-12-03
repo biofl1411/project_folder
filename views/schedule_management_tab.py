@@ -572,7 +572,6 @@ class ScheduleSelectDialog(QDialog):
         ('start_date', '시작일', 'start_date', True),
         ('end_date', '종료일', 'end_date', True),
         ('status', '상태', 'status', True),
-        ('memo', '메모', 'memo', False),
     ]
 
     def __init__(self, parent=None):
@@ -668,7 +667,6 @@ class ScheduleSelectDialog(QDialog):
             'start_date': 90,
             'end_date': 90,
             'status': 70,
-            'memo': 150,
         }
         for col_index, col_def in enumerate(self.ALL_COLUMNS):
             col_key = col_def[0]
@@ -980,9 +978,7 @@ class ScheduleManagementTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_schedule = None
-        self.memo_history = []  # 메모 이력
         self.current_user = None  # 현재 로그인한 사용자
-        self.editing_memo_index = -1  # 수정 중인 메모 인덱스 (-1이면 새 메모)
 
         # 버튼 참조 저장 (권한 체크용)
         self.estimate_btn = None
@@ -994,7 +990,6 @@ class ScheduleManagementTab(QWidget):
 
         # 그룹 참조 저장 (JPG 저장용)
         self.info_group = None
-        self.memo_group = None
         self.experiment_group = None
 
         self.initUI()
@@ -1131,10 +1126,7 @@ class ScheduleManagementTab(QWidget):
         # 2. 보관 온도 구간
         self.create_temperature_panel(main_layout)
 
-        # 3. 메모 (1/3) + 메모 이력 (2/3)
-        self.create_memo_panel(main_layout)
-
-        # 4. 온도조건별 실험 스케줄
+        # 3. 온도조건별 실험 스케줄
         self.create_experiment_schedule_panel(main_layout)
 
         scroll.setWidget(content_widget)
@@ -1329,67 +1321,9 @@ class ScheduleManagementTab(QWidget):
         # 기존 호환성을 위해 빈 메서드로 유지
         pass
 
-    def create_memo_panel(self, parent_layout):
-        """메모 입력 (1/3) + 메모 이력 (2/3)"""
-        self.memo_group = QGroupBox("2. 메모")
-        group = self.memo_group
-        group.setStyleSheet("""
-            QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #9b59b6; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #9b59b6; }
-        """)
-        group.setMaximumHeight(120)  # 메모 영역 전체 높이 제한
-
-        layout = QHBoxLayout(group)
-
-        # 왼쪽: 메모 입력 (1/3)
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.memo_edit = QTextEdit()
-        self.memo_edit.setPlaceholderText("새 메모를 입력하세요...")
-        self.memo_edit.setMaximumHeight(50)
-        left_layout.addWidget(self.memo_edit)
-
-        save_btn = QPushButton("메모 저장")
-        save_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 5px;")
-        save_btn.clicked.connect(self.save_memo)
-        left_layout.addWidget(save_btn)
-
-        # 오른쪽: 메모 이력 (2/3)
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.memo_history_list = QListWidget()
-        self.memo_history_list.setMaximumHeight(50)
-        self.memo_history_list.itemDoubleClicked.connect(self.edit_memo_history)
-        right_layout.addWidget(self.memo_history_list)
-
-        # 메모 수정/삭제 버튼 레이아웃
-        memo_btn_layout = QHBoxLayout()
-
-        edit_memo_btn = QPushButton("메모 수정")
-        edit_memo_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px;")
-        edit_memo_btn.clicked.connect(self.edit_selected_memo)
-        memo_btn_layout.addWidget(edit_memo_btn)
-
-        delete_memo_btn = QPushButton("메모 삭제")
-        delete_memo_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px;")
-        delete_memo_btn.clicked.connect(self.delete_selected_memo)
-        memo_btn_layout.addWidget(delete_memo_btn)
-
-        right_layout.addLayout(memo_btn_layout)
-
-        # 비율 설정 (1:2 - 메모 입력 1/3, 메모 이력 2/3)
-        layout.addWidget(left_widget, 1)
-        layout.addWidget(right_widget, 2)
-
-        parent_layout.addWidget(group)
-
     def create_experiment_schedule_panel(self, parent_layout):
         """온도조건별 실험 스케줄"""
-        self.experiment_group = QGroupBox("3. 온도조건별 실험 스케줄")
+        self.experiment_group = QGroupBox("2. 온도조건별 실험 스케줄")
         group = self.experiment_group
         group.setStyleSheet("""
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #e67e22; border-radius: 5px; margin-top: 8px; padding-top: 8px; }
@@ -1574,7 +1508,6 @@ class ScheduleManagementTab(QWidget):
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
             self.update_info_panel(schedule)
             self.update_experiment_schedule(schedule)
-            self.load_memo_history()
 
     def _load_saved_test_items(self, schedule):
         """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""
@@ -1910,151 +1843,6 @@ class ScheduleManagementTab(QWidget):
             self.packaging_value.setText("-")
             self.required_sample_value.setText("-")
             self.current_required_sample = 0
-
-    def load_memo_history(self):
-        """메모 이력 로드"""
-        self.memo_history_list.clear()
-        self.editing_memo_index = -1  # 수정 모드 초기화
-        if not self.current_schedule:
-            return
-
-        memo = self.current_schedule.get('memo', '') or ''
-        if memo:
-            # 메모를 줄바꿈으로 분리하여 이력으로 표시
-            lines = memo.strip().split('\n')
-            for line in lines:
-                if line.strip():
-                    item = QListWidgetItem(line.strip())
-                    self.memo_history_list.addItem(item)
-
-    def edit_memo_history(self, item):
-        """메모 이력 더블클릭 시 편집"""
-        self.editing_memo_index = self.memo_history_list.row(item)
-        self.memo_edit.setText(item.text())
-
-    def edit_selected_memo(self):
-        """선택된 메모를 수정창에 로드"""
-        current_item = self.memo_history_list.currentItem()
-        if current_item:
-            self.editing_memo_index = self.memo_history_list.currentRow()
-            self.memo_edit.setText(current_item.text())
-        else:
-            QMessageBox.warning(self, "선택 필요", "수정할 메모를 선택하세요.")
-
-    def delete_selected_memo(self):
-        """선택된 메모 삭제"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "삭제 실패", "먼저 스케줄을 선택하세요.")
-            return
-
-        current_item = self.memo_history_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "선택 필요", "삭제할 메모를 선택하세요.")
-            return
-
-        reply = QMessageBox.question(
-            self, "메모 삭제",
-            "선택된 메모를 삭제하시겠습니까?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-
-        if reply != QMessageBox.Yes:
-            return
-
-        schedule_id = self.current_schedule.get('id')
-        existing_memo = self.current_schedule.get('memo', '') or ''
-
-        # 메모를 줄 단위로 분리
-        lines = existing_memo.strip().split('\n')
-        current_index = self.memo_history_list.currentRow()
-
-        # 해당 인덱스의 메모 삭제
-        if 0 <= current_index < len(lines):
-            del lines[current_index]
-
-        # 나머지 메모들을 다시 합침
-        updated_memo = '\n'.join(lines)
-
-        try:
-            deleted_memo = current_item.text()  # 로그용
-            success = Schedule.update_memo(schedule_id, updated_memo)
-            if success:
-                self.current_schedule['memo'] = updated_memo
-                self.memo_edit.clear()
-                self.editing_memo_index = -1
-                self.load_memo_history()
-
-                # 활동 로그 기록
-                self.log_activity('schedule_memo_delete', details={'deleted_memo': deleted_memo[:100]})
-
-                QMessageBox.information(self, "삭제 완료", "메모가 삭제되었습니다.")
-                self.schedule_saved.emit()
-            else:
-                QMessageBox.warning(self, "삭제 실패", "메모 삭제에 실패했습니다.")
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"메모 삭제 중 오류:\n{str(e)}")
-
-    def save_memo(self):
-        """메모 저장"""
-        if not self.current_schedule:
-            QMessageBox.warning(self, "저장 실패", "먼저 스케줄을 선택하세요.")
-            return
-
-        new_memo = self.memo_edit.toPlainText().strip()
-        if not new_memo:
-            QMessageBox.warning(self, "저장 실패", "메모 내용을 입력하세요.")
-            return
-
-        schedule_id = self.current_schedule.get('id')
-        existing_memo = self.current_schedule.get('memo', '') or ''
-
-        # 메모를 줄 단위로 분리
-        lines = existing_memo.strip().split('\n') if existing_memo.strip() else []
-
-        # 수정 모드인 경우 기존 메모 업데이트
-        if self.editing_memo_index >= 0 and self.editing_memo_index < len(lines):
-            # 타임스탬프 추가하여 수정
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-            # 기존 타임스탬프 제거 후 새 타임스탬프 추가
-            import re
-            memo_text = re.sub(r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\]\s*', '', new_memo)
-            formatted_memo = f"[{timestamp}] {memo_text}"
-            lines[self.editing_memo_index] = formatted_memo
-            updated_memo = '\n'.join(lines)
-            message = "메모가 수정되었습니다."
-        else:
-            # 새 메모 추가
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-            formatted_memo = f"[{timestamp}] {new_memo}"
-            if existing_memo:
-                updated_memo = f"{existing_memo}\n{formatted_memo}"
-            else:
-                updated_memo = formatted_memo
-            message = "메모가 저장되었습니다."
-
-        try:
-            is_editing = self.editing_memo_index >= 0 and self.editing_memo_index < len(lines)
-            success = Schedule.update_memo(schedule_id, updated_memo)
-            if success:
-                self.current_schedule['memo'] = updated_memo
-                self.memo_edit.clear()
-                self.editing_memo_index = -1  # 수정 모드 해제
-                self.load_memo_history()
-
-                # 활동 로그 기록
-                if is_editing:
-                    self.log_activity('schedule_memo_edit', details={'memo': new_memo[:100]})
-                else:
-                    self.log_activity('schedule_memo_add', details={'memo': new_memo[:100]})
-
-                QMessageBox.information(self, "저장 완료", message)
-                # 스케줄 작성 탭 새로고침을 위해 시그널 발생
-                self.schedule_saved.emit()
-            else:
-                QMessageBox.warning(self, "저장 실패", "메모 저장에 실패했습니다.")
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"메모 저장 중 오류:\n{str(e)}")
 
     def update_experiment_schedule(self, schedule):
         """온도조건별 실험 스케줄 테이블 업데이트"""
@@ -3449,8 +3237,6 @@ class ScheduleManagementTab(QWidget):
             widgets_to_capture = []
             if self.info_group:
                 widgets_to_capture.append(self.info_group)
-            if self.memo_group:
-                widgets_to_capture.append(self.memo_group)
             if self.experiment_group:
                 widgets_to_capture.append(self.experiment_group)
 
@@ -3553,8 +3339,6 @@ class ScheduleManagementTab(QWidget):
             widgets_to_capture = []
             if self.info_group:
                 widgets_to_capture.append(self.info_group)
-            if self.memo_group:
-                widgets_to_capture.append(self.memo_group)
             if self.experiment_group:
                 widgets_to_capture.append(self.experiment_group)
 
