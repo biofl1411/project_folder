@@ -96,7 +96,7 @@ class Schedule:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT s.*, c.name as client_name
+                SELECT s.*, c.name as client_name, c.email as client_email
                 FROM schedules s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.id = ?

@@ -3592,8 +3592,8 @@ class ScheduleManagementTab(QWidget):
 
             # 파일명 생성
             start_date = self.current_schedule.get('start_date', '') or ''
-            company = self.current_schedule.get('company_name', '') or ''
-            food_type = self.current_schedule.get('food_type', '') or ''
+            client_name = self.current_schedule.get('client_name', '') or ''
+            product_name = self.current_schedule.get('product_name', '') or ''
 
             import re
             def sanitize_filename(name):
@@ -3601,10 +3601,15 @@ class ScheduleManagementTab(QWidget):
 
             filename_parts = [
                 start_date.replace('-', ''),
-                sanitize_filename(company),
-                sanitize_filename(food_type)
+                sanitize_filename(client_name),
+                sanitize_filename(product_name)
             ]
             filename = '_'.join([p for p in filename_parts if p]) + '.jpg'
+
+            # 파일명이 비어있으면 기본값 사용
+            if filename == '.jpg':
+                from datetime import datetime
+                filename = datetime.now().strftime('%Y%m%d') + '.jpg'
 
             # 임시 폴더에 저장
             temp_dir = os.path.join(os.getcwd(), '스케줄관리')
@@ -3962,7 +3967,7 @@ class ScheduleMailDialog(QDialog):
         food_type_name = '-'
         if food_type_id:
             try:
-                from models.food_types import ProductType
+                from models.product_types import ProductType
                 food_type = ProductType.get_by_id(food_type_id)
                 if food_type:
                     food_type_name = food_type.get('type_name', '-') or '-'
@@ -3990,8 +3995,33 @@ class ScheduleMailDialog(QDialog):
         }
         test_method = method_map.get(test_method_code, test_method_code) if test_method_code else '-'
 
-        # 검사 항목
-        test_items = self.schedule.get('test_items', []) or []
+        # 검사 항목 (식품유형에서 가져오기 + 추가 항목)
+        test_items = []
+        if food_type_id:
+            try:
+                from models.product_types import ProductType
+                food_type_data = ProductType.get_by_id(food_type_id)
+                if food_type_data:
+                    test_items_str_raw = food_type_data.get('test_items', '') or ''
+                    if test_items_str_raw:
+                        test_items = [item.strip() for item in test_items_str_raw.split(',') if item.strip()]
+            except Exception:
+                pass
+
+        # 기본 검사항목이 없으면 기본값
+        if not test_items:
+            test_items = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        # 추가된 검사항목
+        import json
+        additional_json = self.schedule.get('additional_test_items', '')
+        if additional_json:
+            try:
+                additional_items = json.loads(additional_json)
+                test_items = test_items + additional_items
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         test_items_str = ', '.join(test_items) if test_items else '-'
 
         # 중간보고서
