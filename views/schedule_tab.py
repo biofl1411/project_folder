@@ -1337,10 +1337,31 @@ class ScheduleTab(QWidget):
                         try:
                             from models.clients import Client
                             clients = Client.get_all()
+                            client_name_normalized = client_name.strip().lower()
+
+                            # 1차: 정확히 일치
                             for c in clients:
-                                if c.get('company_name') == client_name:
+                                db_name = (c.get('name') or '').strip()
+                                if db_name == client_name:
                                     client_id = c.get('id')
                                     break
+
+                            # 2차: 대소문자 무시 비교
+                            if not client_id:
+                                for c in clients:
+                                    db_name = (c.get('name') or '').strip().lower()
+                                    if db_name == client_name_normalized:
+                                        client_id = c.get('id')
+                                        break
+
+                            # 3차: 부분 일치 (엑셀의 업체명이 DB의 업체명에 포함되거나 그 반대)
+                            if not client_id:
+                                for c in clients:
+                                    db_name = (c.get('name') or '').strip().lower()
+                                    if db_name and client_name_normalized:
+                                        if client_name_normalized in db_name or db_name in client_name_normalized:
+                                            client_id = c.get('id')
+                                            break
                         except Exception:
                             pass
 
