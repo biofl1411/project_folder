@@ -3754,6 +3754,31 @@ class ScheduleMailDialog(QDialog):
         cc_main_layout.addWidget(cc_scroll)
         layout.addWidget(cc_group)
 
+        # 외부 이메일 발송 영역
+        email_group = QGroupBox("외부 이메일 발송 (그룹웨어 SMTP)")
+        email_layout = QVBoxLayout(email_group)
+
+        email_to_layout = QHBoxLayout()
+        email_to_layout.addWidget(QLabel("수신자 이메일:"))
+        self.external_email_to = QLineEdit()
+        self.external_email_to.setPlaceholderText("이메일 주소 입력 (여러 개는 쉼표로 구분)")
+        email_to_layout.addWidget(self.external_email_to)
+        email_layout.addLayout(email_to_layout)
+
+        email_cc_layout = QHBoxLayout()
+        email_cc_layout.addWidget(QLabel("참조 이메일:"))
+        self.external_email_cc = QLineEdit()
+        self.external_email_cc.setPlaceholderText("참조 이메일 (선택사항)")
+        email_cc_layout.addWidget(self.external_email_cc)
+        email_layout.addLayout(email_cc_layout)
+
+        # 업체 이메일 자동 입력 버튼
+        self.auto_fill_btn = QPushButton("업체 이메일 자동 입력")
+        self.auto_fill_btn.clicked.connect(self._auto_fill_client_email)
+        email_layout.addWidget(self.auto_fill_btn)
+
+        layout.addWidget(email_group)
+
         # 제목
         subject_layout = QHBoxLayout()
         subject_layout.addWidget(QLabel("제목:"))
@@ -3902,18 +3927,68 @@ class ScheduleMailDialog(QDialog):
 
     def _set_default_subject(self):
         """기본 메일 제목 설정"""
-        company = self.schedule.get('company_name', '') or ''
+        company = self.schedule.get('client_name', '') or ''
         self.subject_input.setText(f"[{company}] 소비기한 입고 알림")
 
     def _set_default_content(self):
         """기본 메일 내용 설정"""
+        # 설정에서 회사 정보 가져오기
+        company_name = "(주)바이오푸드랩"
+        company_phone = ""
+        company_mobile = ""
+        company_email = ""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            settings = cursor.fetchall()
+            conn.close()
+            settings_dict = {s['key']: s['value'] for s in settings}
+            company_name = settings_dict.get('company_name', '(주)바이오푸드랩') or '(주)바이오푸드랩'
+            company_phone = settings_dict.get('company_phone', '') or ''
+            company_mobile = settings_dict.get('company_mobile', '') or ''
+            company_email = settings_dict.get('company_email', '') or settings_dict.get('smtp_email', '') or ''
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
         # 스케줄 정보 추출
         start_date = self.schedule.get('start_date', '') or '-'
-        company = self.schedule.get('company_name', '') or '-'
-        food_type = self.schedule.get('food_type', '') or '-'
-        test_method = self.schedule.get('test_method', '') or '-'
-        storage_condition = self.schedule.get('storage_condition', '') or '-'
+        client_name = self.schedule.get('client_name', '') or '-'
         product_name = self.schedule.get('product_name', '') or '-'
+
+        # 식품유형 조회
+        food_type_id = self.schedule.get('food_type_id', '')
+        food_type_name = '-'
+        if food_type_id:
+            try:
+                from models.food_types import ProductType
+                food_type = ProductType.get_by_id(food_type_id)
+                if food_type:
+                    food_type_name = food_type.get('type_name', '-') or '-'
+            except Exception:
+                pass
+
+        # 보관조건 변환
+        storage_code = self.schedule.get('storage_condition', '') or ''
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage_condition = storage_map.get(storage_code, storage_code) if storage_code else '-'
+
+        # 실험방법 변환
+        test_method_code = self.schedule.get('test_method', '') or ''
+        method_map = {
+            'real': '실측실험',
+            'acceleration': '가속실험',
+            'custom_real': '의뢰자요청(실측)',
+            'custom_accel': '의뢰자요청(가속)',
+            'custom_acceleration': '의뢰자요청(가속)'
+        }
+        test_method = method_map.get(test_method_code, test_method_code) if test_method_code else '-'
 
         # 검사 항목
         test_items = self.schedule.get('test_items', []) or []
@@ -3944,14 +4019,26 @@ class ScheduleMailDialog(QDialog):
             except (ValueError, TypeError):
                 pass
 
-        content = f"""안녕하세요.
+        # 서명 정보 구성
+        signature_lines = [company_name]
+        if company_phone:
+            signature_lines.append(f"Tel: {company_phone}")
+        if company_mobile:
+            signature_lines.append(f"Mobile: {company_mobile}")
+        if company_email:
+            signature_lines.append(f"Email: {company_email}")
+        signature = '\n'.join(signature_lines)
+
+        content = f"""안녕하세요, {company_name}입니다.
+
+{client_name} 귀하
 
 소비기한 설정 실험 입고 건에 대해 안내드립니다.
 
 ■ 접수일자: {start_date}
-■ 업체명: {company}
+■ 업체명: {client_name}
 ■ 제품명: {product_name}
-■ 식품유형: {food_type}
+■ 식품유형: {food_type_name}
 ■ 실험방법: {test_method}
 ■ 보관방법: {storage_condition}
 ■ 검사항목: {test_items_str}
@@ -3960,7 +4047,11 @@ class ScheduleMailDialog(QDialog):
 
 첨부파일을 확인해주시기 바랍니다.
 
-감사합니다."""
+감사합니다.
+
+─────────────────────────
+{signature}
+─────────────────────────"""
 
         self.content_input.setPlainText(content)
 
@@ -4004,15 +4095,34 @@ class ScheduleMailDialog(QDialog):
                 self.attachment_files.remove(file_path)
             self.attachment_list.takeItem(self.attachment_list.row(item))
 
+    def _auto_fill_client_email(self):
+        """업체 이메일 자동 입력"""
+        client_email = self.schedule.get('client_email', '')
+        if client_email:
+            self.external_email_to.setText(client_email)
+        else:
+            QMessageBox.information(self, "알림", "등록된 업체 이메일이 없습니다.")
+
     def send_mail(self):
-        """메일 전송"""
+        """메일 전송 (시스템 내 메일 + SMTP 이메일)"""
+        import os
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+        from email.header import Header
+
         to_ids = [uid for uid, cb in self.to_checkboxes.items() if cb.isChecked()]
         cc_ids = [uid for uid, cb in self.cc_checkboxes.items() if cb.isChecked()]
         subject = self.subject_input.text().strip()
         content = self.content_input.toPlainText().strip()
+        external_to = self.external_email_to.text().strip()
+        external_cc = self.external_email_cc.text().strip()
 
-        if not to_ids:
-            QMessageBox.warning(self, "알림", "수신자를 선택하세요.")
+        # 시스템 내 메일 수신자 또는 외부 이메일 중 하나는 필수
+        if not to_ids and not external_to:
+            QMessageBox.warning(self, "알림", "수신자를 선택하거나 외부 이메일을 입력하세요.")
             return
 
         if not subject:
@@ -4028,19 +4138,139 @@ class ScheduleMailDialog(QDialog):
             if reply == QMessageBox.No:
                 return
 
-        try:
-            from models.communications import MailNotice
+        system_mail_sent = False
+        smtp_mail_sent = False
+        errors = []
 
-            # 시스템 내 메일 전송
-            MailNotice.send(
-                self.current_user['id'],
-                subject,
-                content,
-                to_ids,
-                cc_ids if cc_ids else None
-            )
+        # 1. 시스템 내 메일 전송
+        if to_ids:
+            try:
+                from models.communications import MailNotice
+                MailNotice.send(
+                    self.current_user['id'],
+                    subject,
+                    content,
+                    to_ids,
+                    cc_ids if cc_ids else None
+                )
+                system_mail_sent = True
+            except Exception as e:
+                errors.append(f"시스템 내 메일: {e}")
 
+        # 2. 외부 SMTP 이메일 전송
+        if external_to:
+            try:
+                # SMTP 설정 가져오기
+                from database import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT key, value FROM settings")
+                settings = cursor.fetchall()
+                conn.close()
+
+                settings_dict = {s['key']: s['value'] for s in settings}
+                smtp_server = settings_dict.get('smtp_server', '')
+                smtp_port = int(settings_dict.get('smtp_port', '587'))
+                smtp_security = settings_dict.get('smtp_security', 'TLS')
+                smtp_email = settings_dict.get('smtp_email', '')
+                smtp_password = settings_dict.get('smtp_password', '')
+                sender_name = settings_dict.get('smtp_sender_name', '') or settings_dict.get('company_name', '(주)바이오푸드랩')
+
+                if not smtp_server or not smtp_email or not smtp_password:
+                    errors.append("SMTP 설정이 완료되지 않았습니다. 설정 > 이메일 탭에서 SMTP 설정을 완료해주세요.")
+                else:
+                    # 이메일 구성
+                    msg = MIMEMultipart()
+                    msg['From'] = f"{sender_name} <{smtp_email}>"
+
+                    # 수신자 처리
+                    to_list = [email.strip() for email in external_to.split(',') if email.strip()]
+                    msg['To'] = ', '.join(to_list)
+
+                    # 참조 처리
+                    cc_list = []
+                    if external_cc:
+                        cc_list = [email.strip() for email in external_cc.split(',') if email.strip()]
+                        msg['Cc'] = ', '.join(cc_list)
+
+                    msg['Subject'] = subject
+
+                    # 본문
+                    msg.attach(MIMEText(content, 'plain', 'utf-8'))
+
+                    # 첨부파일
+                    for file_path in self.attachment_files:
+                        if os.path.exists(file_path):
+                            with open(file_path, 'rb') as attachment:
+                                filename = os.path.basename(file_path)
+                                ext = os.path.splitext(filename)[1].lower()
+
+                                # MIME 타입 결정
+                                if ext in ['.jpg', '.jpeg']:
+                                    mime_type = 'image/jpeg'
+                                elif ext == '.png':
+                                    mime_type = 'image/png'
+                                elif ext == '.pdf':
+                                    mime_type = 'application/pdf'
+                                else:
+                                    mime_type = 'application/octet-stream'
+
+                                maintype, subtype = mime_type.split('/', 1)
+                                part = MIMEBase(maintype, subtype)
+                                part.set_payload(attachment.read())
+                                encoders.encode_base64(part)
+
+                                # 한글 파일명 인코딩
+                                encoded_filename = Header(filename, 'utf-8').encode()
+                                part.add_header(
+                                    'Content-Disposition',
+                                    'attachment',
+                                    filename=('utf-8', '', filename)
+                                )
+                                part.add_header('Content-Type', mime_type, name=encoded_filename)
+                                msg.attach(part)
+
+                    # SMTP 연결 및 발송
+                    all_recipients = to_list + cc_list
+
+                    if smtp_security == "SSL":
+                        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
+                    else:
+                        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+                        if smtp_security == "TLS":
+                            server.starttls()
+
+                    server.login(smtp_email, smtp_password)
+                    server.sendmail(smtp_email, all_recipients, msg.as_string())
+                    server.quit()
+                    smtp_mail_sent = True
+
+            except smtplib.SMTPAuthenticationError:
+                errors.append("SMTP 인증 실패. 이메일 또는 비밀번호를 확인해주세요.")
+            except smtplib.SMTPException as e:
+                errors.append(f"SMTP 오류: {str(e)}")
+            except Exception as e:
+                errors.append(f"외부 이메일: {str(e)}")
+
+        # 결과 표시
+        if errors:
+            error_msg = '\n'.join(errors)
+            if system_mail_sent or smtp_mail_sent:
+                sent_parts = []
+                if system_mail_sent:
+                    sent_parts.append("시스템 내 메일")
+                if smtp_mail_sent:
+                    sent_parts.append("외부 이메일")
+                QMessageBox.warning(self, "부분 성공",
+                    f"{', '.join(sent_parts)} 발송 완료.\n\n오류:\n{error_msg}")
+                self.accept()
+            else:
+                QMessageBox.critical(self, "오류", f"메일 전송 실패:\n{error_msg}")
+        else:
+            sent_parts = []
+            if system_mail_sent:
+                sent_parts.append("시스템 내 메일")
+            if smtp_mail_sent:
+                sent_parts.append("외부 이메일")
+            QMessageBox.information(self, "완료", f"메일 발송 완료: {', '.join(sent_parts)}")
             self.accept()
-
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"메일 전송 실패: {e}")
