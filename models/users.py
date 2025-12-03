@@ -23,7 +23,6 @@ PERMISSION_CATEGORIES = {
     'fee': '수수료 관리',
     'schedule_mgmt': '스케줄 관리',
     'estimate': '견적서 관리',
-    'storage': '보관구 관리',
     'system': '시스템'
 }
 
@@ -71,8 +70,6 @@ PERMISSION_LABELS = {
     'estimate_print': '인쇄',
     'estimate_pdf': 'PDF 저장',
     'estimate_email': '이메일 전송',
-    # 보관구 관리
-    'storage_edit': '보관구 수정',
     # 시스템
     'user_manage': '사용자 관리',
     'settings_full': '설정 전체 접근',
@@ -122,8 +119,6 @@ PERMISSION_DESCRIPTIONS = {
     'estimate_print': '견적서를 프린터로 인쇄할 수 있습니다.\n견적서 관리 탭에서 "인쇄" 버튼 사용',
     'estimate_pdf': '견적서를 PDF 파일로 저장할 수 있습니다.\n견적서 관리 탭에서 "PDF 저장" 버튼 사용',
     'estimate_email': '견적서를 이메일로 전송할 수 있습니다.\n견적서 관리 탭에서 "이메일 전송" 버튼 사용',
-    # 보관구 관리
-    'storage_edit': '보관구의 용량과 사용량을 수정할 수 있습니다.\n보관구 현황 탭에서 "수정" 버튼 및 "보관구 추가" 버튼 사용',
     # 시스템
     'user_manage': '사용자를 추가, 수정, 삭제하고 권한을 관리할 수 있습니다.\n사용자 관리 탭 접근 권한',
     'settings_full': '시스템 설정 전체에 접근할 수 있습니다.\n상태 설정, 시스템 설정 등 모든 설정 변경 가능',
@@ -144,7 +139,6 @@ PERMISSION_BY_CATEGORY = {
                       'schedule_mgmt_delete_item', 'schedule_mgmt_save',
                       'schedule_mgmt_edit_plan'],
     'estimate': ['estimate_print', 'estimate_pdf', 'estimate_email'],
-    'storage': ['storage_edit'],
     'system': ['user_manage', 'settings_full'],
 }
 

@@ -15,9 +15,6 @@ ACTION_TYPES = {
     'schedule_edit': '스케줄 수정',
     'schedule_delete': '스케줄 삭제',
     'schedule_status_change': '스케줄 상태 변경',
-    'schedule_memo_add': '스케줄 메모 추가',
-    'schedule_memo_edit': '스케줄 메모 수정',
-    'schedule_memo_delete': '스케줄 메모 삭제',
     'schedule_item_add': '검사항목 추가',
     'schedule_item_delete': '검사항목 삭제',
     'schedule_date_edit': '실험일자 수정',
@@ -43,9 +40,6 @@ ACTION_TYPES = {
     'estimate_print': '견적서 인쇄',
     'estimate_pdf': '견적서 PDF 저장',
     'estimate_email': '견적서 이메일 전송',
-
-    # 보관구 관련
-    'storage_edit': '보관구 수정',
 
     # 사용자 관련
     'user_login': '로그인',

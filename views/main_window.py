@@ -17,7 +17,6 @@ TAB_IDS = {
     'fee': '수수료 관리',
     'estimate': '견적서 관리',
     'schedule_mgmt': '스케줄 관리',
-    'storage': '보관구 현황',
     'communication': '커뮤니케이션',
     'user_mgmt': '사용자 관리',
 }
@@ -158,12 +157,6 @@ class MainWindow(QMainWindow):
         # 스케줄 관리 탭에서 저장 시 스케줄 작성 탭 및 대시보드 새로고침
         self.schedule_management_tab.schedule_saved.connect(self.schedule_tab.load_schedules)
         self.schedule_management_tab.schedule_saved.connect(self.load_dashboard_data)
-
-        # 보관구 현황 탭 (모든 사용자 조회 가능, 수정은 권한 필요)
-        from .storage_tab import StorageTab
-        self.storage_tab = StorageTab()
-        self.tab_widgets['storage'] = self.storage_tab
-        self.tab_widget.addTab(self.storage_tab, TAB_IDS['storage'])
 
         # 커뮤니케이션 탭
         from .communication_tab import CommunicationTab
@@ -667,8 +660,6 @@ class MainWindow(QMainWindow):
             self.fee_tab.set_current_user(user_data)
         if hasattr(self, 'schedule_management_tab') and self.schedule_management_tab:
             self.schedule_management_tab.set_current_user(user_data)
-        if hasattr(self, 'storage_tab') and self.storage_tab:
-            self.storage_tab.set_current_user(user_data)
         if hasattr(self, 'communication_tab') and self.communication_tab:
             self.communication_tab.set_current_user(user_data)
         if hasattr(self, 'user_management_tab') and self.user_management_tab:
@@ -747,7 +738,6 @@ class MainWindow(QMainWindow):
             'schedule_mgmt': ['schedule_mgmt_view_estimate', 'schedule_mgmt_display_settings',
                              'schedule_mgmt_select', 'schedule_mgmt_add_item',
                              'schedule_mgmt_delete_item', 'schedule_mgmt_save'],
-            # storage - 모든 사용자 접근 가능 (권한은 내부에서 수정 기능만 제한)
             'user_mgmt': ['user_manage'],
         }
 
