@@ -1401,7 +1401,8 @@ class ScheduleManagementTab(QWidget):
         # 단일 테이블
         self.experiment_table = QTableWidget()
         self.experiment_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.experiment_table.setMinimumHeight(250)
+        # 동적 높이 조절을 위해 고정 최소 높이 제거, 대신 SizePolicy 설정
+        self.experiment_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.experiment_table.cellClicked.connect(self.on_experiment_cell_clicked)
         layout.addWidget(self.experiment_table)
 
@@ -2315,6 +2316,31 @@ class ScheduleManagementTab(QWidget):
 
         # 금액을 DB에 저장
         self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
+        # 테이블 높이를 내용에 맞게 조절
+        self._adjust_table_height()
+
+    def _adjust_table_height(self):
+        """테이블 높이를 내용(행 수)에 맞게 자동 조절"""
+        table = self.experiment_table
+        if table.rowCount() == 0:
+            table.setFixedHeight(100)  # 최소 높이
+            return
+
+        # 헤더 높이 + 모든 행 높이 + 여백
+        header_height = table.horizontalHeader().height()
+        rows_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
+        # 스크롤바, 테두리 등을 위한 여백
+        margin = 10
+
+        total_height = header_height + rows_height + margin
+
+        # 최소/최대 높이 제한
+        min_height = 150
+        max_height = 500
+
+        adjusted_height = max(min_height, min(total_height, max_height))
+        table.setFixedHeight(adjusted_height)
 
     def _save_amounts_to_db(self, supply_amount, tax_amount, total_amount):
         """금액을 DB에 저장"""
@@ -3408,6 +3434,13 @@ class ScheduleManagementTab(QWidget):
                 self.cost_frame.hide()
                 hidden_widgets.append(self.cost_frame)
 
+            # 테이블의 마지막 행 "(1회 기준)" 숨기기
+            last_row_hidden = False
+            if hasattr(self, 'experiment_table') and self.experiment_table.rowCount() > 0:
+                last_row = self.experiment_table.rowCount() - 1
+                self.experiment_table.hideRow(last_row)
+                last_row_hidden = True
+
             # 레이아웃 업데이트를 위해 잠시 대기
             from PyQt5.QtWidgets import QApplication
             QApplication.processEvents()
@@ -3425,6 +3458,9 @@ class ScheduleManagementTab(QWidget):
                 # 숨긴 위젯 복원
                 for w in hidden_widgets:
                     w.show()
+                # 테이블 마지막 행 복원
+                if last_row_hidden:
+                    self.experiment_table.showRow(last_row)
                 QMessageBox.warning(self, "오류", "캡처할 영역이 없습니다.")
                 return
 
@@ -3450,6 +3486,9 @@ class ScheduleManagementTab(QWidget):
             # 숨긴 위젯 복원
             for w in hidden_widgets:
                 w.show()
+            # 테이블 마지막 행 복원
+            if last_row_hidden:
+                self.experiment_table.showRow(last_row)
 
             # JPG로 저장
             if image.save(file_path, "JPEG", 95):
@@ -3461,8 +3500,12 @@ class ScheduleManagementTab(QWidget):
 
         except Exception as e:
             # 숨긴 위젯 복원
-            for w in hidden_widgets:
-                w.show()
+            if 'hidden_widgets' in locals():
+                for w in hidden_widgets:
+                    w.show()
+            # 테이블 마지막 행 복원
+            if 'last_row_hidden' in locals() and last_row_hidden:
+                self.experiment_table.showRow(last_row)
             QMessageBox.critical(self, "오류", f"이미지 저장 중 오류가 발생했습니다.\n{str(e)}")
 
     def open_mail_dialog(self):
@@ -3495,6 +3538,14 @@ class ScheduleManagementTab(QWidget):
                 self.cost_frame.hide()
                 hidden_widgets.append(self.cost_frame)
 
+            # 테이블의 마지막 행 "(1회 기준)" 숨기기
+            last_row_hidden = False
+            last_row = 0
+            if hasattr(self, 'experiment_table') and self.experiment_table.rowCount() > 0:
+                last_row = self.experiment_table.rowCount() - 1
+                self.experiment_table.hideRow(last_row)
+                last_row_hidden = True
+
             # 레이아웃 업데이트를 위해 잠시 대기
             QApplication.processEvents()
 
@@ -3510,6 +3561,8 @@ class ScheduleManagementTab(QWidget):
             if not widgets_to_capture:
                 for w in hidden_widgets:
                     w.show()
+                if last_row_hidden:
+                    self.experiment_table.showRow(last_row)
                 return
 
             # 각 위젯의 크기 계산
@@ -3533,6 +3586,9 @@ class ScheduleManagementTab(QWidget):
             # 숨긴 위젯 복원
             for w in hidden_widgets:
                 w.show()
+            # 테이블 마지막 행 복원
+            if last_row_hidden:
+                self.experiment_table.showRow(last_row)
 
             # 파일명 생성
             start_date = self.current_schedule.get('start_date', '') or ''
@@ -3566,6 +3622,9 @@ class ScheduleManagementTab(QWidget):
             if 'hidden_widgets' in locals():
                 for w in hidden_widgets:
                     w.show()
+            # 테이블 마지막 행 복원
+            if 'last_row_hidden' in locals() and last_row_hidden:
+                self.experiment_table.showRow(last_row)
 
 
 class ScheduleMailDialog(QDialog):
