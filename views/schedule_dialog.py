@@ -2098,7 +2098,7 @@ class ScheduleCreateDialog(QDialog):
             # 롤백 시도
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 pass
             finally:
                 conn.close()

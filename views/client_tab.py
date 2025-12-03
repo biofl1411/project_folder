@@ -372,7 +372,7 @@ class ClientTab(QWidget):
         # 기존 연결 해제 후 재연결 (중복 연결 방지)
         try:
             self.client_table.doubleClicked.disconnect()
-        except:
+        except (TypeError, RuntimeError):
             pass
         self.client_table.doubleClicked.connect(self.on_table_double_clicked)
 

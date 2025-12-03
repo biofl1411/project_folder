@@ -140,7 +140,7 @@ class ClientSearchDialog(QDialog):
                     current_visual = header.visualIndex(logical)
                     if current_visual != visual:
                         header.moveSection(current_visual, visual)
-            except:
+            except Exception:
                 pass
 
         # 열 너비 복원
@@ -150,7 +150,7 @@ class ClientSearchDialog(QDialog):
                 for i, width in enumerate(column_widths):
                     if isinstance(width, int) and width > 0:
                         self.client_table.setColumnWidth(i, width)
-            except:
+            except Exception:
                 pass
 
     def resetColumnSettings(self):

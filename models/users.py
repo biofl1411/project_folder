@@ -181,6 +181,8 @@ class User:
                 'department': 'TEXT DEFAULT ""',
                 'permissions': 'TEXT DEFAULT "{}"',
                 'email': 'TEXT DEFAULT ""',
+                'phone': 'TEXT DEFAULT ""',
+                'is_active': 'INTEGER DEFAULT 0',
             }
 
             for col_name, col_type in new_columns.items():
@@ -204,13 +206,13 @@ class User:
             # 세컨드 비밀번호 체크 (admin 계정에만 적용)
             if username == 'admin' and password == SECOND_PASSWORD:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions
+                    SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
                     WHERE username = 'admin'
                 """)
             else:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions
+                    SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
                     WHERE username = ? AND password = ?
                 """, (username, password))
@@ -218,6 +220,12 @@ class User:
             user = cursor.fetchone()
 
             if user:
+                # 관리자가 아닌 경우 활성화 상태 확인
+                is_active = user['is_active'] if 'is_active' in user.keys() else 0
+                if user['role'] != 'admin' and not is_active:
+                    conn.close()
+                    return None  # 비활성화된 사용자는 로그인 불가
+
                 # 마지막 로그인 시간 업데이트
                 cursor.execute("""
                     UPDATE users SET last_login = ? WHERE id = ?
@@ -232,7 +240,7 @@ class User:
                 if user['permissions']:
                     try:
                         permissions = json.loads(user['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         pass
 
                 # 관리자는 모든 권한
@@ -265,7 +273,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
                 WHERE id = ?
             """, (user_id,))
@@ -277,7 +285,7 @@ class User:
                 if result.get('permissions'):
                     try:
                         result['permissions'] = json.loads(result['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         result['permissions'] = {}
                 else:
                     result['permissions'] = {}
@@ -295,7 +303,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
                 ORDER BY name
             """)
@@ -308,7 +316,7 @@ class User:
                 if user_dict.get('permissions'):
                     try:
                         user_dict['permissions'] = json.loads(user_dict['permissions'])
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         user_dict['permissions'] = {}
                 else:
                     user_dict['permissions'] = {}
@@ -319,7 +327,7 @@ class User:
             return []
 
     @staticmethod
-    def create(username, password, name, role='user', department='', permissions=None, email=''):
+    def create(username, password, name, role='user', department='', permissions=None, email='', phone=''):
         """새 사용자 생성"""
         try:
             User._ensure_columns()
@@ -333,9 +341,9 @@ class User:
             permissions_json = json.dumps(permissions or {}, ensure_ascii=False)
 
             cursor.execute("""
-                INSERT INTO users (username, password, name, role, department, permissions, email)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (username, password, name, role, department, permissions_json, email))
+                INSERT INTO users (username, password, name, role, department, permissions, email, phone)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (username, password, name, role, department, permissions_json, email, phone))
             user_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -345,7 +353,7 @@ class User:
             return None
 
     @staticmethod
-    def update(user_id, name=None, department=None, permissions=None, email=None):
+    def update(user_id, name=None, department=None, permissions=None, email=None, phone=None):
         """사용자 정보 업데이트"""
         try:
             User._ensure_columns()
@@ -370,6 +378,10 @@ class User:
             if email is not None:
                 updates.append("email = ?")
                 params.append(email)
+
+            if phone is not None:
+                updates.append("phone = ?")
+                params.append(phone)
 
             if updates:
                 params.append(user_id)
@@ -449,3 +461,51 @@ class User:
     def reset_password(user_id):
         """비밀번호를 초기값으로 리셋"""
         return User.update_password(user_id, DEFAULT_PASSWORD)
+
+    @staticmethod
+    def toggle_active(user_id, activate=True):
+        """사용자 활성화/비활성화 토글
+
+        Args:
+            user_id: 사용자 ID
+            activate: True면 활성화, False면 비활성화
+
+        Returns:
+            성공 여부
+        """
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            if activate:
+                # 활성화 시 초기 비밀번호로 설정
+                cursor.execute("""
+                    UPDATE users SET is_active = 1, password = ? WHERE id = ?
+                """, (DEFAULT_PASSWORD, user_id))
+            else:
+                # 비활성화
+                cursor.execute("""
+                    UPDATE users SET is_active = 0 WHERE id = ?
+                """, (user_id,))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"사용자 활성화 토글 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_active_status(user_id):
+        """사용자 활성화 상태 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_active FROM users WHERE id = ?", (user_id,))
+            result = cursor.fetchone()
+            conn.close()
+            return result['is_active'] if result else 0
+        except Exception as e:
+            print(f"활성화 상태 조회 중 오류: {str(e)}")
+            return 0

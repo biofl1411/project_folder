@@ -581,7 +581,7 @@ class ScheduleTab(QWidget):
                                 food_type = ProductType.get_by_id(food_type_id)
                                 if food_type:
                                     food_type_name = food_type.get('type_name', '') or ''
-                            except:
+                            except Exception:
                                 pass
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(food_type_name))
 
@@ -719,7 +719,7 @@ class ScheduleTab(QWidget):
                                 interval = experiment_days // sampling_count
                                 interim_date = start + timedelta(days=interval * 6)
                                 interim_date_text = interim_date.strftime('%Y-%m-%d')
-                            except:
+                            except (ValueError, TypeError, ZeroDivisionError):
                                 interim_date_text = '-'
 
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(interim_date_text))
@@ -1304,7 +1304,7 @@ class ScheduleTab(QWidget):
                     if 'sampling_count' in schedule_data:
                         try:
                             schedule_data['sampling_count'] = int(float(schedule_data['sampling_count']))
-                        except:
+                        except (ValueError, TypeError):
                             schedule_data['sampling_count'] = 6
 
                     # 날짜 형식 처리
@@ -1313,7 +1313,7 @@ class ScheduleTab(QWidget):
                             try:
                                 date_val = pd.to_datetime(schedule_data[date_field])
                                 schedule_data[date_field] = date_val.strftime('%Y-%m-%d')
-                            except:
+                            except (ValueError, TypeError):
                                 del schedule_data[date_field]
 
                     # 식품유형 처리 (이름으로 ID 조회)
@@ -1327,7 +1327,7 @@ class ScheduleTab(QWidget):
                                 if ft.get('type_name') == food_type_name:
                                     food_type_id = ft.get('id')
                                     break
-                        except:
+                        except Exception:
                             pass
 
                     # client_name으로 client_id 조회
@@ -1341,7 +1341,7 @@ class ScheduleTab(QWidget):
                                 if c.get('company_name') == client_name:
                                     client_id = c.get('id')
                                     break
-                        except:
+                        except Exception:
                             pass
 
                     # 필드명 매핑

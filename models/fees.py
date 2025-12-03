@@ -59,11 +59,11 @@ class Fee:
                 # 열 추가 시도
                 try:
                     cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
-                except:
+                except Exception:
                     pass
                 try:
                     cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
-                except:
+                except Exception:
                     pass
                 # 다시 삽입 시도
                 cursor.execute(
@@ -94,11 +94,11 @@ class Fee:
                 # 열 추가 시도
                 try:
                     cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
-                except:
+                except Exception:
                     pass
                 try:
                     cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
-                except:
+                except Exception:
                     pass
                 # 다시 업데이트 시도
                 cursor.execute(
@@ -198,12 +198,12 @@ class Fee:
                     # 숫자만 추출 시도
                     try:
                         sample_qty = int(''.join(filter(str.isdigit, sample_qty.split('\n')[0][:10])))
-                    except:
+                    except (ValueError, TypeError):
                         sample_qty = 0
                 else:
                     try:
                         sample_qty = int(sample_qty)
-                    except:
+                    except (ValueError, TypeError):
                         sample_qty = 0
 
                 cursor.execute("""

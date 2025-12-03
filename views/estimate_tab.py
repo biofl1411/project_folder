@@ -522,7 +522,7 @@ class EstimateTab(QWidget):
             try:
                 date_obj = datetime.strptime(created_at[:10], '%Y-%m-%d')
                 date_str = date_obj.strftime('%Y%m%d')
-            except:
+            except (ValueError, TypeError):
                 date_str = datetime.now().strftime('%Y%m%d')
         else:
             date_str = datetime.now().strftime('%Y%m%d')
@@ -876,7 +876,7 @@ class EstimateTab(QWidget):
                 # 최종보고서 예상일 (실험 완료 + 분석시간 약 15일)
                 final_date = start_date + timedelta(days=total_experiment_days + 15)
                 final_expected_date = final_date.strftime('%Y-%m-%d')
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # 소비기한 개월 수 계산
