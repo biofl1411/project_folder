@@ -3902,18 +3902,68 @@ class ScheduleMailDialog(QDialog):
 
     def _set_default_subject(self):
         """기본 메일 제목 설정"""
-        company = self.schedule.get('company_name', '') or ''
+        company = self.schedule.get('client_name', '') or ''
         self.subject_input.setText(f"[{company}] 소비기한 입고 알림")
 
     def _set_default_content(self):
         """기본 메일 내용 설정"""
+        # 설정에서 회사 정보 가져오기
+        company_name = "(주)바이오푸드랩"
+        company_phone = ""
+        company_mobile = ""
+        company_email = ""
+        try:
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            settings = cursor.fetchall()
+            conn.close()
+            settings_dict = {s['key']: s['value'] for s in settings}
+            company_name = settings_dict.get('company_name', '(주)바이오푸드랩') or '(주)바이오푸드랩'
+            company_phone = settings_dict.get('company_phone', '') or ''
+            company_mobile = settings_dict.get('company_mobile', '') or ''
+            company_email = settings_dict.get('company_email', '') or settings_dict.get('smtp_email', '') or ''
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+
         # 스케줄 정보 추출
         start_date = self.schedule.get('start_date', '') or '-'
-        company = self.schedule.get('company_name', '') or '-'
-        food_type = self.schedule.get('food_type', '') or '-'
-        test_method = self.schedule.get('test_method', '') or '-'
-        storage_condition = self.schedule.get('storage_condition', '') or '-'
+        client_name = self.schedule.get('client_name', '') or '-'
         product_name = self.schedule.get('product_name', '') or '-'
+
+        # 식품유형 조회
+        food_type_id = self.schedule.get('food_type_id', '')
+        food_type_name = '-'
+        if food_type_id:
+            try:
+                from models.food_types import ProductType
+                food_type = ProductType.get_by_id(food_type_id)
+                if food_type:
+                    food_type_name = food_type.get('type_name', '-') or '-'
+            except Exception:
+                pass
+
+        # 보관조건 변환
+        storage_code = self.schedule.get('storage_condition', '') or ''
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage_condition = storage_map.get(storage_code, storage_code) if storage_code else '-'
+
+        # 실험방법 변환
+        test_method_code = self.schedule.get('test_method', '') or ''
+        method_map = {
+            'real': '실측실험',
+            'acceleration': '가속실험',
+            'custom_real': '의뢰자요청(실측)',
+            'custom_accel': '의뢰자요청(가속)',
+            'custom_acceleration': '의뢰자요청(가속)'
+        }
+        test_method = method_map.get(test_method_code, test_method_code) if test_method_code else '-'
 
         # 검사 항목
         test_items = self.schedule.get('test_items', []) or []
@@ -3944,14 +3994,26 @@ class ScheduleMailDialog(QDialog):
             except (ValueError, TypeError):
                 pass
 
-        content = f"""안녕하세요.
+        # 서명 정보 구성
+        signature_lines = [company_name]
+        if company_phone:
+            signature_lines.append(f"Tel: {company_phone}")
+        if company_mobile:
+            signature_lines.append(f"Mobile: {company_mobile}")
+        if company_email:
+            signature_lines.append(f"Email: {company_email}")
+        signature = '\n'.join(signature_lines)
+
+        content = f"""안녕하세요, {company_name}입니다.
+
+{client_name} 귀하
 
 소비기한 설정 실험 입고 건에 대해 안내드립니다.
 
 ■ 접수일자: {start_date}
-■ 업체명: {company}
+■ 업체명: {client_name}
 ■ 제품명: {product_name}
-■ 식품유형: {food_type}
+■ 식품유형: {food_type_name}
 ■ 실험방법: {test_method}
 ■ 보관방법: {storage_condition}
 ■ 검사항목: {test_items_str}
@@ -3960,7 +4022,11 @@ class ScheduleMailDialog(QDialog):
 
 첨부파일을 확인해주시기 바랍니다.
 
-감사합니다."""
+감사합니다.
+
+─────────────────────────
+{signature}
+─────────────────────────"""
 
         self.content_input.setPlainText(content)
 
