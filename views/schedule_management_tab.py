@@ -1197,8 +1197,8 @@ class ScheduleManagementTab(QWidget):
         """)
 
         grid = QGridLayout(group)
-        grid.setSpacing(2)
-        grid.setContentsMargins(5, 10, 5, 5)
+        grid.setSpacing(0)
+        grid.setContentsMargins(5, 5, 5, 5)
 
         # 8열 균등 배분 (라벨+값 4쌍)
         for col in range(8):
