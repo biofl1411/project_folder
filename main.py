@@ -20,12 +20,45 @@ if getattr(sys, 'frozen', False):
 try:
     from PyQt5.QtWidgets import QApplication, QMessageBox
     from PyQt5.QtGui import QIcon
-    
+
     from views import MainWindow
     from database import init_database
 except ImportError as e:
     print(f"필요한 라이브러리를 불러올 수 없습니다: {e}")
     sys.exit(1)
+
+def check_for_updates_on_startup():
+    """시작 시 업데이트 확인"""
+    try:
+        from updater import check_for_updates, perform_update
+
+        needs_update, local_ver, server_ver, error = check_for_updates()
+
+        if error:
+            print(f"업데이트 확인 실패: {error}")
+            return False
+
+        if needs_update:
+            # 업데이트 확인 다이얼로그
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowTitle("업데이트 확인")
+            msg.setText(f"새 버전이 있습니다!\n\n현재 버전: {local_ver}\n새 버전: {server_ver}\n\n업데이트 하시겠습니까?")
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg.setDefaultButton(QMessageBox.Yes)
+
+            if msg.exec_() == QMessageBox.Yes:
+                success, message = perform_update()
+                if success:
+                    QMessageBox.information(None, "업데이트", message)
+                    return True  # 프로그램 종료
+                else:
+                    QMessageBox.warning(None, "업데이트 실패", message)
+
+        return False
+    except Exception as e:
+        print(f"업데이트 확인 중 오류: {e}")
+        return False
 
 def check_dependencies():
     """필요한 라이브러리 체크"""
@@ -60,15 +93,20 @@ def main():
         print("필요한 라이브러리가 설치되지 않았습니다.")
         print("pip install -r requirements.txt 명령으로 필요한 라이브러리를 설치하세요.")
         return
-    
+
     # 환경 설정
     if not setup_environment():
         print("환경 설정 중 오류가 발생했습니다.")
         return
-    
+
     # QApplication 생성
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # 모던한 스타일 적용
+
+    # 자동 업데이트 확인
+    if check_for_updates_on_startup():
+        # 업데이트 진행 중이면 프로그램 종료
+        sys.exit(0)
     
     # 메인 윈도우 생성 및 표시
     try:
