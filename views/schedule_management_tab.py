@@ -1192,13 +1192,15 @@ class ScheduleManagementTab(QWidget):
         self.info_group = QGroupBox("1. 소비기한 설정 실험 계획 (안)")
         group = self.info_group
         group.setStyleSheet("""
-            QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #3498db; border-radius: 5px; margin-top: 8px; padding-top: 2px; }
+            QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #3498db; border-radius: 5px; margin-top: 10px; padding: 0px; padding-top: 15px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #2980b9; }
         """)
 
         grid = QGridLayout(group)
         grid.setSpacing(0)
-        grid.setContentsMargins(5, 2, 5, 2)
+        grid.setContentsMargins(2, 0, 2, 2)
+        grid.setVerticalSpacing(0)
+        grid.setHorizontalSpacing(0)
 
         # 8열 균등 배분 (라벨+값 4쌍)
         for col in range(8):
