@@ -19,7 +19,12 @@ class Schedule:
                 'interim_report_date': 'TEXT',
                 'supply_amount': 'INTEGER DEFAULT 0',
                 'tax_amount': 'INTEGER DEFAULT 0',
-                'total_amount': 'INTEGER DEFAULT 0'
+                'total_amount': 'INTEGER DEFAULT 0',
+                'is_urgent': 'INTEGER DEFAULT 0',
+                'report_date': 'TEXT',
+                'report1_date': 'TEXT',
+                'report2_date': 'TEXT',
+                'report3_date': 'TEXT'
             }
 
             for col_name, col_type in new_columns.items():
@@ -254,7 +259,12 @@ class Schedule:
                     packaging_unit = ?,
                     estimate_date = ?,
                     expected_date = ?,
-                    interim_report_date = ?
+                    interim_report_date = ?,
+                    is_urgent = ?,
+                    report_date = ?,
+                    report1_date = ?,
+                    report2_date = ?,
+                    report3_date = ?
                 WHERE id = ?
             """, (
                 data.get('client_id'),
@@ -279,6 +289,11 @@ class Schedule:
                 data.get('estimate_date'),
                 data.get('expected_date'),
                 data.get('interim_report_date'),
+                data.get('is_urgent', 0),
+                data.get('report_date'),
+                data.get('report1_date'),
+                data.get('report2_date'),
+                data.get('report3_date'),
                 schedule_id
             ))
 

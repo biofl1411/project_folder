@@ -1227,11 +1227,15 @@ class ScheduleManagementTab(QWidget):
         self.storage_value = self._create_value_label("-", value_style)
         grid.addWidget(self.storage_value, 0, 7)
 
-        # 행 2: 실험방법, 중간보고서, 연장실험, 시작일
-        self.test_method_label = self._create_label("실험방법", label_style)
-        grid.addWidget(self.test_method_label, 1, 0)
-        self.test_method_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.test_method_value, 1, 1)
+        # 행 2: 긴급여부, 중간보고서, 마지막실험일, 보고서작성일
+        self.urgent_label = self._create_label("긴급여부", label_style)
+        grid.addWidget(self.urgent_label, 1, 0)
+        self.urgent_value = ClickableLabel("-")
+        self.urgent_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.urgent_value.setAlignment(Qt.AlignCenter)
+        self.urgent_value.setFixedHeight(25)
+        self.urgent_value.clicked.connect(self.toggle_urgent_status)
+        grid.addWidget(self.urgent_value, 1, 1)
         self.interim_report_label = self._create_label("중간보고서", label_style)
         grid.addWidget(self.interim_report_label, 1, 2)
         self.interim_report_value = ClickableLabel("-")
@@ -1240,38 +1244,42 @@ class ScheduleManagementTab(QWidget):
         self.interim_report_value.setFixedHeight(25)
         self.interim_report_value.clicked.connect(self.toggle_interim_report)
         grid.addWidget(self.interim_report_value, 1, 3)
-        self.extension_label = self._create_label("연장실험", label_style)
-        grid.addWidget(self.extension_label, 1, 4)
-        self.extension_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.extension_value, 1, 5)
-        self.start_date_label = self._create_label("시 작 일", label_style)
-        grid.addWidget(self.start_date_label, 1, 6)
-        self.start_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.start_date_value, 1, 7)
-
-        # 행 3: 소비기한, 실험기간, 샘플링간격, 중간보고일
-        self.expiry_label = self._create_label("소비기한", label_style)
-        grid.addWidget(self.expiry_label, 2, 0)
-        self.expiry_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.expiry_value, 2, 1)
-        self.period_label = self._create_label("실험기간", label_style)
-        grid.addWidget(self.period_label, 2, 2)
-        self.period_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.period_value, 2, 3)
-        self.sampling_interval_label = self._create_label("샘플링간격", label_style)
-        grid.addWidget(self.sampling_interval_label, 2, 4)
-        self.sampling_interval_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.sampling_interval_value, 2, 5)
         self.last_experiment_date_label = self._create_label("마지막실험일", label_style)
-        grid.addWidget(self.last_experiment_date_label, 2, 6)
+        grid.addWidget(self.last_experiment_date_label, 1, 4)
         self.last_experiment_date_value = ClickableLabel("-")
         self.last_experiment_date_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.last_experiment_date_value.setAlignment(Qt.AlignCenter)
         self.last_experiment_date_value.setFixedHeight(25)
         self.last_experiment_date_value.clicked.connect(self.edit_last_experiment_date_with_calendar)
-        grid.addWidget(self.last_experiment_date_value, 2, 7)
+        grid.addWidget(self.last_experiment_date_value, 1, 5)
+        self.report_date_label = self._create_label("보고서작성일", label_style)
+        grid.addWidget(self.report_date_label, 1, 6)
+        self.report_date_value = ClickableLabel("-")
+        self.report_date_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.report_date_value.setAlignment(Qt.AlignCenter)
+        self.report_date_value.setFixedHeight(25)
+        self.report_date_value.clicked.connect(self.edit_report_date_with_calendar)
+        grid.addWidget(self.report_date_value, 1, 7)
 
-        # 행 4: 1회실험검체량, 포장단위, 필요검체량, 보고서작성일
+        # 행 3: 실험방법, 소비기한, 실험기간, 샘플링간격
+        self.test_method_label = self._create_label("실험방법", label_style)
+        grid.addWidget(self.test_method_label, 2, 0)
+        self.test_method_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.test_method_value, 2, 1)
+        self.expiry_label = self._create_label("소비기한", label_style)
+        grid.addWidget(self.expiry_label, 2, 2)
+        self.expiry_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.expiry_value, 2, 3)
+        self.period_label = self._create_label("실험기간", label_style)
+        grid.addWidget(self.period_label, 2, 4)
+        self.period_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.period_value, 2, 5)
+        self.sampling_interval_label = self._create_label("샘플링간격", label_style)
+        grid.addWidget(self.sampling_interval_label, 2, 6)
+        self.sampling_interval_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.sampling_interval_value, 2, 7)
+
+        # 행 4: 1회실험검체량, 포장단위, 필요검체량, 시작일
         self.sample_per_test_label = self._create_label("1회검체량", label_style)
         grid.addWidget(self.sample_per_test_label, 3, 0)
         self.sample_per_test_value = self._create_value_label("-", value_style)
@@ -1289,32 +1297,75 @@ class ScheduleManagementTab(QWidget):
         self.required_sample_value.setFixedHeight(25)
         grid.addWidget(self.required_sample_value, 3, 5)
         self.current_required_sample = 0
-        self.report_date_label = self._create_label("보고서작성일", label_style)
-        grid.addWidget(self.report_date_label, 3, 6)
-        self.report_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.report_date_value, 3, 7)
+        self.start_date_label = self._create_label("시 작 일", label_style)
+        grid.addWidget(self.start_date_label, 3, 6)
+        self.start_date_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.start_date_value, 3, 7)
 
-        # 행 5: 상태, 보관온도 (1구간, 2구간, 3구간)
+        # 행 5: 중간보고서(예/아니오), 1보고서, 2보고서, 3보고서
+        report_label_style = "font-weight: bold; background-color: #fdebd0; padding: 3px; border: 1px solid #e67e22; font-size: 11px;"
+        report_value_style = "background-color: white; padding: 3px; border: 1px solid #e67e22; color: #e67e22; font-weight: bold; font-size: 11px;"
+
+        self.interim_report_yn_label = self._create_label("중간보고서", report_label_style)
+        grid.addWidget(self.interim_report_yn_label, 4, 0)
+        self.interim_report_yn_value = ClickableLabel("-")
+        self.interim_report_yn_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
+        self.interim_report_yn_value.setAlignment(Qt.AlignCenter)
+        self.interim_report_yn_value.setFixedHeight(25)
+        self.interim_report_yn_value.clicked.connect(self.toggle_interim_report)
+        grid.addWidget(self.interim_report_yn_value, 4, 1)
+        self.report1_label = self._create_label("1 보고서", report_label_style)
+        grid.addWidget(self.report1_label, 4, 2)
+        self.report1_value = ClickableLabel("-")
+        self.report1_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
+        self.report1_value.setAlignment(Qt.AlignCenter)
+        self.report1_value.setFixedHeight(25)
+        self.report1_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(1))
+        grid.addWidget(self.report1_value, 4, 3)
+        self.report2_label = self._create_label("2 보고서", report_label_style)
+        grid.addWidget(self.report2_label, 4, 4)
+        self.report2_value = ClickableLabel("-")
+        self.report2_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
+        self.report2_value.setAlignment(Qt.AlignCenter)
+        self.report2_value.setFixedHeight(25)
+        self.report2_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(2))
+        grid.addWidget(self.report2_value, 4, 5)
+        self.report3_label = self._create_label("3 보고서", report_label_style)
+        grid.addWidget(self.report3_label, 4, 6)
+        self.report3_value = ClickableLabel("-")
+        self.report3_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
+        self.report3_value.setAlignment(Qt.AlignCenter)
+        self.report3_value.setFixedHeight(25)
+        self.report3_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(3))
+        grid.addWidget(self.report3_value, 4, 7)
+
+        # 행 6: 상태, 보관온도 (1구간, 2구간, 3구간)
         self.status_label = self._create_label("상    태", label_style)
-        grid.addWidget(self.status_label, 4, 0)
+        grid.addWidget(self.status_label, 5, 0)
         self.status_value = ClickableLabel("-")
         self.status_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.status_value.setAlignment(Qt.AlignCenter)
         self.status_value.setFixedHeight(25)
         self.status_value.clicked.connect(self.change_status)
-        grid.addWidget(self.status_value, 4, 1)
+        grid.addWidget(self.status_value, 5, 1)
         self.temp_zone1_label = self._create_label("1 구 간", temp_label_style)
-        grid.addWidget(self.temp_zone1_label, 4, 2)
+        grid.addWidget(self.temp_zone1_label, 5, 2)
         self.temp_zone1_value = self._create_value_label("-", temp_value_style)
-        grid.addWidget(self.temp_zone1_value, 4, 3)
+        grid.addWidget(self.temp_zone1_value, 5, 3)
         self.temp_zone2_label = self._create_label("2 구 간", temp_label_style)
-        grid.addWidget(self.temp_zone2_label, 4, 4)
+        grid.addWidget(self.temp_zone2_label, 5, 4)
         self.temp_zone2_value = self._create_value_label("-", temp_value_style)
-        grid.addWidget(self.temp_zone2_value, 4, 5)
+        grid.addWidget(self.temp_zone2_value, 5, 5)
         self.temp_zone3_label = self._create_label("3 구 간", temp_label_style)
-        grid.addWidget(self.temp_zone3_label, 4, 6)
+        grid.addWidget(self.temp_zone3_label, 5, 6)
         self.temp_zone3_value = self._create_value_label("-", temp_value_style)
-        grid.addWidget(self.temp_zone3_value, 4, 7)
+        grid.addWidget(self.temp_zone3_value, 5, 7)
+
+        # 연장실험 필드 (호환성 유지, 숨김)
+        self.extension_label = QLabel("연장실험", self)
+        self.extension_label.hide()
+        self.extension_value = QLabel("-", self)
+        self.extension_value.hide()
 
         # 샘플링횟수는 다른 곳에서 사용하므로 숨겨진 라벨로 유지 (부모 지정 필수)
         self.sampling_count_label = QLabel("샘플링횟수", self)
@@ -1626,7 +1677,32 @@ class ScheduleManagementTab(QWidget):
         if exp_days > 0: period_parts.append(f"{exp_days}일")
         self.period_value.setText(' '.join(period_parts) if period_parts else '-')
 
+        # 긴급여부
+        is_urgent = schedule.get('is_urgent', 0)
+        if is_urgent:
+            self.urgent_value.setText("긴급")
+            self.urgent_value.setStyleSheet("background-color: #ffcccc; padding: 3px; border: 1px solid #e74c3c; color: #e74c3c; font-weight: bold; font-size: 11px; text-decoration: underline;")
+        else:
+            self.urgent_value.setText("일반")
+            self.urgent_value.setStyleSheet("background-color: white; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;")
+
+        # 중간보고서 (행 2)
         self.interim_report_value.setText("요청" if schedule.get('report_interim') else "미요청")
+
+        # 중간보고서 (행 5 - 예/아니오)
+        report_interim = schedule.get('report_interim', 0)
+        if report_interim:
+            self.interim_report_yn_value.setText("예")
+            self.interim_report_yn_value.setStyleSheet("background-color: #d5f5e3; padding: 3px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 11px; text-decoration: underline;")
+        else:
+            self.interim_report_yn_value.setText("아니오")
+            self.interim_report_yn_value.setStyleSheet("background-color: white; padding: 3px; border: 1px solid #e67e22; color: #2980b9; font-size: 11px; text-decoration: underline;")
+
+        # N 보고서 날짜 (report1_date, report2_date, report3_date)
+        self.report1_value.setText(schedule.get('report1_date', '-') or '-')
+        self.report2_value.setText(schedule.get('report2_date', '-') or '-')
+        self.report3_value.setText(schedule.get('report3_date', '-') or '-')
+
         self.extension_value.setText("진행" if schedule.get('extension_test') else "미진행")
 
         sampling_count = schedule.get('sampling_count', 6) or 6
@@ -2674,6 +2750,168 @@ class ScheduleManagementTab(QWidget):
         # 영업일 기준으로 보고서 작성일 계산
         report_date = add_business_days(last_experiment_date, report_offset)
         self.report_date_value.setText(report_date.strftime('%Y-%m-%d'))
+
+    def toggle_urgent_status(self):
+        """긴급여부 토글"""
+        # 수정 가능 여부 확인 (상태가 '대기'일 때만, 권한 확인)
+        if not self.can_edit_plan():
+            return
+
+        from PyQt5.QtWidgets import QInputDialog
+
+        options = ["일반", "긴급"]
+        current_value = self.urgent_value.text()
+        old_value = current_value  # 로그용
+
+        try:
+            current_index = options.index(current_value)
+        except ValueError:
+            current_index = 0
+
+        new_value, ok = QInputDialog.getItem(
+            self, "긴급여부 설정", "긴급 여부:",
+            options, current_index, False
+        )
+
+        if ok and new_value:
+            is_urgent = (new_value == "긴급")
+            self.current_schedule['is_urgent'] = 1 if is_urgent else 0
+            self.urgent_value.setText(new_value)
+
+            # 긴급일 경우 빨간색으로 스타일 변경
+            if is_urgent:
+                self.urgent_value.setStyleSheet("background-color: #ffcccc; padding: 3px; border: 1px solid #e74c3c; color: #e74c3c; font-weight: bold; font-size: 11px; text-decoration: underline;")
+            else:
+                self.urgent_value.setStyleSheet("background-color: white; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;")
+
+            # DB에 저장
+            try:
+                from models.schedules import Schedule
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    Schedule.update(schedule_id, is_urgent=1 if is_urgent else 0)
+            except Exception as e:
+                print(f"긴급여부 저장 오류: {e}")
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_edit',
+                details={'field': '긴급여부', 'old_value': old_value, 'new_value': new_value}
+            )
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
+
+    def edit_report_date_with_calendar(self):
+        """달력을 통해 보고서 작성일 수정"""
+        # 수정 가능 여부 확인
+        if not self.can_edit_plan():
+            return
+
+        current_date_text = self.report_date_value.text()
+        old_date = current_date_text  # 로그용
+
+        # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
+        current_date = None
+        if current_date_text and current_date_text != "-":
+            try:
+                from datetime import datetime
+                current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
+            except (ValueError, TypeError):
+                current_date = None
+
+        # 날짜 선택 다이얼로그 표시
+        dialog = DateSelectDialog(self, current_date=current_date, title="보고서 작성일 선택")
+        if dialog.exec_() and dialog.selected_date:
+            # 선택된 날짜 저장
+            new_date_str = dialog.selected_date.strftime('%Y-%m-%d')
+            self.report_date_value.setText(new_date_str)
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_date_edit',
+                details={'field': '보고서작성일', 'old_date': old_date, 'new_date': new_date_str}
+            )
+
+            # 스타일 변경 (수정된 날짜 강조)
+            value_style = "background-color: #FFE4B5; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;"
+            self.report_date_value.setStyleSheet(value_style)
+
+            # 현재 스케줄에도 저장 (저장 시 반영됨)
+            self.current_schedule['report_date_custom'] = new_date_str
+
+            # DB에 저장
+            try:
+                from models.schedules import Schedule
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    Schedule.update(schedule_id, report_date=new_date_str)
+            except Exception as e:
+                print(f"보고서 작성일 저장 오류: {e}")
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
+
+    def edit_report_date_with_calendar_n(self, report_num):
+        """달력을 통해 N번 보고서 날짜 수정 (1, 2, 3)"""
+        # 수정 가능 여부 확인
+        if not self.can_edit_plan():
+            return
+
+        # 해당 보고서 날짜 위젯 가져오기
+        report_value_widgets = {
+            1: self.report1_value,
+            2: self.report2_value,
+            3: self.report3_value
+        }
+        report_value = report_value_widgets.get(report_num)
+        if not report_value:
+            return
+
+        current_date_text = report_value.text()
+        old_date = current_date_text  # 로그용
+
+        # 현재 표시된 날짜를 파싱하여 달력 초기값으로 설정
+        current_date = None
+        if current_date_text and current_date_text != "-":
+            try:
+                from datetime import datetime
+                current_date = datetime.strptime(current_date_text, '%Y-%m-%d')
+            except (ValueError, TypeError):
+                current_date = None
+
+        # 날짜 선택 다이얼로그 표시
+        dialog = DateSelectDialog(self, current_date=current_date, title=f"{report_num} 보고서 날짜 선택")
+        if dialog.exec_() and dialog.selected_date:
+            # 선택된 날짜 저장
+            new_date_str = dialog.selected_date.strftime('%Y-%m-%d')
+            report_value.setText(new_date_str)
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_date_edit',
+                details={'field': f'{report_num}보고서', 'old_date': old_date, 'new_date': new_date_str}
+            )
+
+            # 스타일 변경 (수정된 날짜 강조)
+            value_style = "background-color: #FFE4B5; padding: 3px; border: 1px solid #e67e22; color: #e67e22; font-weight: bold; font-size: 11px; text-decoration: underline;"
+            report_value.setStyleSheet(value_style)
+
+            # 현재 스케줄에도 저장 (저장 시 반영됨)
+            self.current_schedule[f'report{report_num}_date'] = new_date_str
+
+            # DB에 저장
+            try:
+                from models.schedules import Schedule
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    update_data = {f'report{report_num}_date': new_date_str}
+                    Schedule.update(schedule_id, **update_data)
+            except Exception as e:
+                print(f"{report_num} 보고서 날짜 저장 오류: {e}")
+
+            # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
+            self.schedule_saved.emit()
 
     def on_experiment_cell_clicked(self, row, col):
         """실험 테이블 셀 클릭 시 O/X 토글 또는 날짜 수정"""
