@@ -1227,7 +1227,7 @@ class ScheduleManagementTab(QWidget):
         self.storage_value = self._create_value_label("-", value_style)
         grid.addWidget(self.storage_value, 0, 7)
 
-        # 행 2: 긴급여부, 중간보고서, 마지막실험일, 보고서작성일
+        # 행 2: 긴급여부, 시작일, 마지막실험일, 보고서작성일
         self.urgent_label = self._create_label("긴급여부", label_style)
         grid.addWidget(self.urgent_label, 1, 0)
         self.urgent_value = ClickableLabel("-")
@@ -1236,14 +1236,10 @@ class ScheduleManagementTab(QWidget):
         self.urgent_value.setFixedHeight(25)
         self.urgent_value.clicked.connect(self.toggle_urgent_status)
         grid.addWidget(self.urgent_value, 1, 1)
-        self.interim_report_label = self._create_label("중간보고서", label_style)
-        grid.addWidget(self.interim_report_label, 1, 2)
-        self.interim_report_value = ClickableLabel("-")
-        self.interim_report_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
-        self.interim_report_value.setAlignment(Qt.AlignCenter)
-        self.interim_report_value.setFixedHeight(25)
-        self.interim_report_value.clicked.connect(self.toggle_interim_report)
-        grid.addWidget(self.interim_report_value, 1, 3)
+        self.start_date_label = self._create_label("시 작 일", label_style)
+        grid.addWidget(self.start_date_label, 1, 2)
+        self.start_date_value = self._create_value_label("-", value_style)
+        grid.addWidget(self.start_date_value, 1, 3)
         self.last_experiment_date_label = self._create_label("마지막실험일", label_style)
         grid.addWidget(self.last_experiment_date_label, 1, 4)
         self.last_experiment_date_value = ClickableLabel("-")
@@ -1279,7 +1275,7 @@ class ScheduleManagementTab(QWidget):
         self.sampling_interval_value = self._create_value_label("-", value_style)
         grid.addWidget(self.sampling_interval_value, 2, 7)
 
-        # 행 4: 1회실험검체량, 포장단위, 필요검체량, 시작일
+        # 행 4: 1회실험검체량, 포장단위, 필요검체량, 중간보고서
         self.sample_per_test_label = self._create_label("1회검체량", label_style)
         grid.addWidget(self.sample_per_test_label, 3, 0)
         self.sample_per_test_value = self._create_value_label("-", value_style)
@@ -1297,10 +1293,14 @@ class ScheduleManagementTab(QWidget):
         self.required_sample_value.setFixedHeight(25)
         grid.addWidget(self.required_sample_value, 3, 5)
         self.current_required_sample = 0
-        self.start_date_label = self._create_label("시 작 일", label_style)
-        grid.addWidget(self.start_date_label, 3, 6)
-        self.start_date_value = self._create_value_label("-", value_style)
-        grid.addWidget(self.start_date_value, 3, 7)
+        self.interim_report_label = self._create_label("중간보고서", label_style)
+        grid.addWidget(self.interim_report_label, 3, 6)
+        self.interim_report_value = ClickableLabel("-")
+        self.interim_report_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.interim_report_value.setAlignment(Qt.AlignCenter)
+        self.interim_report_value.setFixedHeight(25)
+        self.interim_report_value.clicked.connect(self.toggle_interim_report)
+        grid.addWidget(self.interim_report_value, 3, 7)
 
         # 행 5: 중간보고서(예/아니오), 1보고서, 2보고서, 3보고서
         report_label_style = "font-weight: bold; background-color: #fdebd0; padding: 3px; border: 1px solid #e67e22; font-size: 11px;"
