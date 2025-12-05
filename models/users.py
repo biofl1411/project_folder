@@ -168,8 +168,8 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(users)")
-            columns = [col[1] for col in cursor.fetchall()]
+            cursor.execute("SHOW COLUMNS FROM users")
+            columns = [col['Field'] for col in cursor.fetchall()]
 
             new_columns = {
                 'department': 'TEXT DEFAULT ""',

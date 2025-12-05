@@ -9,9 +9,9 @@ class Fee:
         conn = get_connection()
         cursor = conn.cursor()
         
-        # 열 정보 확인
-        cursor.execute("PRAGMA table_info(fees)")
-        columns = [column[1] for column in cursor.fetchall()]
+        # 열 정보 확인 (MySQL)
+        cursor.execute("SHOW COLUMNS FROM fees")
+        columns = [column['Field'] for column in cursor.fetchall()]
         
         # display_order 열이 있는지 확인
         if "display_order" in columns:
@@ -167,9 +167,9 @@ class Fee:
             # 기존 데이터 삭제
             cursor.execute("DELETE FROM fees")
 
-            # display_order 열 확인 및 추가
-            cursor.execute("PRAGMA table_info(fees)")
-            columns = [column[1] for column in cursor.fetchall()]
+            # display_order 열 확인 및 추가 (MySQL)
+            cursor.execute("SHOW COLUMNS FROM fees")
+            columns = [column['Field'] for column in cursor.fetchall()]
 
             if "display_order" not in columns:
                 cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")

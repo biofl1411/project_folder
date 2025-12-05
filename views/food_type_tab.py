@@ -919,9 +919,9 @@ class FoodTypeTab(QWidget):
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA database_list")
+            cursor.execute("SELECT DATABASE()")
             db_info = cursor.fetchone()
-            db_path = db_info[2] if db_info else "Unknown"
+            db_path = db_info['DATABASE()'] if db_info else "Unknown"
             conn.close()
             
             QMessageBox.information(

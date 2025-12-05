@@ -9,8 +9,8 @@ class Schedule:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(schedules)")
-            columns = [col[1] for col in cursor.fetchall()]
+            cursor.execute("SHOW COLUMNS FROM schedules")
+            columns = [col['Field'] for col in cursor.fetchall()]
 
             # 필요한 컬럼 목록
             new_columns = {
