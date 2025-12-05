@@ -1364,41 +1364,53 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.temp_zone3_value, 5, 7)
 
         # 행 7: 연장기간, 연장 실험기간, 연장 회차
-        extension_label_style = "font-weight: bold; background-color: #e8f8f5; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
-        extension_value_style = "background-color: white; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
+        extension_label_style = "font-weight: bold; background-color: #e8f8f5; padding: 2px; border: 1px solid #1abc9c; font-size: 11px;"
+        extension_value_style = "background-color: white; padding: 2px; border: 1px solid #1abc9c; font-size: 11px;"
 
         self.extend_period_label = self._create_label("연장기간", extension_label_style)
         grid.addWidget(self.extend_period_label, 6, 0)
 
-        # 연장기간 입력 위젯 (일, 월, 년)
+        # 연장기간 입력 위젯 (일, 월, 년) - 1.5배 크기
         extend_period_widget = QWidget()
         extend_period_layout = QHBoxLayout(extend_period_widget)
-        extend_period_layout.setContentsMargins(2, 0, 2, 0)
-        extend_period_layout.setSpacing(2)
+        extend_period_layout.setContentsMargins(2, 2, 2, 2)
+        extend_period_layout.setSpacing(3)
 
         self.extend_days_input = QLineEdit()
-        self.extend_days_input.setFixedWidth(30)
+        self.extend_days_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_days_input.setFixedHeight(24)  # 높이도 키움
         self.extend_days_input.setAlignment(Qt.AlignCenter)
         self.extend_days_input.setPlaceholderText("0")
+        self.extend_days_input.setStyleSheet("font-size: 12px;")
         self.extend_days_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_days_input)
-        extend_period_layout.addWidget(QLabel("일"))
+        day_label = QLabel("일")
+        day_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(day_label)
 
         self.extend_months_input = QLineEdit()
-        self.extend_months_input.setFixedWidth(30)
+        self.extend_months_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_months_input.setFixedHeight(24)
         self.extend_months_input.setAlignment(Qt.AlignCenter)
         self.extend_months_input.setPlaceholderText("0")
+        self.extend_months_input.setStyleSheet("font-size: 12px;")
         self.extend_months_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_months_input)
-        extend_period_layout.addWidget(QLabel("월"))
+        month_label = QLabel("월")
+        month_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(month_label)
 
         self.extend_years_input = QLineEdit()
-        self.extend_years_input.setFixedWidth(30)
+        self.extend_years_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_years_input.setFixedHeight(24)
         self.extend_years_input.setAlignment(Qt.AlignCenter)
         self.extend_years_input.setPlaceholderText("0")
+        self.extend_years_input.setStyleSheet("font-size: 12px;")
         self.extend_years_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_years_input)
-        extend_period_layout.addWidget(QLabel("년"))
+        year_label = QLabel("년")
+        year_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(year_label)
         extend_period_layout.addStretch()
 
         grid.addWidget(extend_period_widget, 6, 1, 1, 3)
@@ -1409,22 +1421,26 @@ class ScheduleManagementTab(QWidget):
         self.extend_experiment_period_value = self._create_value_label("-", extension_value_style)
         grid.addWidget(self.extend_experiment_period_value, 6, 5)
 
-        # 연장 회차
+        # 연장 회차 - 1.5배 크기
         self.extend_rounds_label = self._create_label("연장회차", extension_label_style)
         grid.addWidget(self.extend_rounds_label, 6, 6)
 
         extend_rounds_widget = QWidget()
         extend_rounds_layout = QHBoxLayout(extend_rounds_widget)
-        extend_rounds_layout.setContentsMargins(2, 0, 2, 0)
-        extend_rounds_layout.setSpacing(2)
+        extend_rounds_layout.setContentsMargins(2, 2, 2, 2)
+        extend_rounds_layout.setSpacing(3)
 
         self.extend_rounds_input = QLineEdit()
-        self.extend_rounds_input.setFixedWidth(40)
+        self.extend_rounds_input.setFixedWidth(60)  # 40 * 1.5 = 60
+        self.extend_rounds_input.setFixedHeight(24)
         self.extend_rounds_input.setAlignment(Qt.AlignCenter)
         self.extend_rounds_input.setPlaceholderText("0")
+        self.extend_rounds_input.setStyleSheet("font-size: 12px;")
         self.extend_rounds_input.textChanged.connect(self.on_extend_rounds_changed)
         extend_rounds_layout.addWidget(self.extend_rounds_input)
-        extend_rounds_layout.addWidget(QLabel("회"))
+        rounds_label = QLabel("회")
+        rounds_label.setStyleSheet("font-size: 12px;")
+        extend_rounds_layout.addWidget(rounds_label)
         extend_rounds_layout.addStretch()
 
         grid.addWidget(extend_rounds_widget, 6, 7)
