@@ -46,6 +46,55 @@ class EstimateTab(QWidget):
         button_layout.addWidget(self.email_toggle_btn)
         button_layout.addStretch()
 
+        # 견적서 유형 버튼 (1차, 중단, 연장)
+        self.estimate_type = "first"  # 기본값: 1차 견적
+
+        # 버튼 스타일 정의
+        self.btn_active_style = """
+            QPushButton {
+                background-color: #1e90ff;
+                color: white;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #1873cc;
+            }
+        """
+        self.btn_inactive_style = """
+            QPushButton {
+                background-color: #e0e0e0;
+                color: #333;
+                padding: 8px 20px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+        """
+
+        self.first_estimate_btn = QPushButton("1차")
+        self.first_estimate_btn.setStyleSheet(self.btn_active_style)
+        self.first_estimate_btn.clicked.connect(lambda: self.switch_estimate_type("first"))
+
+        self.suspend_estimate_btn = QPushButton("중단")
+        self.suspend_estimate_btn.setStyleSheet(self.btn_inactive_style)
+        self.suspend_estimate_btn.clicked.connect(lambda: self.switch_estimate_type("suspend"))
+
+        self.extend_estimate_btn = QPushButton("연장")
+        self.extend_estimate_btn.setStyleSheet(self.btn_inactive_style)
+        self.extend_estimate_btn.clicked.connect(lambda: self.switch_estimate_type("extend"))
+
+        button_layout.addWidget(self.first_estimate_btn)
+        button_layout.addWidget(self.suspend_estimate_btn)
+        button_layout.addWidget(self.extend_estimate_btn)
+
         main_layout.addWidget(button_frame)
 
         # 스크롤 영역 - 수직 스크롤만
@@ -531,7 +580,15 @@ class EstimateTab(QWidget):
         else:
             date_str = datetime.now().strftime('%Y%m%d')
 
-        self.estimate_no_input.setText(f"BFL_소비기한_{date_str}-{schedule_id}")
+        # 견적서 유형에 따른 접미사
+        type_suffix = {
+            "first": "",
+            "suspend": "_중단",
+            "extend": "_연장"
+        }
+        suffix = type_suffix.get(self.estimate_type, "")
+
+        self.estimate_no_input.setText(f"BFL_소비기한_{date_str}-{schedule_id}{suffix}")
 
         # 견적일자
         self.estimate_date_input.setText(f"{datetime.now().strftime('%Y년 %m월 %d일')}")
@@ -540,8 +597,13 @@ class EstimateTab(QWidget):
         client_name = schedule.get('client_name', '')
         self.receiver_input.setText(client_name)
 
-        # 견적 명칭
-        self.title_value.setText("소비기한설정시험의 건")
+        # 견적 명칭 (유형에 따라 다르게 표시)
+        title_names = {
+            "first": "소비기한설정시험의 건",
+            "suspend": "소비기한설정시험 중단정산의 건",
+            "extend": "소비기한설정시험 연장의 건"
+        }
+        self.title_value.setText(title_names.get(self.estimate_type, "소비기한설정시험의 건"))
 
         # 품목 테이블 업데이트
         self.update_items_table(schedule)
@@ -725,27 +787,8 @@ class EstimateTab(QWidget):
         # 소계 열
         self.items_table.setCellWidget(0, 4, create_top_aligned_cell(f"{total_price:,} 원", Qt.AlignTop | Qt.AlignRight))
 
-    def calculate_total_price(self, schedule):
+    def calculate_total_price(self, schedule, completed_rounds=None):
         """총 금액 계산 - 스케줄 관리에서 전달받은 비용 데이터 사용"""
-        # 스케줄 관리에서 계산된 비용 정보가 있으면 그대로 사용
-        if schedule.get('total_rounds_cost') is not None and schedule.get('report_cost') is not None:
-            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
-            report_cost = schedule.get('report_cost', 0) or 0
-            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
-
-            # 가속 실험인 경우 온도 구간 수(3) 적용
-            test_method = schedule.get('test_method', 'real')
-            if test_method in ['acceleration', 'custom_acceleration', 'custom_accel']:
-                zone_count = 3
-            else:
-                zone_count = 1
-
-            total = (total_rounds_cost * zone_count) + report_cost + interim_report_cost
-            return int(total)
-
-        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
-        total = 0
-
         # 실험방법 확인
         test_method = schedule.get('test_method', 'real')
         sampling_count = schedule.get('sampling_count', 6) or 6
@@ -756,19 +799,87 @@ class EstimateTab(QWidget):
         else:
             zone_count = 3
 
+        # 견적 유형에 따른 계산
+        if self.estimate_type == "suspend":
+            # 중단 견적: 완료된 회차만 계산
+            completed = completed_rounds if completed_rounds else schedule.get('completed_rounds', 3) or 3
+            return self._calculate_suspend_price(schedule, completed, zone_count)
+        elif self.estimate_type == "extend":
+            # 연장 견적: 연장 비용만 계산
+            return self._calculate_extend_price(schedule, zone_count)
+        else:
+            # 1차 견적: 전체 비용 계산
+            return self._calculate_first_price(schedule, zone_count, sampling_count)
+
+    def _calculate_first_price(self, schedule, zone_count, sampling_count):
+        """1차 견적 금액 계산"""
+        # 스케줄 관리에서 계산된 비용 정보가 있으면 그대로 사용
+        if schedule.get('total_rounds_cost') is not None and schedule.get('report_cost') is not None:
+            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
+            report_cost = schedule.get('report_cost', 0) or 0
+            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+
+            total = (total_rounds_cost * zone_count) + report_cost + interim_report_cost
+            return int(total)
+
+        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
+        total = 0
+        test_method = schedule.get('test_method', 'real')
+
         # 검사항목 수수료 계산
         test_items = schedule.get('test_items', '')
         if test_items:
-            # 검사항목별 수수료 합계
             item_cost = Fee.calculate_total_fee(test_items)
-            # 회차별 총계 × 구간수
             total += item_cost * sampling_count * zone_count
 
-        # 보고서 비용 (실측: 200,000원, 가속: 300,000원)
+        # 보고서 비용
         if test_method in ['real', 'custom_real']:
             report_cost = 200000
         else:
             report_cost = 300000
+        total += report_cost
+
+        return int(total)
+
+    def _calculate_suspend_price(self, schedule, completed_rounds, zone_count):
+        """중단 견적 금액 계산 - 완료된 회차까지만 정산"""
+        total = 0
+        test_method = schedule.get('test_method', 'real')
+
+        # 검사항목 수수료 계산 (완료된 회차만)
+        test_items = schedule.get('test_items', '')
+        if test_items:
+            item_cost = Fee.calculate_total_fee(test_items)
+            total += item_cost * completed_rounds * zone_count
+
+        # 중단 시에는 보고서 비용의 50% 적용
+        if test_method in ['real', 'custom_real']:
+            report_cost = 100000  # 200,000 × 50%
+        else:
+            report_cost = 150000  # 300,000 × 50%
+        total += report_cost
+
+        return int(total)
+
+    def _calculate_extend_price(self, schedule, zone_count):
+        """연장 견적 금액 계산 - 추가 실험 비용"""
+        total = 0
+        test_method = schedule.get('test_method', 'real')
+
+        # 연장 실험: 기본 3회차 추가로 계산
+        extend_rounds = schedule.get('extend_rounds', 3) or 3
+
+        # 검사항목 수수료 계산 (연장 회차)
+        test_items = schedule.get('test_items', '')
+        if test_items:
+            item_cost = Fee.calculate_total_fee(test_items)
+            total += item_cost * extend_rounds * zone_count
+
+        # 연장 보고서 비용 (50%)
+        if test_method in ['real', 'custom_real']:
+            report_cost = 100000
+        else:
+            report_cost = 150000
         total += report_cost
 
         return int(total)
@@ -901,7 +1012,43 @@ class EstimateTab(QWidget):
         final_date_text = f" / {final_expected_date}" if final_expected_date else ""
         test_period_text += f"→ 실험 기간 : {total_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (최종 보고서{final_date_text})"
 
-        remark_text = f"""※ 검체량
+        # 견적 유형에 따른 Remark 생성
+        if self.estimate_type == "suspend":
+            # 중단 견적서 Remark
+            completed_rounds = schedule.get('completed_rounds', 3) or 3
+            remark_text = f"""※ 중단 정산 내역
+
+→ 실험 중단 사유: 품질한계 도달 / 의뢰자 요청
+→ 완료된 실험 회차: {completed_rounds}회 (온도 {zone_count}구간)
+→ 정산 기준: 완료된 회차까지의 검사비용 + 보고서 비용(50%)
+
+※ 정산 안내
+* 본 견적서는 실험 중단에 따른 정산 견적서입니다.
+* 완료된 실험 회차까지의 비용만 청구됩니다.
+* 보고서 비용은 중단보고서 작성 비용(50%)이 포함됩니다.
+* 추가 문의사항은 담당자에게 연락 바랍니다."""
+
+        elif self.estimate_type == "extend":
+            # 연장 견적서 Remark
+            extend_rounds = schedule.get('extend_rounds', 3) or 3
+            remark_text = f"""※ 연장실험 안내
+
+→ 연장 실험 회차: {extend_rounds}회 (온도 {zone_count}구간)
+→ 추가 검체량: {extend_rounds * zone_count}ea
+
+※ 연장실험 진행 절차
+1. 본 견적서 확인 후 입금
+2. 추가 검체 준비 및 발송
+3. 연장실험 진행
+4. 최종 보고서 발행
+
+* 연장실험은 기존 실험 데이터와 연계하여 진행됩니다.
+* 추가 검체는 기존 제품과 동일한 조건으로 준비해주세요.
+* 연장실험 후 최종 보고서가 발행됩니다."""
+
+        else:
+            # 1차 견적서 Remark (기존 내용)
+            remark_text = f"""※ 검체량
 → 검체는 판매 또는 판매 예정인 제품과 동일하게 검사제품을 준비해주시기 바랍니다.
 → 검체량 : 온도 구간별({zone_text}) 총 {sampling_count}회씩 실험 = {total_samples}ea
     => 포장단위 {packaging_text} 이상 제품 기준 총 {total_samples}ea 이상 준비
@@ -1587,3 +1734,31 @@ class EstimateTab(QWidget):
         if reply == QMessageBox.Yes:
             self.memo_text.clear()
             QMessageBox.information(self, "완료", "메모가 삭제되었습니다.")
+
+    def switch_estimate_type(self, estimate_type):
+        """견적서 유형 전환 (1차, 중단, 연장)"""
+        self.estimate_type = estimate_type
+
+        # 버튼 스타일 업데이트
+        self.first_estimate_btn.setStyleSheet(
+            self.btn_active_style if estimate_type == "first" else self.btn_inactive_style
+        )
+        self.suspend_estimate_btn.setStyleSheet(
+            self.btn_active_style if estimate_type == "suspend" else self.btn_inactive_style
+        )
+        self.extend_estimate_btn.setStyleSheet(
+            self.btn_active_style if estimate_type == "extend" else self.btn_inactive_style
+        )
+
+        # 현재 스케줄이 있으면 견적서 다시 로드
+        if self.current_schedule:
+            self.load_schedule_data(self.current_schedule)
+
+    def get_estimate_type_name(self):
+        """현재 견적서 유형 이름 반환"""
+        type_names = {
+            "first": "1차",
+            "suspend": "중단",
+            "extend": "연장"
+        }
+        return type_names.get(self.estimate_type, "1차")
