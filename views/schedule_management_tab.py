@@ -1980,8 +1980,14 @@ class ScheduleManagementTab(QWidget):
                     # 1회당 1개 필요
                     required_packages = total_sampling
 
-                # 개수로 표시
-                self.required_sample_value.setText(f"{required_packages}개")
+                # 연장실험 진행 시 2배로 계산
+                extension_test = schedule.get('extension_test', 0)
+                if extension_test:
+                    required_packages = required_packages * 2
+                    self.required_sample_value.setText(f"{required_packages}개 (연장×2)")
+                else:
+                    self.required_sample_value.setText(f"{required_packages}개")
+
                 self.current_required_sample = required_packages
             else:
                 self.required_sample_value.setText("-")
