@@ -2487,12 +2487,18 @@ class ScheduleManagementTab(QWidget):
         # 완료 회차 정보 추가 (중단 견적서용)
         schedule_data['completed_rounds'] = self.count_completed_rounds()
 
-        # 연장 회차 정보 추가 (연장 견적서용)
+        # 연장 실험 정보 추가 (연장 견적서용)
         try:
             extend_rounds = int(self.extend_rounds_input.text() or 0)
             schedule_data['extend_rounds'] = extend_rounds
         except (ValueError, AttributeError):
             schedule_data['extend_rounds'] = 0
+
+        # 연장 실험기간 정보 추가 (current_schedule에서 가져오기)
+        schedule_data['extend_experiment_days'] = self.current_schedule.get('extend_experiment_days', 0) or 0
+        schedule_data['extend_period_days'] = self.current_schedule.get('extend_period_days', 0) or 0
+        schedule_data['extend_period_months'] = self.current_schedule.get('extend_period_months', 0) or 0
+        schedule_data['extend_period_years'] = self.current_schedule.get('extend_period_years', 0) or 0
 
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
