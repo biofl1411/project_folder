@@ -343,7 +343,7 @@ class DisplaySettingsDialog(QDialog):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_display_fields'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_display_fields'")
             result = cursor.fetchone()
             conn.close()
 
@@ -366,14 +366,14 @@ class DisplaySettingsDialog(QDialog):
             cursor = conn.cursor()
 
             cursor.execute("""
-                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE key = 'schedule_display_fields'
+                UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE `key` = 'schedule_display_fields'
             """, (value,))
 
             if cursor.rowcount == 0:
                 cursor.execute("""
-                    INSERT INTO settings (key, value, description)
-                    VALUES ('schedule_display_fields', ?, '스케줄 관리 표시 필드')
+                    INSERT INTO settings (`key`, value, description)
+                    VALUES ('schedule_display_fields', %s, '스케줄 관리 표시 필드')
                 """, (value,))
 
             conn.commit()
@@ -701,7 +701,7 @@ class ScheduleSelectDialog(QDialog):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_tab_columns'")
             result = cursor.fetchone()
             conn.close()
 
@@ -1744,7 +1744,7 @@ class ScheduleManagementTab(QWidget):
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
-                    cursor.execute("SELECT value FROM settings WHERE key = 'report_date_offset'")
+                    cursor.execute("SELECT value FROM settings WHERE `key` = 'report_date_offset'")
                     result = cursor.fetchone()
                     conn.close()
                     if result and result['value']:
@@ -2321,7 +2321,7 @@ class ScheduleManagementTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_display_fields'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_display_fields'")
             result = cursor.fetchone()
             conn.close()
 
@@ -2489,15 +2489,15 @@ class ScheduleManagementTab(QWidget):
 
             cursor.execute("""
                 UPDATE schedules SET
-                    additional_test_items = ?,
-                    removed_test_items = ?,
-                    experiment_schedule_data = ?,
-                    status = ?,
-                    report_interim = ?,
-                    start_date = ?,
-                    custom_dates = ?,
-                    actual_experiment_days = ?
-                WHERE id = ?
+                    additional_test_items = %s,
+                    removed_test_items = %s,
+                    experiment_schedule_data = %s,
+                    status = %s,
+                    report_interim = %s,
+                    start_date = %s,
+                    custom_dates = %s,
+                    actual_experiment_days = %s
+                WHERE id = %s
             """, (additional_items_json, removed_items_json, experiment_data_json,
                   status, report_interim, start_date, custom_dates_json, actual_experiment_days, schedule_id))
 
@@ -2607,7 +2607,7 @@ class ScheduleManagementTab(QWidget):
                 if schedule_id:
                     conn = get_connection()
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE schedules SET status = ? WHERE id = ?", (status_code, schedule_id))
+                    cursor.execute("UPDATE schedules SET status = %s WHERE id = %s", (status_code, schedule_id))
                     conn.commit()
                     conn.close()
 
@@ -2741,7 +2741,7 @@ class ScheduleManagementTab(QWidget):
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'report_date_offset'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'report_date_offset'")
             result = cursor.fetchone()
             conn.close()
             if result and result['value']:

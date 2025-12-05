@@ -47,7 +47,7 @@ class EmailSender:
             keys = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_use_ssl', 'smtp_sender_name']
 
             for key in keys:
-                cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+                cursor.execute("SELECT value FROM settings WHERE `key` = %s", (key,))
                 result = cursor.fetchone()
                 if result:
                     settings[key] = result['value']
@@ -77,14 +77,14 @@ class EmailSender:
 
             for key, value, description in settings:
                 cursor.execute("""
-                    UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE key = ?
+                    UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE `key` = %s
                 """, (value, key))
 
                 if cursor.rowcount == 0:
                     cursor.execute("""
-                        INSERT INTO settings (key, value, description)
-                        VALUES (?, ?, ?)
+                        INSERT INTO settings (`key`, value, description)
+                        VALUES (%s, %s, %s)
                     """, (key, value, description))
 
             conn.commit()

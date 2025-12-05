@@ -688,7 +688,7 @@ class FoodTypeTab(QWidget):
                     
                     # 데이터 삽입
                     cursor.execute(
-                        "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (%s, %s, %s, %s, %s, %s)",
                         (
                             food_type_data["type_name"],
                             food_type_data.get("category", ""),

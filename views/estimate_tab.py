@@ -979,7 +979,7 @@ class EstimateTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'output_path'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'output_path'")
             result = cursor.fetchone()
             conn.close()
             if result and result['value']:

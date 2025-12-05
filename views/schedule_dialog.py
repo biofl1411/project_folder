@@ -1770,7 +1770,7 @@ class ScheduleCreateDialog(QDialog):
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'default_sampling_count'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'default_sampling_count'")
             result = cursor.fetchone()
             conn.close()
 
@@ -2082,7 +2082,7 @@ class ScheduleCreateDialog(QDialog):
             print(f"식품 유형 삭제 시작: ID {food_type_id}")
             
             # 데이터 삭제 쿼리 실행
-            cursor.execute("DELETE FROM food_types WHERE id = ?", (food_type_id,))
+            cursor.execute("DELETE FROM food_types WHERE id = %s", (food_type_id,))
             
             # 영향 받은 행 수 확인
             rows_affected = cursor.rowcount

@@ -431,7 +431,7 @@ class MainWindow(QMainWindow):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'dashboard_detail_columns'")
             result = cursor.fetchone()
             conn.close()
 
@@ -934,7 +934,7 @@ class DashboardDisplaySettingsDialog(QDialog):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'dashboard_detail_columns'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'dashboard_detail_columns'")
             result = cursor.fetchone()
             conn.close()
 
@@ -956,14 +956,14 @@ class DashboardDisplaySettingsDialog(QDialog):
             cursor = conn.cursor()
 
             cursor.execute("""
-                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE key = 'dashboard_detail_columns'
+                UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE `key` = 'dashboard_detail_columns'
             """, (value,))
 
             if cursor.rowcount == 0:
                 cursor.execute("""
-                    INSERT INTO settings (key, value, description)
-                    VALUES ('dashboard_detail_columns', ?, '대시보드 세부 내역 표시 컬럼')
+                    INSERT INTO settings (`key`, value, description)
+                    VALUES ('dashboard_detail_columns', %s, '대시보드 세부 내역 표시 컬럼')
                 """, (value,))
 
             conn.commit()

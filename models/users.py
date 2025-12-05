@@ -172,11 +172,11 @@ class User:
             columns = [col['Field'] for col in cursor.fetchall()]
 
             new_columns = {
-                'department': 'TEXT DEFAULT ""',
-                'permissions': 'TEXT DEFAULT "{}"',
-                'email': 'TEXT DEFAULT ""',
-                'phone': 'TEXT DEFAULT ""',
-                'is_active': 'INTEGER DEFAULT 0',
+                'department': "VARCHAR(255) DEFAULT ''",
+                'permissions': "VARCHAR(2000) DEFAULT '{}'",
+                'email': "VARCHAR(255) DEFAULT ''",
+                'phone': "VARCHAR(50) DEFAULT ''",
+                'is_active': "INT DEFAULT 0",
             }
 
             for col_name, col_type in new_columns.items():
@@ -269,7 +269,7 @@ class User:
             cursor.execute("""
                 SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
-                WHERE id = ?
+                WHERE id = %s
             """, (user_id,))
             user = cursor.fetchone()
             conn.close()
@@ -336,7 +336,7 @@ class User:
 
             cursor.execute("""
                 INSERT INTO users (username, password, name, role, department, permissions, email, phone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (username, password, name, role, department, permissions_json, email, phone))
             user_id = cursor.lastrowid
             conn.commit()
@@ -358,29 +358,29 @@ class User:
             params = []
 
             if name is not None:
-                updates.append("name = ?")
+                updates.append("name = %s")
                 params.append(name)
 
             if department is not None:
-                updates.append("department = ?")
+                updates.append("department = %s")
                 params.append(department)
 
             if permissions is not None:
-                updates.append("permissions = ?")
+                updates.append("permissions = %s")
                 params.append(json.dumps(permissions, ensure_ascii=False))
 
             if email is not None:
-                updates.append("email = ?")
+                updates.append("email = %s")
                 params.append(email)
 
             if phone is not None:
-                updates.append("phone = ?")
+                updates.append("phone = %s")
                 params.append(phone)
 
             if updates:
                 params.append(user_id)
                 cursor.execute(f"""
-                    UPDATE users SET {', '.join(updates)} WHERE id = ?
+                    UPDATE users SET {', '.join(updates)} WHERE id = %s
                 """, params)
                 conn.commit()
 
@@ -496,7 +496,7 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT is_active FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT is_active FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
             conn.close()
             return result['is_active'] if result else 0

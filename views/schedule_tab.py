@@ -125,7 +125,7 @@ class ScheduleDisplaySettingsDialog(QDialog):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_tab_columns'")
             result = cursor.fetchone()
             conn.close()
 
@@ -148,14 +148,14 @@ class ScheduleDisplaySettingsDialog(QDialog):
             cursor = conn.cursor()
 
             cursor.execute("""
-                UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE key = 'schedule_tab_columns'
+                UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE `key` = 'schedule_tab_columns'
             """, (value,))
 
             if cursor.rowcount == 0:
                 cursor.execute("""
-                    INSERT INTO settings (key, value, description)
-                    VALUES ('schedule_tab_columns', ?, '스케줄 작성 탭 표시 컬럼')
+                    INSERT INTO settings (`key`, value, description)
+                    VALUES ('schedule_tab_columns', %s, '스케줄 작성 탭 표시 컬럼')
                 """, (value,))
 
             conn.commit()
@@ -1010,7 +1010,7 @@ class ScheduleTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_tab_columns'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_tab_columns'")
             result = cursor.fetchone()
             conn.close()
 
@@ -1062,8 +1062,8 @@ class ScheduleTab(QWidget):
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO settings (key, value)
-                VALUES ('schedule_column_order', ?)
+                REPLACE INTO settings (`key`, value)
+                VALUES ('schedule_column_order', %s)
             """, (order_str,))
             conn.commit()
             conn.close()
@@ -1077,7 +1077,7 @@ class ScheduleTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'schedule_column_order'")
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_column_order'")
             result = cursor.fetchone()
             conn.close()
 

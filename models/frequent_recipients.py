@@ -20,15 +20,15 @@ class FrequentRecipient:
             cursor = conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS frequent_recipients (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    name TEXT NOT NULL,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    name VARCHAR(255) NOT NULL,
                     recipient_ids TEXT NOT NULL,
-                    cc_ids TEXT DEFAULT '[]',
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    cc_ids TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
             conn.commit()
             conn.close()
@@ -45,7 +45,7 @@ class FrequentRecipient:
             cursor.execute("""
                 SELECT id, name, recipient_ids, cc_ids, created_at
                 FROM frequent_recipients
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY name
             """, (user_id,))
             rows = cursor.fetchall()
@@ -72,7 +72,7 @@ class FrequentRecipient:
             cursor.execute("""
                 SELECT id, user_id, name, recipient_ids, cc_ids, created_at
                 FROM frequent_recipients
-                WHERE id = ?
+                WHERE id = %s
             """, (recipient_list_id,))
             row = cursor.fetchone()
             conn.close()
@@ -100,7 +100,7 @@ class FrequentRecipient:
 
             cursor.execute("""
                 INSERT INTO frequent_recipients (user_id, name, recipient_ids, cc_ids)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             """, (user_id, name, recipient_ids_json, cc_ids_json))
 
             new_id = cursor.lastrowid
@@ -123,15 +123,15 @@ class FrequentRecipient:
             params = []
 
             if name is not None:
-                updates.append("name = ?")
+                updates.append("name = %s")
                 params.append(name)
 
             if recipient_ids is not None:
-                updates.append("recipient_ids = ?")
+                updates.append("recipient_ids = %s")
                 params.append(json.dumps(recipient_ids, ensure_ascii=False))
 
             if cc_ids is not None:
-                updates.append("cc_ids = ?")
+                updates.append("cc_ids = %s")
                 params.append(json.dumps(cc_ids, ensure_ascii=False))
 
             if updates:
@@ -140,7 +140,7 @@ class FrequentRecipient:
                 cursor.execute(f"""
                     UPDATE frequent_recipients
                     SET {', '.join(updates)}
-                    WHERE id = ?
+                    WHERE id = %s
                 """, params)
                 conn.commit()
 
@@ -157,7 +157,7 @@ class FrequentRecipient:
             FrequentRecipient._ensure_table()
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM frequent_recipients WHERE id = ?", (recipient_list_id,))
+            cursor.execute("DELETE FROM frequent_recipients WHERE id = %s", (recipient_list_id,))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
