@@ -1048,17 +1048,18 @@ class ScheduleManagementTab(QWidget):
             if not has_perm:
                 self.save_schedule_btn.setToolTip("권한이 없습니다")
 
-    def can_edit_plan(self, show_message=True):
+    def can_edit_plan(self, show_message=True, allow_suspended=False):
         """
         실험 계획안 수정 가능 여부 확인
 
         조건:
         1. 스케줄이 선택되어 있어야 함
-        2. 상태가 'pending' (대기)일 때만 수정 가능
+        2. 상태가 'pending' (대기) 또는 'suspended' (중단, allow_suspended=True일 때)
         3. 권한이 있어야 함 (schedule_mgmt_edit_plan)
 
         Args:
             show_message: True이면 수정 불가 시 메시지 표시
+            allow_suspended: True이면 중단 상태에서도 수정 허용
 
         Returns:
             bool: 수정 가능 여부
@@ -1068,9 +1069,13 @@ class ScheduleManagementTab(QWidget):
                 QMessageBox.warning(self, "수정 불가", "먼저 스케줄을 선택하세요.")
             return False
 
-        # 상태 확인 - 'pending' (대기) 상태일 때만 수정 가능
+        # 상태 확인 - 'pending' (대기) 상태 또는 'suspended' (중단, allow_suspended일 때)
         current_status = self.current_schedule.get('status', 'pending')
-        if current_status != 'pending':
+        allowed_statuses = ['pending']
+        if allow_suspended:
+            allowed_statuses.append('suspended')
+
+        if current_status not in allowed_statuses:
             if show_message:
                 status_map = get_status_map()
                 status_name = status_map.get(current_status, current_status)
@@ -1199,12 +1204,16 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(0)
         grid.setContentsMargins(2, 0, 2, 2)
-        grid.setVerticalSpacing(0)
+        grid.setVerticalSpacing(2)  # 행 간격 추가
         grid.setHorizontalSpacing(0)
 
         # 8열 균등 배분 (라벨+값 4쌍)
         for col in range(8):
             grid.setColumnStretch(col, 1)
+
+        # 행 최소 높이 설정
+        for row in range(7):
+            grid.setRowMinimumHeight(row, 22)
 
         label_style = "font-weight: bold; background-color: #ecf0f1; padding: 1px; border: 1px solid #bdc3c7; font-size: 11px;"
         value_style = "background-color: white; padding: 1px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 11px;"
@@ -3248,8 +3257,9 @@ class ScheduleManagementTab(QWidget):
         if col < 1 or col > sampling_count:
             return
 
-        # 수정 가능 여부 확인 (상태가 '대기'일 때만)
-        if not self.can_edit_plan():
+        # 수정 가능 여부 확인 (대기 또는 중단 상태에서 수정 가능)
+        # 중단 상태에서는 X 표시로 미완료 회차를 표시할 수 있음
+        if not self.can_edit_plan(allow_suspended=True):
             return
 
         item = table.item(row, col)
@@ -3279,10 +3289,12 @@ class ScheduleManagementTab(QWidget):
         self.recalculate_costs()
 
     def count_completed_rounds(self):
-        """온도조건별 실험 테이블에서 완료된(O 표시된) 회차 수를 계산
+        """온도조건별 실험 테이블에서 완료된 회차 수를 계산
 
         중단 견적서에서 실제 완료된 회차만 정산하기 위해 사용
-        각 회차(열)에서 최소 하나의 검사항목에 O 표시가 있으면 완료로 간주
+        각 회차(열)에서:
+        - X 표시가 하나라도 있으면 미완료 회차로 간주
+        - O 표시만 있으면 완료 회차로 간주
         """
         if not hasattr(self, 'experiment_table') or not self.current_schedule:
             return 0
@@ -3301,19 +3313,28 @@ class ScheduleManagementTab(QWidget):
 
         # 각 회차(열) 확인
         for col in range(1, sampling_count + 1):
-            has_completed_item = False
+            has_incomplete = False
+            has_any_test = False
 
             # 해당 회차의 모든 검사항목 확인
             for row in range(test_item_start_row, test_item_end_row + 1):
                 item = table.item(row, col)
-                if item and item.text() == 'O':
-                    has_completed_item = True
-                    break
+                if item:
+                    text = item.text()
+                    if text == 'X':
+                        # X 표시가 있으면 미완료 회차
+                        has_incomplete = True
+                        break
+                    elif text == 'O':
+                        has_any_test = True
 
-            if has_completed_item:
+            if has_incomplete:
+                # X 표시가 있는 첫 회차에서 중단 (연속된 완료 회차만 카운트)
+                break
+            elif has_any_test:
                 completed_rounds += 1
             else:
-                # O 표시가 없는 첫 회차에서 중단 (연속된 완료 회차만 카운트)
+                # O도 X도 없으면 미완료로 간주하고 중단
                 break
 
         return completed_rounds
