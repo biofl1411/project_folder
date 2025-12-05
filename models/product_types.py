@@ -99,8 +99,9 @@ class ProductType:
             cursor = conn.cursor()
             
             # 삭제 전 행 수 확인
-            cursor.execute("SELECT COUNT(*) FROM food_types")
-            count_before = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) as cnt FROM food_types")
+            result = cursor.fetchone()
+            count_before = result['cnt'] if result else 0
             
             # 트랜잭션 시작
             conn.execute("BEGIN TRANSACTION")
@@ -115,8 +116,9 @@ class ProductType:
             conn.commit()
             
             # 삭제 후 행 수 확인
-            cursor.execute("SELECT COUNT(*) FROM food_types")
-            count_after = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) as cnt FROM food_types")
+            result = cursor.fetchone()
+            count_after = result['cnt'] if result else 0
             
             conn.close()
             

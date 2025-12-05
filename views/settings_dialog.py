@@ -895,10 +895,10 @@ class SettingsDialog(QDialog):
 
         if reply == QMessageBox.Yes:
             self.custom_statuses = [
-                {'code': 'pending', 'name': '대기', 'color': '#FFFFFF'},
-                {'code': 'scheduled', 'name': '입고예정', 'color': '#00FFFF'},
-                {'code': 'received', 'name': '입고', 'color': '#FFFF00'},
-                {'code': 'completed', 'name': '종료', 'color': '#00FF00'},
+                {'code': 'pending', 'name': '대기', 'color': '#FFFFFF', 'text_color': '#2196F3'},
+                {'code': 'received', 'name': '입고', 'color': '#FFFFFF', 'text_color': '#4CAF50'},
+                {'code': 'suspended', 'name': '중단', 'color': '#FFFFFF', 'text_color': '#FF9800'},
+                {'code': 'completed', 'name': '완료', 'color': '#FFFFFF', 'text_color': '#9C27B0'},
             ]
             self.refresh_status_list()
             QMessageBox.information(self, "복원 완료", "기본값으로 복원되었습니다.")
