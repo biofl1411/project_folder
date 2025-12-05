@@ -1452,6 +1452,33 @@ class ScheduleManagementTab(QWidget):
         rounds_label = QLabel("회")
         rounds_label.setStyleSheet("font-size: 12px;")
         extend_rounds_layout.addWidget(rounds_label)
+
+        # 회차계산 버튼 추가
+        self.calc_rounds_btn = QPushButton("회차계산")
+        self.calc_rounds_btn.setFixedWidth(60)
+        self.calc_rounds_btn.setFixedHeight(24)
+        self.calc_rounds_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QPushButton:pressed {
+                background-color: #1f6dad;
+            }
+            QPushButton:disabled {
+                background-color: #bdc3c7;
+            }
+        """)
+        self.calc_rounds_btn.clicked.connect(self.show_extend_rounds_dialog)
+        self.calc_rounds_btn.setEnabled(False)  # 초기에는 비활성화
+        extend_rounds_layout.addWidget(self.calc_rounds_btn)
         extend_rounds_layout.addStretch()
 
         grid.addWidget(extend_rounds_widget, 6, 7)
@@ -2653,6 +2680,13 @@ class ScheduleManagementTab(QWidget):
             interim2_round = self.current_schedule.get('interim2_round', 0) or 0
             interim3_round = self.current_schedule.get('interim3_round', 0) or 0
 
+            # 연장 실험 관련 정보
+            extend_period_days = self.current_schedule.get('extend_period_days', 0) or 0
+            extend_period_months = self.current_schedule.get('extend_period_months', 0) or 0
+            extend_period_years = self.current_schedule.get('extend_period_years', 0) or 0
+            extend_experiment_days = self.current_schedule.get('extend_experiment_days', 0) or 0
+            extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -2672,12 +2706,19 @@ class ScheduleManagementTab(QWidget):
                     report3_date = %s,
                     interim1_round = %s,
                     interim2_round = %s,
-                    interim3_round = %s
+                    interim3_round = %s,
+                    extend_period_days = %s,
+                    extend_period_months = %s,
+                    extend_period_years = %s,
+                    extend_experiment_days = %s,
+                    extend_rounds = %s
                 WHERE id = %s
             """, (additional_items_json, removed_items_json, experiment_data_json,
                   status, report_interim, start_date, custom_dates_json, actual_experiment_days,
                   report1_date, report2_date, report3_date,
-                  interim1_round, interim2_round, interim3_round, schedule_id))
+                  interim1_round, interim2_round, interim3_round,
+                  extend_period_days, extend_period_months, extend_period_years,
+                  extend_experiment_days, extend_rounds, schedule_id))
 
             conn.commit()
             conn.close()
@@ -2928,6 +2969,7 @@ class ScheduleManagementTab(QWidget):
         self.extend_months_input.setEnabled(enabled)
         self.extend_years_input.setEnabled(enabled)
         self.extend_rounds_input.setEnabled(enabled)
+        self.calc_rounds_btn.setEnabled(enabled)
 
         if not enabled:
             self.extend_days_input.clear()
@@ -3076,6 +3118,109 @@ class ScheduleManagementTab(QWidget):
                             self.report3_value.setText('-')
                             self.current_schedule['report3_date'] = ''
                             self.current_schedule['interim3_round'] = 0
+
+    def show_extend_rounds_dialog(self):
+        """연장 회차 계산 다이얼로그 표시"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "경고", "스케줄을 먼저 선택해주세요.")
+            return
+
+        # 연장 실험기간 확인
+        extend_experiment_days = self.current_schedule.get('extend_experiment_days', 0)
+        if not extend_experiment_days or extend_experiment_days <= 0:
+            QMessageBox.warning(self, "경고", "연장기간을 먼저 입력해주세요.")
+            return
+
+        # 샘플링 간격 가져오기
+        sampling_interval = self.current_schedule.get('sampling_interval', 15) or 15
+
+        # 자동 계산 가능 회차
+        auto_rounds = extend_experiment_days // sampling_interval
+        if auto_rounds <= 0:
+            auto_rounds = 1
+
+        # 다이얼로그 표시
+        msg = QMessageBox(self)
+        msg.setWindowTitle("연장 회차 설정")
+        msg.setText(f"기존 샘플링 주기({sampling_interval}일)로 회차를 자동 계산하시겠습니까?\n\n"
+                   f"연장 실험기간: {extend_experiment_days}일\n"
+                   f"자동 계산 시: {auto_rounds}회차 추가")
+        msg.setIcon(QMessageBox.Question)
+
+        yes_btn = msg.addButton("예 (자동 계산)", QMessageBox.YesRole)
+        no_btn = msg.addButton("아니요 (직접 입력)", QMessageBox.NoRole)
+        cancel_btn = msg.addButton("취소", QMessageBox.RejectRole)
+
+        msg.exec_()
+
+        clicked = msg.clickedButton()
+
+        if clicked == yes_btn:
+            # 자동 계산으로 회차 설정
+            self.extend_rounds_input.setText(str(auto_rounds))
+        elif clicked == no_btn:
+            # 직접 입력 다이얼로그
+            self._show_manual_rounds_dialog(extend_experiment_days, sampling_interval)
+
+    def _show_manual_rounds_dialog(self, extend_experiment_days, sampling_interval):
+        """연장 회차 직접 입력 다이얼로그"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QDialogButtonBox
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("연장 회차 직접 입력")
+        dialog.setFixedWidth(350)
+
+        layout = QVBoxLayout(dialog)
+
+        # 안내 메시지
+        info_label = QLabel(f"연장 실험기간: {extend_experiment_days}일\n"
+                           f"기존 샘플링 주기: {sampling_interval}일\n\n"
+                           f"추가할 회차 수를 입력하세요:")
+        info_label.setStyleSheet("font-size: 12px; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # 회차 입력
+        input_layout = QHBoxLayout()
+        input_label = QLabel("추가 회차:")
+        input_label.setStyleSheet("font-size: 12px;")
+        input_layout.addWidget(input_label)
+
+        rounds_spin = QSpinBox()
+        rounds_spin.setRange(1, 50)
+        rounds_spin.setValue(1)
+        rounds_spin.setFixedWidth(80)
+        rounds_spin.setStyleSheet("font-size: 12px;")
+        input_layout.addWidget(rounds_spin)
+
+        unit_label = QLabel("회")
+        unit_label.setStyleSheet("font-size: 12px;")
+        input_layout.addWidget(unit_label)
+        input_layout.addStretch()
+
+        layout.addLayout(input_layout)
+
+        # 새 샘플링 간격 표시
+        interval_info = QLabel("")
+        interval_info.setStyleSheet("font-size: 11px; color: #666; margin-top: 10px;")
+        layout.addWidget(interval_info)
+
+        def update_interval_info():
+            rounds = rounds_spin.value()
+            if rounds > 0:
+                new_interval = extend_experiment_days // rounds
+                interval_info.setText(f"→ 새 샘플링 간격: 약 {new_interval}일")
+
+        rounds_spin.valueChanged.connect(update_interval_info)
+        update_interval_info()
+
+        # 버튼
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec_() == QDialog.Accepted:
+            self.extend_rounds_input.setText(str(rounds_spin.value()))
 
     def on_extend_rounds_changed(self):
         """연장 회차 변경 시 스케줄 테이블 업데이트"""

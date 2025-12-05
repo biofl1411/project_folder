@@ -1123,19 +1123,27 @@ class EstimateTab(QWidget):
             extend_rounds = schedule.get('extend_rounds', 0)
             if extend_rounds is None or extend_rounds == 0:
                 extend_rounds = 3  # 기본값: 3회
+
+            # 연장 실험 간격 계산
+            extend_experiment_days = schedule.get('extend_experiment_days', 0)
+            sampling_interval = schedule.get('sampling_interval', 15) or 15
+            if extend_rounds > 0 and extend_experiment_days > 0:
+                extend_interval = extend_experiment_days // extend_rounds
+            else:
+                extend_interval = sampling_interval
+
             remark_text = f"""※ 연장실험 안내
 
 → 연장 실험 회차: {extend_rounds}회 (온도 {zone_count}구간)
-→ 추가 검체량: {extend_rounds * zone_count}ea
+→ 연장 샘플링 간격: 약 {extend_interval}일
 
 ※ 연장실험 진행 절차
 1. 본 견적서 확인 후 입금
-2. 추가 검체 준비 및 발송
-3. 연장실험 진행
-4. 최종 보고서 발행
+2. 연장실험 진행 (기존 보관 검체 사용)
+3. 최종 보고서 발행
 
 * 연장실험은 기존 실험 데이터와 연계하여 진행됩니다.
-* 추가 검체는 기존 제품과 동일한 조건으로 준비해주세요.
+* 기존 보관 중인 검체를 사용하여 연장 실험을 진행합니다.
 * 연장실험 후 최종 보고서가 발행됩니다."""
 
         else:

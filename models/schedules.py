@@ -27,7 +27,12 @@ class Schedule:
                 'report3_date': 'TEXT',
                 'interim1_round': 'INTEGER DEFAULT 0',
                 'interim2_round': 'INTEGER DEFAULT 0',
-                'interim3_round': 'INTEGER DEFAULT 0'
+                'interim3_round': 'INTEGER DEFAULT 0',
+                'extend_period_days': 'INTEGER DEFAULT 0',
+                'extend_period_months': 'INTEGER DEFAULT 0',
+                'extend_period_years': 'INTEGER DEFAULT 0',
+                'extend_experiment_days': 'INTEGER DEFAULT 0',
+                'extend_rounds': 'INTEGER DEFAULT 0'
             }
 
             for col_name, col_type in new_columns.items():
@@ -267,7 +272,12 @@ class Schedule:
                     report_date = %s,
                     report1_date = %s,
                     report2_date = %s,
-                    report3_date = %s
+                    report3_date = %s,
+                    extend_period_days = %s,
+                    extend_period_months = %s,
+                    extend_period_years = %s,
+                    extend_experiment_days = %s,
+                    extend_rounds = %s
                 WHERE id = %s
             """, (
                 data.get('client_id'),
@@ -297,6 +307,11 @@ class Schedule:
                 data.get('report1_date'),
                 data.get('report2_date'),
                 data.get('report3_date'),
+                data.get('extend_period_days', 0),
+                data.get('extend_period_months', 0),
+                data.get('extend_period_years', 0),
+                data.get('extend_experiment_days', 0),
+                data.get('extend_rounds', 0),
                 schedule_id
             ))
 
