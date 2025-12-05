@@ -1246,7 +1246,7 @@ class ScheduleManagementTab(QWidget):
         self.urgent_value = ClickableLabel("-")
         self.urgent_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.urgent_value.setAlignment(Qt.AlignCenter)
-        self.urgent_value.setFixedHeight(18)
+        self.urgent_value.setFixedHeight(25)
         self.urgent_value.clicked.connect(self.toggle_urgent_status)
         grid.addWidget(self.urgent_value, 1, 1)
         self.start_date_label = self._create_label("시 작 일", label_style)
@@ -1258,7 +1258,7 @@ class ScheduleManagementTab(QWidget):
         self.last_experiment_date_value = ClickableLabel("-")
         self.last_experiment_date_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.last_experiment_date_value.setAlignment(Qt.AlignCenter)
-        self.last_experiment_date_value.setFixedHeight(18)
+        self.last_experiment_date_value.setFixedHeight(25)
         self.last_experiment_date_value.clicked.connect(self.edit_last_experiment_date_with_calendar)
         grid.addWidget(self.last_experiment_date_value, 1, 5)
         self.report_date_label = self._create_label("보고서작성일", label_style)
@@ -1266,7 +1266,7 @@ class ScheduleManagementTab(QWidget):
         self.report_date_value = ClickableLabel("-")
         self.report_date_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.report_date_value.setAlignment(Qt.AlignCenter)
-        self.report_date_value.setFixedHeight(18)
+        self.report_date_value.setFixedHeight(25)
         self.report_date_value.clicked.connect(self.edit_report_date_with_calendar)
         grid.addWidget(self.report_date_value, 1, 7)
 
@@ -1303,7 +1303,7 @@ class ScheduleManagementTab(QWidget):
         self.required_sample_value.setStyleSheet(value_style + " color: #e67e22; font-weight: bold;")
         self.required_sample_value.setAlignment(Qt.AlignCenter)
         self.required_sample_value.setPlaceholderText("개수")
-        self.required_sample_value.setFixedHeight(18)
+        self.required_sample_value.setFixedHeight(25)
         grid.addWidget(self.required_sample_value, 3, 5)
         self.current_required_sample = 0
         self.extension_test_label = self._create_label("연장실험", label_style)
@@ -1311,7 +1311,7 @@ class ScheduleManagementTab(QWidget):
         self.extension_test_value = ClickableLabel("-")
         self.extension_test_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.extension_test_value.setAlignment(Qt.AlignCenter)
-        self.extension_test_value.setFixedHeight(18)
+        self.extension_test_value.setFixedHeight(25)
         self.extension_test_value.clicked.connect(self.toggle_extension_test)
         grid.addWidget(self.extension_test_value, 3, 7)
 
@@ -1324,7 +1324,7 @@ class ScheduleManagementTab(QWidget):
         self.interim_report_yn_value = ClickableLabel("-")
         self.interim_report_yn_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
         self.interim_report_yn_value.setAlignment(Qt.AlignCenter)
-        self.interim_report_yn_value.setFixedHeight(18)
+        self.interim_report_yn_value.setFixedHeight(25)
         self.interim_report_yn_value.clicked.connect(self.toggle_interim_report)
         grid.addWidget(self.interim_report_yn_value, 4, 1)
         self.report1_label = self._create_label("1 보고서", report_label_style)
@@ -1332,7 +1332,7 @@ class ScheduleManagementTab(QWidget):
         self.report1_value = ClickableLabel("-")
         self.report1_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
         self.report1_value.setAlignment(Qt.AlignCenter)
-        self.report1_value.setFixedHeight(18)
+        self.report1_value.setFixedHeight(25)
         self.report1_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(1))
         grid.addWidget(self.report1_value, 4, 3)
         self.report2_label = self._create_label("2 보고서", report_label_style)
@@ -1340,7 +1340,7 @@ class ScheduleManagementTab(QWidget):
         self.report2_value = ClickableLabel("-")
         self.report2_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
         self.report2_value.setAlignment(Qt.AlignCenter)
-        self.report2_value.setFixedHeight(18)
+        self.report2_value.setFixedHeight(25)
         self.report2_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(2))
         grid.addWidget(self.report2_value, 4, 5)
         self.report3_label = self._create_label("3 보고서", report_label_style)
@@ -1348,7 +1348,7 @@ class ScheduleManagementTab(QWidget):
         self.report3_value = ClickableLabel("-")
         self.report3_value.setStyleSheet(report_value_style + " color: #2980b9; text-decoration: underline;")
         self.report3_value.setAlignment(Qt.AlignCenter)
-        self.report3_value.setFixedHeight(18)
+        self.report3_value.setFixedHeight(25)
         self.report3_value.clicked.connect(lambda: self.edit_report_date_with_calendar_n(3))
         grid.addWidget(self.report3_value, 4, 7)
 
@@ -1358,7 +1358,7 @@ class ScheduleManagementTab(QWidget):
         self.status_value = ClickableLabel("-")
         self.status_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
         self.status_value.setAlignment(Qt.AlignCenter)
-        self.status_value.setFixedHeight(18)
+        self.status_value.setFixedHeight(25)
         self.status_value.clicked.connect(self.change_status)
         grid.addWidget(self.status_value, 5, 1)
         self.temp_zone1_label = self._create_label("1 구 간", temp_label_style)
@@ -1635,7 +1635,7 @@ class ScheduleManagementTab(QWidget):
         label = QLabel(text)
         label.setStyleSheet(style)
         label.setAlignment(Qt.AlignCenter)
-        label.setFixedHeight(18)
+        label.setFixedHeight(25)
         return label
 
     def _create_value_label(self, text, style):
@@ -1643,7 +1643,7 @@ class ScheduleManagementTab(QWidget):
         label.setStyleSheet(style)
         label.setAlignment(Qt.AlignCenter)
         label.setMinimumWidth(60)
-        label.setFixedHeight(18)
+        label.setFixedHeight(25)
         return label
 
     def open_schedule_selector(self):
