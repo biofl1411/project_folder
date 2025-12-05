@@ -168,15 +168,16 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(users)")
-            columns = [col[1] for col in cursor.fetchall()]
+            # MySQL: SHOW COLUMNS 사용
+            cursor.execute("SHOW COLUMNS FROM users")
+            columns = [col['Field'] for col in cursor.fetchall()]
 
             new_columns = {
-                'department': 'TEXT DEFAULT ""',
-                'permissions': 'TEXT DEFAULT "{}"',
-                'email': 'TEXT DEFAULT ""',
-                'phone': 'TEXT DEFAULT ""',
-                'is_active': 'INTEGER DEFAULT 0',
+                'department': 'VARCHAR(255) DEFAULT ""',
+                'permissions': 'TEXT',
+                'email': 'VARCHAR(255) DEFAULT ""',
+                'phone': 'VARCHAR(50) DEFAULT ""',
+                'is_active': 'INT DEFAULT 0',
             }
 
             for col_name, col_type in new_columns.items():
@@ -208,7 +209,7 @@ class User:
                 cursor.execute("""
                     SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
-                    WHERE username = ? AND password = ?
+                    WHERE username = %s AND password = %s
                 """, (username, password))
 
             user = cursor.fetchone()
@@ -222,7 +223,7 @@ class User:
 
                 # 마지막 로그인 시간 업데이트
                 cursor.execute("""
-                    UPDATE users SET last_login = ? WHERE id = ?
+                    UPDATE users SET last_login = %s WHERE id = %s
                 """, (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
                 conn.commit()
 
@@ -269,7 +270,7 @@ class User:
             cursor.execute("""
                 SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
                 FROM users
-                WHERE id = ?
+                WHERE id = %s
             """, (user_id,))
             user = cursor.fetchone()
             conn.close()
@@ -336,7 +337,7 @@ class User:
 
             cursor.execute("""
                 INSERT INTO users (username, password, name, role, department, permissions, email, phone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (username, password, name, role, department, permissions_json, email, phone))
             user_id = cursor.lastrowid
             conn.commit()
@@ -358,29 +359,29 @@ class User:
             params = []
 
             if name is not None:
-                updates.append("name = ?")
+                updates.append("name = %s")
                 params.append(name)
 
             if department is not None:
-                updates.append("department = ?")
+                updates.append("department = %s")
                 params.append(department)
 
             if permissions is not None:
-                updates.append("permissions = ?")
+                updates.append("permissions = %s")
                 params.append(json.dumps(permissions, ensure_ascii=False))
 
             if email is not None:
-                updates.append("email = ?")
+                updates.append("email = %s")
                 params.append(email)
 
             if phone is not None:
-                updates.append("phone = ?")
+                updates.append("phone = %s")
                 params.append(phone)
 
             if updates:
                 params.append(user_id)
                 cursor.execute(f"""
-                    UPDATE users SET {', '.join(updates)} WHERE id = ?
+                    UPDATE users SET {', '.join(updates)} WHERE id = %s
                 """, params)
                 conn.commit()
 
@@ -397,7 +398,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE users SET password = ? WHERE id = ?
+                UPDATE users SET password = %s WHERE id = %s
             """, (new_password, user_id))
             success = cursor.rowcount > 0
             conn.commit()
@@ -414,7 +415,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id FROM users WHERE id = ? AND password = ?
+                SELECT id FROM users WHERE id = %s AND password = %s
             """, (user_id, password))
             result = cursor.fetchone()
             conn.close()
@@ -429,7 +430,7 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
@@ -474,12 +475,12 @@ class User:
             if activate:
                 # 활성화 시 초기 비밀번호로 설정
                 cursor.execute("""
-                    UPDATE users SET is_active = 1, password = ? WHERE id = ?
+                    UPDATE users SET is_active = 1, password = %s WHERE id = %s
                 """, (DEFAULT_PASSWORD, user_id))
             else:
                 # 비활성화
                 cursor.execute("""
-                    UPDATE users SET is_active = 0 WHERE id = ?
+                    UPDATE users SET is_active = 0 WHERE id = %s
                 """, (user_id,))
 
             success = cursor.rowcount > 0
@@ -496,7 +497,7 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT is_active FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT is_active FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
             conn.close()
             return result['is_active'] if result else 0

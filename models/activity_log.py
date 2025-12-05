@@ -63,32 +63,23 @@ class ActivityLog:
 
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS activity_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                user_name TEXT NOT NULL,
-                department TEXT,
-                action_type TEXT NOT NULL,
-                action_name TEXT NOT NULL,
-                target_type TEXT,
-                target_id INTEGER,
-                target_name TEXT,
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                username VARCHAR(100) NOT NULL,
+                user_name VARCHAR(100) NOT NULL,
+                department VARCHAR(100),
+                action_type VARCHAR(100) NOT NULL,
+                action_name VARCHAR(200) NOT NULL,
+                target_type VARCHAR(100),
+                target_id INT,
+                target_name VARCHAR(255),
                 details TEXT,
-                ip_address TEXT,
+                ip_address VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-            ''')
-
-            # 인덱스 생성 (빠른 검색을 위해)
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs (user_id)
-            ''')
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs (created_at)
-            ''')
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_action_type ON activity_logs (action_type)
+                INDEX idx_activity_logs_user_id (user_id),
+                INDEX idx_activity_logs_created_at (created_at),
+                INDEX idx_activity_logs_action_type (action_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ''')
 
             conn.commit()
@@ -133,7 +124,7 @@ class ActivityLog:
                 INSERT INTO activity_logs
                 (user_id, username, user_name, department, action_type, action_name,
                  target_type, target_id, target_name, details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 user.get('id'),
                 user.get('username', ''),
@@ -167,9 +158,9 @@ class ActivityLog:
 
             cursor.execute('''
                 SELECT * FROM activity_logs
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
+                LIMIT %s OFFSET %s
             ''', (user_id, limit, offset))
 
             logs = cursor.fetchall()
@@ -207,30 +198,30 @@ class ActivityLog:
 
             if filters:
                 if filters.get('user_id'):
-                    query += " AND user_id = ?"
+                    query += " AND user_id = %s"
                     params.append(filters['user_id'])
 
                 if filters.get('username'):
-                    query += " AND username LIKE ?"
+                    query += " AND username LIKE %s"
                     params.append(f"%{filters['username']}%")
 
                 if filters.get('action_type'):
-                    query += " AND action_type = ?"
+                    query += " AND action_type = %s"
                     params.append(filters['action_type'])
 
                 if filters.get('date_from'):
-                    query += " AND date(created_at) >= ?"
+                    query += " AND DATE(created_at) >= %s"
                     params.append(filters['date_from'])
 
                 if filters.get('date_to'):
-                    query += " AND date(created_at) <= ?"
+                    query += " AND DATE(created_at) <= %s"
                     params.append(filters['date_to'])
 
                 if filters.get('target_type'):
-                    query += " AND target_type = ?"
+                    query += " AND target_type = %s"
                     params.append(filters['target_type'])
 
-            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
             params.extend([limit, offset])
 
             cursor.execute(query, params)
@@ -256,23 +247,23 @@ class ActivityLog:
 
             if filters:
                 if filters.get('user_id'):
-                    query += " AND user_id = ?"
+                    query += " AND user_id = %s"
                     params.append(filters['user_id'])
 
                 if filters.get('username'):
-                    query += " AND username LIKE ?"
+                    query += " AND username LIKE %s"
                     params.append(f"%{filters['username']}%")
 
                 if filters.get('action_type'):
-                    query += " AND action_type = ?"
+                    query += " AND action_type = %s"
                     params.append(filters['action_type'])
 
                 if filters.get('date_from'):
-                    query += " AND date(created_at) >= ?"
+                    query += " AND DATE(created_at) >= %s"
                     params.append(filters['date_from'])
 
                 if filters.get('date_to'):
-                    query += " AND date(created_at) <= ?"
+                    query += " AND DATE(created_at) <= %s"
                     params.append(filters['date_to'])
 
             cursor.execute(query, params)
@@ -302,7 +293,7 @@ class ActivityLog:
                     COUNT(*) as total_actions,
                     MAX(created_at) as last_activity
                 FROM activity_logs
-                GROUP BY user_id
+                GROUP BY user_id, username, user_name, department
                 ORDER BY last_activity DESC
             ''')
 
@@ -327,7 +318,7 @@ class ActivityLog:
 
             cursor.execute('''
                 DELETE FROM activity_logs
-                WHERE date(created_at) < ?
+                WHERE DATE(created_at) < %s
             ''', (cutoff_date,))
 
             deleted_count = cursor.rowcount

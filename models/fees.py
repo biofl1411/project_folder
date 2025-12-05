@@ -8,18 +8,18 @@ class Fee:
         """모든 수수료 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # 열 정보 확인
-        cursor.execute("PRAGMA table_info(fees)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
+
+        # 열 정보 확인 (MySQL)
+        cursor.execute("SHOW COLUMNS FROM fees")
+        columns = [column['Field'] for column in cursor.fetchall()]
+
         # display_order 열이 있는지 확인
         if "display_order" in columns:
             cursor.execute("SELECT * FROM fees ORDER BY display_order, test_item")
         else:
             # display_order 열 추가
             try:
-                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INT DEFAULT 100")
                 conn.commit()
                 # 기존 데이터에 기본값 설정
                 cursor.execute("UPDATE fees SET display_order = 100")
@@ -28,21 +28,21 @@ class Fee:
             except Exception:
                 # 실패하면 기존 정렬 방식 사용
                 cursor.execute("SELECT * FROM fees ORDER BY test_item")
-        
+
         fees = cursor.fetchall()
         conn.close()
         return fees
-    
+
     @staticmethod
     def get_by_item(test_item):
         """검사 항목으로 수수료 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM fees WHERE test_item = ?", (test_item,))
+        cursor.execute("SELECT * FROM fees WHERE test_item = %s", (test_item,))
         fee = cursor.fetchone()
         conn.close()
         return fee
-    
+
     @staticmethod
     def create(test_item, food_category="", price=0, description="", display_order=100, sample_quantity=0):
         """새 수수료 생성"""
@@ -50,24 +50,25 @@ class Fee:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (%s, %s, %s, %s, %s, %s)",
                 (test_item, food_category, price, description, display_order, sample_quantity)
             )
         except Exception as e:
             # display_order 또는 sample_quantity 열이 없는 경우를 처리
-            if "no such column" in str(e):
+            error_msg = str(e).lower()
+            if "unknown column" in error_msg or "doesn't exist" in error_msg:
                 # 열 추가 시도
                 try:
-                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INT DEFAULT 100")
                 except Exception:
                     pass
                 try:
-                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INT DEFAULT 0")
                 except Exception:
                     pass
                 # 다시 삽입 시도
                 cursor.execute(
-                    "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (%s, %s, %s, %s, %s, %s)",
                     (test_item, food_category, price, description, display_order, sample_quantity)
                 )
             else:
@@ -77,7 +78,7 @@ class Fee:
         fee_id = cursor.lastrowid
         conn.close()
         return fee_id
-    
+
     @staticmethod
     def update(fee_id, test_item, food_category="", price=0, description="", display_order=None, sample_quantity=None):
         """수수료 정보 수정"""
@@ -85,24 +86,25 @@ class Fee:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                "UPDATE fees SET test_item = %s, food_category = %s, price = %s, description = %s, display_order = %s, sample_quantity = %s WHERE id = %s",
                 (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
             )
         except Exception as e:
             # 열이 없는 경우를 처리
-            if "no such column" in str(e):
+            error_msg = str(e).lower()
+            if "unknown column" in error_msg or "doesn't exist" in error_msg:
                 # 열 추가 시도
                 try:
-                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INT DEFAULT 100")
                 except Exception:
                     pass
                 try:
-                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+                    cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INT DEFAULT 0")
                 except Exception:
                     pass
                 # 다시 업데이트 시도
                 cursor.execute(
-                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                    "UPDATE fees SET test_item = %s, food_category = %s, price = %s, description = %s, display_order = %s, sample_quantity = %s WHERE id = %s",
                     (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
                 )
             else:
@@ -112,18 +114,18 @@ class Fee:
         rowcount = cursor.rowcount
         conn.close()
         return rowcount > 0
-    
+
     @staticmethod
     def delete(fee_id):
         """수수료 삭제"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM fees WHERE id = ?", (fee_id,))
+        cursor.execute("DELETE FROM fees WHERE id = %s", (fee_id,))
         conn.commit()
         rowcount = cursor.rowcount
         conn.close()
         return rowcount > 0
-    
+
     @staticmethod
     def calculate_total_fee(test_items):
         """검사 항목 목록의 총 수수료 계산"""
@@ -141,7 +143,7 @@ class Fee:
 
         total_price = 0
         for item in items_list:
-            cursor.execute("SELECT price FROM fees WHERE test_item = ?", (item,))
+            cursor.execute("SELECT price FROM fees WHERE test_item = %s", (item,))
             fee = cursor.fetchone()
             if fee:
                 total_price += fee['price']
@@ -167,14 +169,14 @@ class Fee:
             # 기존 데이터 삭제
             cursor.execute("DELETE FROM fees")
 
-            # display_order 열 확인 및 추가
-            cursor.execute("PRAGMA table_info(fees)")
-            columns = [column[1] for column in cursor.fetchall()]
+            # display_order 열 확인 및 추가 (MySQL)
+            cursor.execute("SHOW COLUMNS FROM fees")
+            columns = [column['Field'] for column in cursor.fetchall()]
 
             if "display_order" not in columns:
-                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
+                cursor.execute("ALTER TABLE fees ADD COLUMN display_order INT DEFAULT 100")
             if "sample_quantity" not in columns:
-                cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
+                cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INT DEFAULT 0")
 
             # Excel 데이터 삽입 (첫 번째 행은 헤더이므로 2번째 행부터)
             # 열: 정렬순서, 식품 카테고리, 검사항목, 가격, 검체 수량(g)
@@ -208,7 +210,7 @@ class Fee:
 
                 cursor.execute("""
                     INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, (test_item, food_category, price, "", display_order, sample_qty))
                 inserted_count += 1
 

@@ -18,54 +18,54 @@ class Message:
             # 메시지 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender_id INTEGER NOT NULL,
-                    receiver_id INTEGER,
-                    message_type TEXT DEFAULT 'chat',
-                    subject TEXT,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    sender_id INT NOT NULL,
+                    receiver_id INT,
+                    message_type VARCHAR(50) DEFAULT 'chat',
+                    subject VARCHAR(255),
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (sender_id) REFERENCES users(id),
                     FOREIGN KEY (receiver_id) REFERENCES users(id)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             # 메시지 읽음 상태 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS message_reads (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    message_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    message_id INT NOT NULL,
+                    user_id INT NOT NULL,
                     read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (message_id) REFERENCES messages(id),
                     FOREIGN KEY (user_id) REFERENCES users(id),
-                    UNIQUE(message_id, user_id)
-                )
+                    UNIQUE KEY unique_message_user (message_id, user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             # 메일 공지 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mail_notices (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender_id INTEGER NOT NULL,
-                    subject TEXT NOT NULL,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    sender_id INT NOT NULL,
+                    subject VARCHAR(255) NOT NULL,
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (sender_id) REFERENCES users(id)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             # 메일 수신자 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mail_recipients (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    mail_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    recipient_type TEXT DEFAULT 'to',
-                    read_at TIMESTAMP,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    mail_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    recipient_type VARCHAR(20) DEFAULT 'to',
+                    read_at TIMESTAMP NULL,
                     FOREIGN KEY (mail_id) REFERENCES mail_notices(id),
                     FOREIGN KEY (user_id) REFERENCES users(id)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             conn.commit()
@@ -83,7 +83,7 @@ class Message:
 
             cursor.execute("""
                 INSERT INTO messages (sender_id, receiver_id, message_type, subject, content)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             """, (sender_id, receiver_id, message_type, subject, content))
 
             message_id = cursor.lastrowid
@@ -109,10 +109,10 @@ class Message:
                 FROM messages m
                 LEFT JOIN users s ON m.sender_id = s.id
                 LEFT JOIN users r ON m.receiver_id = r.id
-                WHERE (m.sender_id = ? AND m.receiver_id = ?)
-                   OR (m.sender_id = ? AND m.receiver_id = ?)
+                WHERE (m.sender_id = %s AND m.receiver_id = %s)
+                   OR (m.sender_id = %s AND m.receiver_id = %s)
                 ORDER BY m.created_at ASC
-                LIMIT ?
+                LIMIT %s
             """, (user1_id, user2_id, user2_id, user1_id, limit))
 
             messages = cursor.fetchall()
@@ -133,23 +133,23 @@ class Message:
             cursor.execute("""
                 SELECT DISTINCT
                     CASE
-                        WHEN m.sender_id = ? THEN m.receiver_id
+                        WHEN m.sender_id = %s THEN m.receiver_id
                         ELSE m.sender_id
                     END as partner_id,
                     u.name as partner_name,
                     u.department as partner_department,
                     MAX(m.created_at) as last_message_time,
                     (SELECT content FROM messages m2
-                     WHERE ((m2.sender_id = ? AND m2.receiver_id = u.id)
-                         OR (m2.sender_id = u.id AND m2.receiver_id = ?))
+                     WHERE ((m2.sender_id = %s AND m2.receiver_id = u.id)
+                         OR (m2.sender_id = u.id AND m2.receiver_id = %s))
                      ORDER BY m2.created_at DESC LIMIT 1) as last_message
                 FROM messages m
                 JOIN users u ON u.id = CASE
-                    WHEN m.sender_id = ? THEN m.receiver_id
+                    WHEN m.sender_id = %s THEN m.receiver_id
                     ELSE m.sender_id
                 END
-                WHERE m.sender_id = ? OR m.receiver_id = ?
-                GROUP BY partner_id
+                WHERE m.sender_id = %s OR m.receiver_id = %s
+                GROUP BY partner_id, u.name, u.department
                 ORDER BY last_message_time DESC
             """, (user_id, user_id, user_id, user_id, user_id, user_id))
 
@@ -169,8 +169,8 @@ class Message:
             cursor = conn.cursor()
 
             cursor.execute("""
-                INSERT OR IGNORE INTO message_reads (message_id, user_id)
-                VALUES (?, ?)
+                INSERT IGNORE INTO message_reads (message_id, user_id)
+                VALUES (%s, %s)
             """, (message_id, user_id))
 
             conn.commit()
@@ -191,8 +191,8 @@ class Message:
             # 상대방이 보낸 메시지 중 안 읽은 것들 조회
             cursor.execute("""
                 SELECT id FROM messages
-                WHERE sender_id = ? AND receiver_id = ?
-                AND id NOT IN (SELECT message_id FROM message_reads WHERE user_id = ?)
+                WHERE sender_id = %s AND receiver_id = %s
+                AND id NOT IN (SELECT message_id FROM message_reads WHERE user_id = %s)
             """, (partner_id, user_id, user_id))
 
             unread_ids = [row['id'] for row in cursor.fetchall()]
@@ -200,8 +200,8 @@ class Message:
             # 읽음 처리
             for msg_id in unread_ids:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO message_reads (message_id, user_id)
-                    VALUES (?, ?)
+                    INSERT IGNORE INTO message_reads (message_id, user_id)
+                    VALUES (%s, %s)
                 """, (msg_id, user_id))
 
             conn.commit()
@@ -222,8 +222,8 @@ class Message:
             cursor.execute("""
                 SELECT COUNT(*) as count
                 FROM messages m
-                WHERE m.receiver_id = ?
-                AND m.id NOT IN (SELECT message_id FROM message_reads WHERE user_id = ?)
+                WHERE m.receiver_id = %s
+                AND m.id NOT IN (SELECT message_id FROM message_reads WHERE user_id = %s)
             """, (user_id, user_id))
 
             result = cursor.fetchone()
@@ -244,8 +244,8 @@ class Message:
             cursor.execute("""
                 SELECT m.sender_id as partner_id, COUNT(*) as unread_count
                 FROM messages m
-                WHERE m.receiver_id = ?
-                AND m.id NOT IN (SELECT message_id FROM message_reads WHERE user_id = ?)
+                WHERE m.receiver_id = %s
+                AND m.id NOT IN (SELECT message_id FROM message_reads WHERE user_id = %s)
                 GROUP BY m.sender_id
             """, (user_id, user_id))
 
@@ -271,7 +271,7 @@ class MailNotice:
             # 메일 공지 생성
             cursor.execute("""
                 INSERT INTO mail_notices (sender_id, subject, content)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (sender_id, subject, content))
 
             mail_id = cursor.lastrowid
@@ -280,7 +280,7 @@ class MailNotice:
             for user_id in to_user_ids:
                 cursor.execute("""
                     INSERT INTO mail_recipients (mail_id, user_id, recipient_type)
-                    VALUES (?, ?, 'to')
+                    VALUES (%s, %s, 'to')
                 """, (mail_id, user_id))
 
             # 참조자 추가
@@ -288,7 +288,7 @@ class MailNotice:
                 for user_id in cc_user_ids:
                     cursor.execute("""
                         INSERT INTO mail_recipients (mail_id, user_id, recipient_type)
-                        VALUES (?, ?, 'cc')
+                        VALUES (%s, %s, 'cc')
                     """, (mail_id, user_id))
 
             conn.commit()
@@ -316,9 +316,9 @@ class MailNotice:
                 FROM mail_notices mn
                 JOIN mail_recipients mr ON mn.id = mr.mail_id
                 JOIN users u ON mn.sender_id = u.id
-                WHERE mr.user_id = ?
+                WHERE mr.user_id = %s
                 ORDER BY mn.created_at DESC
-                LIMIT ?
+                LIMIT %s
             """, (user_id, limit))
 
             mails = cursor.fetchall()
@@ -343,10 +343,10 @@ class MailNotice:
                 FROM mail_notices mn
                 LEFT JOIN mail_recipients mr ON mn.id = mr.mail_id
                 LEFT JOIN users u ON mr.user_id = u.id
-                WHERE mn.sender_id = ?
+                WHERE mn.sender_id = %s
                 GROUP BY mn.id
                 ORDER BY mn.created_at DESC
-                LIMIT ?
+                LIMIT %s
             """, (user_id, limit))
 
             mails = cursor.fetchall()
@@ -366,7 +366,7 @@ class MailNotice:
             cursor.execute("""
                 UPDATE mail_recipients
                 SET read_at = CURRENT_TIMESTAMP
-                WHERE mail_id = ? AND user_id = ?
+                WHERE mail_id = %s AND user_id = %s
             """, (mail_id, user_id))
 
             conn.commit()
@@ -387,7 +387,7 @@ class MailNotice:
             cursor.execute("""
                 SELECT COUNT(*) as count
                 FROM mail_recipients
-                WHERE user_id = ? AND read_at IS NULL
+                WHERE user_id = %s AND read_at IS NULL
             """, (user_id,))
 
             result = cursor.fetchone()
@@ -408,7 +408,7 @@ class MailNotice:
                 SELECT mn.*, u.name as sender_name
                 FROM mail_notices mn
                 JOIN users u ON mn.sender_id = u.id
-                WHERE mn.id = ?
+                WHERE mn.id = %s
             """, (mail_id,))
 
             mail = cursor.fetchone()
@@ -421,7 +421,7 @@ class MailNotice:
                     SELECT u.id, u.name, mr.recipient_type, mr.read_at
                     FROM mail_recipients mr
                     JOIN users u ON mr.user_id = u.id
-                    WHERE mr.mail_id = ?
+                    WHERE mr.mail_id = %s
                 """, (mail_id,))
 
                 recipients = cursor.fetchall()

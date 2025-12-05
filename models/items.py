@@ -19,64 +19,66 @@ class Item:
         items = cursor.fetchall()
         conn.close()
         return items
-    
+
     @staticmethod
     def get_by_id(item_id):
         """ID로 항목 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))
+        cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
         item = cursor.fetchone()
         conn.close()
         return item
-    
+
     @staticmethod
     def create(name, category, description=""):
         """새 항목 생성"""
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO items (name, category, description) VALUES (?, ?, ?)",
+            "INSERT INTO items (name, category, description) VALUES (%s, %s, %s)",
             (name, category, description)
         )
         conn.commit()
         item_id = cursor.lastrowid
         conn.close()
         return item_id
-    
+
     @staticmethod
     def update(item_id, name, category, description=""):
         """항목 수정"""
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE items SET name = ?, category = ?, description = ? WHERE id = ?",
+            "UPDATE items SET name = %s, category = %s, description = %s WHERE id = %s",
             (name, category, description, item_id)
         )
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
-    
+        return rowcount > 0
+
     @staticmethod
     def delete(item_id):
         """항목 삭제"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        cursor.execute("DELETE FROM items WHERE id = %s", (item_id,))
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
-        return cursor.rowcount > 0
-    
+        return rowcount > 0
+
     @staticmethod
     def get_by_category(category):
         """카테고리별 항목 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM items WHERE category = ? ORDER BY name", (category,))
+        cursor.execute("SELECT * FROM items WHERE category = %s ORDER BY name", (category,))
         items = cursor.fetchall()
         conn.close()
         return items
-    
+
     @staticmethod
     def get_categories():
         """모든 카테고리 목록 조회"""
