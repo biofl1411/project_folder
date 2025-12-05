@@ -1200,20 +1200,22 @@ class ScheduleManagementTab(QWidget):
             QGroupBox { font-weight: bold; font-size: 12px; border: 2px solid #3498db; border-radius: 5px; margin-top: 10px; padding: 0px; padding-top: 15px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #2980b9; }
         """)
+        # GroupBox가 세로로 늘어나지 않도록 설정
+        group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         grid = QGridLayout(group)
         grid.setSpacing(0)
-        grid.setContentsMargins(2, 0, 2, 2)
-        grid.setVerticalSpacing(5)  # 행 간격 5px
+        grid.setContentsMargins(2, 0, 2, 0)  # 하단 마진 제거
+        grid.setVerticalSpacing(0)  # 행 간격 없음 (1~7행 붙임)
         grid.setHorizontalSpacing(0)
 
         # 8열 균등 배분 (라벨+값 4쌍)
         for col in range(8):
             grid.setColumnStretch(col, 1)
 
-        # 행 최소 높이 설정
+        # 각 행 높이 고정 (늘어나지 않도록)
         for row in range(7):
-            grid.setRowMinimumHeight(row, 25)
+            grid.setRowStretch(row, 0)
 
         label_style = "font-weight: bold; background-color: #ecf0f1; padding: 1px; border: 1px solid #bdc3c7; font-size: 11px;"
         value_style = "background-color: white; padding: 1px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 11px;"
