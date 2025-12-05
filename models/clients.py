@@ -41,7 +41,7 @@ class Client:
                 INSERT INTO clients (name, ceo, business_no, category, phone, fax,
                     contact_person, email, sales_rep, toll_free, zip_code, address,
                     detail_address, notes, sales_business, sales_phone, sales_mobile, sales_address, mobile)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
                   sales_rep, toll_free, zip_code, address, detail_address, notes, sales_business,
                   sales_phone, sales_mobile, sales_address, mobile))
@@ -66,7 +66,7 @@ class Client:
                     address, detail_address, notes, sales_business, sales_phone, sales_mobile,
                     sales_address, mobile, created_at
                 FROM clients
-                WHERE id = ?
+                WHERE id = %s
             """, (client_id,))
             client = cursor.fetchone()
             conn.close()
@@ -137,25 +137,25 @@ class Client:
 
             # 영업담당 필터 (해당 업체만 보기)
             if sales_rep_filter:
-                where_conditions.append("sales_rep = ?")
+                where_conditions.append("sales_rep = %s")
                 params.append(sales_rep_filter)
 
             # 검색 조건이 있는 경우
             if search_keyword:
                 if search_field == "고객/회사명":
-                    where_conditions.append("name LIKE ?")
+                    where_conditions.append("name LIKE %s")
                     params.append(f"%{search_keyword}%")
                 elif search_field == "대표자":
-                    where_conditions.append("ceo LIKE ?")
+                    where_conditions.append("ceo LIKE %s")
                     params.append(f"%{search_keyword}%")
                 elif search_field == "담당자":
-                    where_conditions.append("contact_person LIKE ?")
+                    where_conditions.append("contact_person LIKE %s")
                     params.append(f"%{search_keyword}%")
                 elif search_field == "사업자번호":
-                    where_conditions.append("business_no LIKE ?")
+                    where_conditions.append("business_no LIKE %s")
                     params.append(f"%{search_keyword}%")
                 else:  # 전체
-                    where_conditions.append("(name LIKE ? OR ceo LIKE ? OR contact_person LIKE ? OR business_no LIKE ?)")
+                    where_conditions.append("(name LIKE %s OR ceo LIKE %s OR contact_person LIKE %s OR business_no LIKE %s)")
                     params.extend([f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%", f"%{search_keyword}%"])
 
             # WHERE 절 생성
@@ -176,7 +176,7 @@ class Client:
                 FROM clients
                 {where_clause}
                 ORDER BY name
-                LIMIT ? OFFSET ?
+                LIMIT %s OFFSET %s
             """, params + [per_page, offset])
 
             clients = cursor.fetchall()
@@ -208,11 +208,11 @@ class Client:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE clients
-                SET name = ?, ceo = ?, business_no = ?, category = ?, phone = ?,
-                    fax = ?, contact_person = ?, email = ?, sales_rep = ?, toll_free = ?,
-                    zip_code = ?, address = ?, detail_address = ?, notes = ?, sales_business = ?,
-                    sales_phone = ?, sales_mobile = ?, sales_address = ?, mobile = ?
-                WHERE id = ?
+                SET name = %s, ceo = %s, business_no = %s, category = %s, phone = %s,
+                    fax = %s, contact_person = %s, email = %s, sales_rep = %s, toll_free = %s,
+                    zip_code = %s, address = %s, detail_address = %s, notes = %s, sales_business = %s,
+                    sales_phone = %s, sales_mobile = %s, sales_address = %s, mobile = %s
+                WHERE id = %s
             """, (name, ceo, business_no, category, phone, fax, contact_person, email,
                   sales_rep, toll_free, zip_code, address, detail_address, notes, sales_business,
                   sales_phone, sales_mobile, sales_address, mobile, client_id))
@@ -230,7 +230,7 @@ class Client:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+            cursor.execute("DELETE FROM clients WHERE id = %s", (client_id,))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
@@ -252,7 +252,7 @@ class Client:
                     address, detail_address, notes, sales_business, sales_phone, sales_mobile,
                     sales_address, mobile, created_at
                 FROM clients
-                WHERE name LIKE ? OR contact_person LIKE ? OR ceo LIKE ? OR business_no LIKE ?
+                WHERE name LIKE %s OR contact_person LIKE %s OR ceo LIKE %s OR business_no LIKE %s
                 ORDER BY name
             """, (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"))
             clients = cursor.fetchall()

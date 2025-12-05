@@ -23,7 +23,7 @@ class ProductType:
         """이름으로 식품 유형 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM food_types WHERE type_name = ?", (type_name,))
+        cursor.execute("SELECT * FROM food_types WHERE type_name = %s", (type_name,))
         type_info = cursor.fetchone()
         conn.close()
         return dict(type_info) if type_info else None
@@ -34,7 +34,7 @@ class ProductType:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM food_types WHERE id = ?", (type_id,))
+            cursor.execute("SELECT * FROM food_types WHERE id = %s", (type_id,))
             type_info = cursor.fetchone()
             conn.close()
             return dict(type_info) if type_info else None
@@ -47,7 +47,7 @@ class ProductType:
         """식품 유형의 검사 항목 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT test_items FROM food_types WHERE type_name = ?", (type_name,))
+        cursor.execute("SELECT test_items FROM food_types WHERE type_name = %s", (type_name,))
         result = cursor.fetchone()
         conn.close()
         return result['test_items'] if result else ""
@@ -58,7 +58,7 @@ class ProductType:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (%s, %s, %s, %s, %s, %s)",
             (type_name, category, sterilization, pasteurization, appearance, test_items)
         )
         conn.commit()
@@ -72,7 +72,7 @@ class ProductType:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE food_types SET type_name = ?, category = ?, sterilization = ?, pasteurization = ?, appearance = ?, test_items = ? WHERE id = ?",
+            "UPDATE food_types SET type_name = %s, category = %s, sterilization = %s, pasteurization = %s, appearance = %s, test_items = %s WHERE id = %s",
             (type_name, category, sterilization, pasteurization, appearance, test_items, type_id)
         )
         conn.commit()
@@ -85,7 +85,7 @@ class ProductType:
         """식품 유형 삭제"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM food_types WHERE id = ?", (type_id,))
+        cursor.execute("DELETE FROM food_types WHERE id = %s", (type_id,))
         conn.commit()
         rowcount = cursor.rowcount
         conn.close()
@@ -142,7 +142,7 @@ class ProductType:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM food_types
-                WHERE type_name LIKE ? OR category LIKE ?
+                WHERE type_name LIKE %s OR category LIKE %s
                 ORDER BY type_name
             """, (f"%{keyword}%", f"%{keyword}%"))
             food_types = cursor.fetchall()

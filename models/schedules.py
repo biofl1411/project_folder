@@ -73,7 +73,7 @@ class Schedule:
                     extension_test, custom_temperatures, packaging_weight, packaging_unit,
                     estimate_date, expected_date, interim_report_date
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 client_id, product_name, test_start_date, end_date, status,
                 product_name, food_type_id, test_method, storage_condition,
@@ -104,7 +104,7 @@ class Schedule:
                 SELECT s.*, c.name as client_name, c.email as client_email
                 FROM schedules s
                 LEFT JOIN clients c ON s.client_id = c.id
-                WHERE s.id = ?
+                WHERE s.id = %s
             """, (schedule_id,))
             schedule = cursor.fetchone()
             conn.close()
@@ -151,8 +151,8 @@ class Schedule:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE schedules
-                SET status = ?
-                WHERE id = ?
+                SET status = %s
+                WHERE id = %s
             """, (status, schedule_id))
             success = cursor.rowcount > 0
             conn.commit()
@@ -168,7 +168,7 @@ class Schedule:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
+            cursor.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
@@ -187,7 +187,7 @@ class Schedule:
                 SELECT s.*, c.name as client_name
                 FROM schedules s
                 LEFT JOIN clients c ON s.client_id = c.id
-                WHERE s.title LIKE ? OR c.name LIKE ? OR s.product_name LIKE ?
+                WHERE s.title LIKE %s OR c.name LIKE %s OR s.product_name LIKE %s
                 ORDER BY s.created_at DESC
             """, (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"))
             schedules = cursor.fetchall()
@@ -206,8 +206,8 @@ class Schedule:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE schedules
-                SET memo = ?
-                WHERE id = ?
+                SET memo = %s
+                WHERE id = %s
             """, (memo, schedule_id))
             success = cursor.rowcount > 0
             conn.commit()
@@ -238,34 +238,34 @@ class Schedule:
 
             cursor.execute("""
                 UPDATE schedules SET
-                    client_id = ?,
-                    title = ?,
-                    start_date = ?,
-                    end_date = ?,
-                    product_name = ?,
-                    food_type_id = ?,
-                    test_method = ?,
-                    storage_condition = ?,
-                    test_period_days = ?,
-                    test_period_months = ?,
-                    test_period_years = ?,
-                    sampling_count = ?,
-                    report_interim = ?,
-                    report_korean = ?,
-                    report_english = ?,
-                    extension_test = ?,
-                    custom_temperatures = ?,
-                    packaging_weight = ?,
-                    packaging_unit = ?,
-                    estimate_date = ?,
-                    expected_date = ?,
-                    interim_report_date = ?,
-                    is_urgent = ?,
-                    report_date = ?,
-                    report1_date = ?,
-                    report2_date = ?,
-                    report3_date = ?
-                WHERE id = ?
+                    client_id = %s,
+                    title = %s,
+                    start_date = %s,
+                    end_date = %s,
+                    product_name = %s,
+                    food_type_id = %s,
+                    test_method = %s,
+                    storage_condition = %s,
+                    test_period_days = %s,
+                    test_period_months = %s,
+                    test_period_years = %s,
+                    sampling_count = %s,
+                    report_interim = %s,
+                    report_korean = %s,
+                    report_english = %s,
+                    extension_test = %s,
+                    custom_temperatures = %s,
+                    packaging_weight = %s,
+                    packaging_unit = %s,
+                    estimate_date = %s,
+                    expected_date = %s,
+                    interim_report_date = %s,
+                    is_urgent = %s,
+                    report_date = %s,
+                    report1_date = %s,
+                    report2_date = %s,
+                    report3_date = %s
+                WHERE id = %s
             """, (
                 data.get('client_id'),
                 data.get('product_name'),
@@ -325,21 +325,21 @@ class Schedule:
 
             # 키워드 검색
             if keyword:
-                query += " AND (s.title LIKE ? OR c.name LIKE ? OR s.product_name LIKE ?)"
+                query += " AND (s.title LIKE %s OR c.name LIKE %s OR s.product_name LIKE %s)"
                 params.extend([f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"])
 
             # 상태 필터
             if status:
-                query += " AND s.status = ?"
+                query += " AND s.status = %s"
                 params.append(status)
 
             # 기간 필터
             if date_from:
-                query += " AND s.start_date >= ?"
+                query += " AND s.start_date >= %s"
                 params.append(date_from)
 
             if date_to:
-                query += " AND (s.end_date <= ? OR s.start_date <= ?)"
+                query += " AND (s.end_date <= %s OR s.start_date <= %s)"
                 params.extend([date_to, date_to])
 
             query += " ORDER BY s.created_at DESC"
@@ -362,8 +362,8 @@ class Schedule:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE schedules
-                SET supply_amount = ?, tax_amount = ?, total_amount = ?
-                WHERE id = ?
+                SET supply_amount = %s, tax_amount = %s, total_amount = %s
+                WHERE id = %s
             """, (supply_amount, tax_amount, total_amount, schedule_id))
             success = cursor.rowcount > 0
             conn.commit()

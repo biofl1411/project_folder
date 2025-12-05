@@ -25,7 +25,7 @@ class Item:
         """ID로 항목 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))
+        cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
         item = cursor.fetchone()
         conn.close()
         return item
@@ -36,7 +36,7 @@ class Item:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO items (name, category, description) VALUES (?, ?, ?)",
+            "INSERT INTO items (name, category, description) VALUES (%s, %s, %s)",
             (name, category, description)
         )
         conn.commit()
@@ -50,7 +50,7 @@ class Item:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE items SET name = ?, category = ?, description = ? WHERE id = ?",
+            "UPDATE items SET name = %s, category = %s, description = %s WHERE id = %s",
             (name, category, description, item_id)
         )
         conn.commit()
@@ -62,7 +62,7 @@ class Item:
         """항목 삭제"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        cursor.execute("DELETE FROM items WHERE id = %s", (item_id,))
         conn.commit()
         conn.close()
         return cursor.rowcount > 0
@@ -72,7 +72,7 @@ class Item:
         """카테고리별 항목 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM items WHERE category = ? ORDER BY name", (category,))
+        cursor.execute("SELECT * FROM items WHERE category = %s ORDER BY name", (category,))
         items = cursor.fetchall()
         conn.close()
         return items
