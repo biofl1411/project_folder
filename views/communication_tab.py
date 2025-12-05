@@ -327,7 +327,10 @@ class CommunicationTab(QWidget):
                 is_mine = msg['sender_id'] == self.current_user['id']
                 sender_name = msg['sender_name'] or '알 수 없음'
                 content = msg['content']
-                time_str = msg['created_at'][:16] if msg['created_at'] else ''
+                created_at = msg['created_at']
+                if created_at and not isinstance(created_at, str):
+                    created_at = str(created_at)
+                time_str = created_at[:16] if created_at else ''
 
                 if is_mine:
                     html = f"""
@@ -450,7 +453,10 @@ class CommunicationTab(QWidget):
                 self.received_mail_table.setItem(row, 2, subject_item)
 
                 # 날짜
-                date_str = mail['created_at'][:10] if mail['created_at'] else ''
+                mail_created = mail['created_at']
+                if mail_created and not isinstance(mail_created, str):
+                    mail_created = str(mail_created)
+                date_str = mail_created[:10] if mail_created else ''
                 self.received_mail_table.setItem(row, 3, QTableWidgetItem(date_str))
 
             # 보낸 메일
@@ -471,7 +477,10 @@ class CommunicationTab(QWidget):
                 self.sent_mail_table.setItem(row, 1, subject_item)
 
                 # 날짜
-                date_str = mail['created_at'][:10] if mail['created_at'] else ''
+                sent_created = mail['created_at']
+                if sent_created and not isinstance(sent_created, str):
+                    sent_created = str(sent_created)
+                date_str = sent_created[:10] if sent_created else ''
                 self.sent_mail_table.setItem(row, 2, QTableWidgetItem(date_str))
 
         except Exception as e:
@@ -990,7 +999,11 @@ class ViewMailDialog(QDialog):
             info_layout.addRow("보낸 사람:", QLabel(self.mail.get('sender_name', '')))
 
         info_layout.addRow("제목:", QLabel(self.mail.get('subject', '')))
-        info_layout.addRow("날짜:", QLabel(self.mail.get('created_at', '')[:16]))
+        # datetime 객체를 문자열로 변환
+        created_at = self.mail.get('created_at', '')
+        if created_at and not isinstance(created_at, str):
+            created_at = str(created_at)
+        info_layout.addRow("날짜:", QLabel(created_at[:16] if created_at else ''))
 
         layout.addWidget(info_frame)
 

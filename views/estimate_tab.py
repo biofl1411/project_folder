@@ -520,7 +520,11 @@ class EstimateTab(QWidget):
         created_at = schedule.get('created_at', '')
         if created_at:
             try:
-                date_obj = datetime.strptime(created_at[:10], '%Y-%m-%d')
+                # datetime 객체인 경우 직접 사용, 문자열인 경우 파싱
+                if isinstance(created_at, datetime):
+                    date_obj = created_at
+                else:
+                    date_obj = datetime.strptime(str(created_at)[:10], '%Y-%m-%d')
                 date_str = date_obj.strftime('%Y%m%d')
             except (ValueError, TypeError):
                 date_str = datetime.now().strftime('%Y%m%d')

@@ -300,7 +300,11 @@ class FeeTab(QWidget):
                     order_item.setTextAlignment(Qt.AlignCenter)
                     self.fee_table.setItem(row, 5, order_item)
 
-                    self.fee_table.setItem(row, 6, QTableWidgetItem(fee.get('created_at', '') or ""))
+                    # datetime 객체를 문자열로 변환
+                    created_at = fee.get('created_at', '')
+                    if created_at and not isinstance(created_at, str):
+                        created_at = str(created_at)
+                    self.fee_table.setItem(row, 6, QTableWidgetItem(created_at or ""))
 
             log_message('FeeTab', f'수수료 {len(fees) if fees else 0}개 표시 완료')
         except Exception as e:
@@ -660,13 +664,17 @@ class FeeTab(QWidget):
                 if 'display_order' not in fee_dict:
                     fee_dict['display_order'] = i + 1
                 
+                # datetime 객체를 문자열로 변환
+                created_at_val = fee_dict["created_at"]
+                if created_at_val and not isinstance(created_at_val, str):
+                    created_at_val = str(created_at_val)
                 data.append({
                     "검사항목": fee_dict["test_item"],
                     "식품 카테고리": fee_dict["food_category"] or "",
                     "가격": fee_dict["price"],
                     "검체 수량(g)": fee_dict["description"] or "",
                     "정렬순서": fee_dict["display_order"],
-                    "생성일": fee_dict["created_at"] or ""
+                    "생성일": created_at_val or ""
                 })
             
             # DataFrame 생성 및 엑셀 파일로 저장
