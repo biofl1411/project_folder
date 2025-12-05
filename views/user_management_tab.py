@@ -321,7 +321,11 @@ class UserManagementTab(QWidget):
             self.user_table.setItem(row, 2, QTableWidgetItem(user.get('name', '')))
             self.user_table.setItem(row, 3, QTableWidgetItem(user.get('department', '')))
             self.user_table.setItem(row, 4, QTableWidgetItem(user.get('email', '') or ''))
-            self.user_table.setItem(row, 5, QTableWidgetItem(user.get('last_login', '') or ''))
+
+            # last_login이 datetime 객체일 수 있으므로 문자열로 변환
+            last_login = user.get('last_login', '')
+            last_login_str = str(last_login) if last_login else ''
+            self.user_table.setItem(row, 5, QTableWidgetItem(last_login_str))
 
             # 활성화 상태 (O/X)
             is_active = user.get('is_active', 0)
