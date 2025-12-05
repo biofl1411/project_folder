@@ -133,7 +133,7 @@ class ActivityLog:
                 INSERT INTO activity_logs
                 (user_id, username, user_name, department, action_type, action_name,
                  target_type, target_id, target_name, details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 user.get('id'),
                 user.get('username', ''),
