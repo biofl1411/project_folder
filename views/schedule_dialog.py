@@ -693,29 +693,18 @@ class ScheduleCreateDialog(QDialog):
         self.experiment_period_label.setStyleSheet("color: blue; font-weight: bold;")
         test_layout.addRow("실험기간:", self.experiment_period_label)
         
-        # 실험기간 표시용 레이블 추가하는 코드 이후에 추가할 부분:
-
-        # 보고서 종류 체크박스 그룹 추가
-        report_type_frame = QFrame()
-        report_type_layout = QHBoxLayout(report_type_frame)
-        report_type_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 세 가지 체크박스 생성
-        self.report_type_interim = QCheckBox("중간")
-        self.report_type_korean = QCheckBox("국문")
-        self.report_type_english = QCheckBox("영문")
+        # 보고서 종류 - 각각 별도 행으로 표시
+        self.report_type_interim = QCheckBox("중간 보고서")
+        self.report_type_korean = QCheckBox("국문 보고서")
+        self.report_type_english = QCheckBox("영문 보고서")
 
         # 기본값으로 국문 체크
         self.report_type_korean.setChecked(True)
 
-        # 레이아웃에 체크박스 추가
-        report_type_layout.addWidget(self.report_type_interim)
-        report_type_layout.addWidget(self.report_type_korean)
-        report_type_layout.addWidget(self.report_type_english)
-        report_type_layout.addStretch()
-
-        # 폼 레이아웃에 추가
-        test_layout.addRow("보고서 종류:", report_type_frame)
+        # 각각 별도 행으로 폼 레이아웃에 추가
+        test_layout.addRow("중간 보고서:", self.report_type_interim)
+        test_layout.addRow("국문 보고서:", self.report_type_korean)
+        test_layout.addRow("영문 보고서:", self.report_type_english)
 
         # 중간 보고일자
         interim_report_layout = QHBoxLayout()

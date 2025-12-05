@@ -50,6 +50,14 @@ class ClientSearchDialog(QDialog):
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("업체명, CEO, 담당자명, 사업자번호로 검색... (초성 검색 가능: ㅂㅇㅍㄷㄹ)")
+
+        # 영업담당자 검색 조건 추가
+        search_layout.addWidget(QLabel("영업담당:"))
+        self.sales_rep_combo = QComboBox()
+        self.sales_rep_combo.setMinimumWidth(120)
+        self.sales_rep_combo.addItem("전체", "")
+        self.sales_rep_combo.currentIndexChanged.connect(self.onSalesRepChanged)
+
         search_btn = QPushButton("검색")
         search_btn.setAutoDefault(False)
         search_btn.setDefault(False)
@@ -58,6 +66,7 @@ class ClientSearchDialog(QDialog):
         # 실시간 검색 필터링
         self.search_input.textChanged.connect(self.filterClients)
 
+        search_layout.addWidget(self.sales_rep_combo)
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(search_btn)
         layout.addLayout(search_layout)
@@ -178,6 +187,36 @@ class ClientSearchDialog(QDialog):
         """데이터베이스에서 업체 정보 불러오기"""
         try:
             all_clients = Client.get_all()
+
+            # 영업담당자 목록 추출 및 콤보박스 업데이트
+            sales_reps = set()
+            for client in all_clients:
+                rep = client.get('sales_rep', '')
+                if rep:
+                    sales_reps.add(rep)
+
+            # 콤보박스 업데이트 (기존 항목 유지하면서)
+            current_rep = self.sales_rep_combo.currentData()
+            self.sales_rep_combo.blockSignals(True)
+            self.sales_rep_combo.clear()
+            self.sales_rep_combo.addItem("전체", "")
+            for rep in sorted(sales_reps):
+                self.sales_rep_combo.addItem(rep, rep)
+
+            # 이전 선택값 복원
+            if current_rep:
+                idx = self.sales_rep_combo.findData(current_rep)
+                if idx >= 0:
+                    self.sales_rep_combo.setCurrentIndex(idx)
+
+            # sales_rep_filter가 설정된 경우 해당 담당자 선택
+            if self.sales_rep_filter:
+                idx = self.sales_rep_combo.findData(self.sales_rep_filter)
+                if idx >= 0:
+                    self.sales_rep_combo.setCurrentIndex(idx)
+
+            self.sales_rep_combo.blockSignals(False)
+
             # 영업담당 필터가 설정된 경우 필터링
             if self.sales_rep_filter:
                 self.all_clients = [
@@ -236,17 +275,38 @@ class ClientSearchDialog(QDialog):
         text_chosung = self.get_chosung(text)
         return search_text.lower() in text_chosung.lower()
 
-    def filterClients(self, search_text):
-        """실시간 필터링 (초성 검색 지원)"""
+    def onSalesRepChanged(self):
+        """영업담당자 콤보박스 변경 시 필터링"""
+        self.filterClients(self.search_input.text())
+
+    def filterClients(self, search_text=None):
+        """실시간 필터링 (초성 검색 지원 + 영업담당자 필터)"""
+        if search_text is None:
+            search_text = self.search_input.text()
         search_text = search_text.strip()
+
+        # 선택된 영업담당자 가져오기
+        selected_sales_rep = self.sales_rep_combo.currentData()
+
+        # 필터링 대상 결정
+        base_clients = self.all_clients
+
+        # 영업담당자 필터 적용
+        if selected_sales_rep:
+            base_clients = [
+                c for c in base_clients
+                if (c.get('sales_rep', '') or '') == selected_sales_rep
+            ]
+
+        # 검색어가 없으면 영업담당자 필터만 적용한 결과 표시
         if not search_text:
-            self.displayClients(self.all_clients)
+            self.displayClients(base_clients)
             return
 
         filtered = []
         is_chosung = self.is_chosung_only(search_text)
 
-        for client in self.all_clients:
+        for client in base_clients:
             name = client.get('name', '') or ''
             ceo = client.get('ceo', '') or ''
             contact_person = client.get('contact_person', '') or ''
