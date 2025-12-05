@@ -328,7 +328,11 @@ class FoodTypeTab(QWidget):
                     self.food_type_table.setItem(row, 4, QTableWidgetItem(food_type['pasteurization'] or ""))
                     self.food_type_table.setItem(row, 5, QTableWidgetItem(food_type['appearance'] or ""))
                     self.food_type_table.setItem(row, 6, QTableWidgetItem(food_type['test_items'] or ""))
-                    self.food_type_table.setItem(row, 7, QTableWidgetItem(food_type['created_at'] or ""))
+                    # datetime 객체를 문자열로 변환
+                    created_at = food_type['created_at']
+                    if created_at:
+                        created_at = str(created_at) if not isinstance(created_at, str) else created_at
+                    self.food_type_table.setItem(row, 7, QTableWidgetItem(created_at or ""))
         finally:
             # UI 업데이트 재개
             self.food_type_table.setUpdatesEnabled(True)
@@ -883,6 +887,10 @@ class FoodTypeTab(QWidget):
             # 데이터 변환
             data = []
             for food_type in food_types:
+                # datetime 객체를 문자열로 변환
+                created_at_val = food_type["created_at"]
+                if created_at_val and not isinstance(created_at_val, str):
+                    created_at_val = str(created_at_val)
                 data.append({
                     "식품유형": food_type["type_name"],
                     "카테고리": food_type["category"] or "",
@@ -890,7 +898,7 @@ class FoodTypeTab(QWidget):
                     "단서조항_2": food_type["pasteurization"] or "",
                     "성상": food_type["appearance"] or "",
                     "검사항목": food_type["test_items"] or "",
-                    "생성일": food_type["created_at"] or ""
+                    "생성일": created_at_val or ""
                 })
             
             # DataFrame 생성 및 엑셀 파일로 저장
