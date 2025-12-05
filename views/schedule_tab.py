@@ -614,15 +614,11 @@ class ScheduleTab(QWidget):
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(f"{test_days}일" if test_days > 0 else ''))
 
                     elif col_key == 'report_type':
-                        # 보고서 종류
-                        types = []
+                        # 보고서 종류 - 중간보고서만 표시
                         if schedule.get('report_interim'):
-                            types.append('중간')
-                        if schedule.get('report_korean'):
-                            types.append('국문')
-                        if schedule.get('report_english'):
-                            types.append('영문')
-                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(', '.join(types)))
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem('중간'))
+                        else:
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem('-'))
 
                     elif col_key == 'extension_test':
                         # 연장실험
