@@ -1204,16 +1204,12 @@ class ScheduleManagementTab(QWidget):
         grid = QGridLayout(group)
         grid.setSpacing(0)
         grid.setContentsMargins(2, 0, 2, 2)
-        grid.setVerticalSpacing(5)  # 행 간격 5px
+        grid.setVerticalSpacing(0)  # 행 간격 없음 (1~7행 붙임)
         grid.setHorizontalSpacing(0)
 
         # 8열 균등 배분 (라벨+값 4쌍)
         for col in range(8):
             grid.setColumnStretch(col, 1)
-
-        # 행 최소 높이 설정
-        for row in range(7):
-            grid.setRowMinimumHeight(row, 25)
 
         label_style = "font-weight: bold; background-color: #ecf0f1; padding: 1px; border: 1px solid #bdc3c7; font-size: 11px;"
         value_style = "background-color: white; padding: 1px; border: 1px solid #bdc3c7; color: #2c3e50; font-size: 11px;"
