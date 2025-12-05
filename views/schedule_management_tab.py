@@ -1295,14 +1295,14 @@ class ScheduleManagementTab(QWidget):
         self.required_sample_value.setFixedHeight(18)
         grid.addWidget(self.required_sample_value, 3, 5)
         self.current_required_sample = 0
-        self.interim_report_label = self._create_label("중간보고서", label_style)
-        grid.addWidget(self.interim_report_label, 3, 6)
-        self.interim_report_value = ClickableLabel("-")
-        self.interim_report_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
-        self.interim_report_value.setAlignment(Qt.AlignCenter)
-        self.interim_report_value.setFixedHeight(18)
-        self.interim_report_value.clicked.connect(self.toggle_interim_report)
-        grid.addWidget(self.interim_report_value, 3, 7)
+        self.extension_test_label = self._create_label("연장실험", label_style)
+        grid.addWidget(self.extension_test_label, 3, 6)
+        self.extension_test_value = ClickableLabel("-")
+        self.extension_test_value.setStyleSheet(value_style + " color: #2980b9; text-decoration: underline;")
+        self.extension_test_value.setAlignment(Qt.AlignCenter)
+        self.extension_test_value.setFixedHeight(18)
+        self.extension_test_value.clicked.connect(self.toggle_extension_test)
+        grid.addWidget(self.extension_test_value, 3, 7)
 
         # 행 5: 중간보고서(예/아니오), 1보고서, 2보고서, 3보고서
         report_label_style = "font-weight: bold; background-color: #fdebd0; padding: 1px; border: 1px solid #e67e22; font-size: 11px;"
@@ -1362,6 +1362,72 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.temp_zone3_label, 5, 6)
         self.temp_zone3_value = self._create_value_label("-", temp_value_style)
         grid.addWidget(self.temp_zone3_value, 5, 7)
+
+        # 행 7: 연장기간, 연장 실험기간, 연장 회차
+        extension_label_style = "font-weight: bold; background-color: #e8f8f5; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
+        extension_value_style = "background-color: white; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
+
+        self.extend_period_label = self._create_label("연장기간", extension_label_style)
+        grid.addWidget(self.extend_period_label, 6, 0)
+
+        # 연장기간 입력 위젯 (일, 월, 년)
+        extend_period_widget = QWidget()
+        extend_period_layout = QHBoxLayout(extend_period_widget)
+        extend_period_layout.setContentsMargins(2, 0, 2, 0)
+        extend_period_layout.setSpacing(2)
+
+        self.extend_days_input = QLineEdit()
+        self.extend_days_input.setFixedWidth(30)
+        self.extend_days_input.setAlignment(Qt.AlignCenter)
+        self.extend_days_input.setPlaceholderText("0")
+        self.extend_days_input.textChanged.connect(self.on_extend_period_changed)
+        extend_period_layout.addWidget(self.extend_days_input)
+        extend_period_layout.addWidget(QLabel("일"))
+
+        self.extend_months_input = QLineEdit()
+        self.extend_months_input.setFixedWidth(30)
+        self.extend_months_input.setAlignment(Qt.AlignCenter)
+        self.extend_months_input.setPlaceholderText("0")
+        self.extend_months_input.textChanged.connect(self.on_extend_period_changed)
+        extend_period_layout.addWidget(self.extend_months_input)
+        extend_period_layout.addWidget(QLabel("월"))
+
+        self.extend_years_input = QLineEdit()
+        self.extend_years_input.setFixedWidth(30)
+        self.extend_years_input.setAlignment(Qt.AlignCenter)
+        self.extend_years_input.setPlaceholderText("0")
+        self.extend_years_input.textChanged.connect(self.on_extend_period_changed)
+        extend_period_layout.addWidget(self.extend_years_input)
+        extend_period_layout.addWidget(QLabel("년"))
+        extend_period_layout.addStretch()
+
+        grid.addWidget(extend_period_widget, 6, 1, 1, 3)
+
+        # 연장 실험기간 (자동 계산: 실측 1.5배, 가속 1/2)
+        self.extend_experiment_period_label = self._create_label("연장실험기간", extension_label_style)
+        grid.addWidget(self.extend_experiment_period_label, 6, 4)
+        self.extend_experiment_period_value = self._create_value_label("-", extension_value_style)
+        grid.addWidget(self.extend_experiment_period_value, 6, 5)
+
+        # 연장 회차
+        self.extend_rounds_label = self._create_label("연장회차", extension_label_style)
+        grid.addWidget(self.extend_rounds_label, 6, 6)
+
+        extend_rounds_widget = QWidget()
+        extend_rounds_layout = QHBoxLayout(extend_rounds_widget)
+        extend_rounds_layout.setContentsMargins(2, 0, 2, 0)
+        extend_rounds_layout.setSpacing(2)
+
+        self.extend_rounds_input = QLineEdit()
+        self.extend_rounds_input.setFixedWidth(40)
+        self.extend_rounds_input.setAlignment(Qt.AlignCenter)
+        self.extend_rounds_input.setPlaceholderText("0")
+        self.extend_rounds_input.textChanged.connect(self.on_extend_rounds_changed)
+        extend_rounds_layout.addWidget(self.extend_rounds_input)
+        extend_rounds_layout.addWidget(QLabel("회"))
+        extend_rounds_layout.addStretch()
+
+        grid.addWidget(extend_rounds_widget, 6, 7)
 
         # 연장실험 필드 (호환성 유지, 숨김)
         self.extension_label = QLabel("연장실험", self)
@@ -1688,8 +1754,23 @@ class ScheduleManagementTab(QWidget):
             self.urgent_value.setText("일반")
             self.urgent_value.setStyleSheet("background-color: white; padding: 3px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;")
 
-        # 중간보고서 (행 2)
-        self.interim_report_value.setText("요청" if schedule.get('report_interim') else "미요청")
+        # 연장실험 (행 4 - 기존 중간보고서 위치)
+        extension_test = schedule.get('extension_test', 0)
+        if extension_test:
+            self.extension_test_value.setText("진행")
+            self.extension_test_value.setStyleSheet("background-color: #d5f5e3; padding: 1px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 11px; text-decoration: underline;")
+        else:
+            self.extension_test_value.setText("미진행")
+            self.extension_test_value.setStyleSheet("background-color: white; padding: 1px; border: 1px solid #bdc3c7; color: #2980b9; font-size: 11px; text-decoration: underline;")
+
+        # 연장실험 필드 활성화/비활성화
+        self._update_extension_fields_visibility(extension_test)
+
+        # 연장기간 값 로드
+        self.extend_days_input.setText(str(schedule.get('extend_period_days', '') or ''))
+        self.extend_months_input.setText(str(schedule.get('extend_period_months', '') or ''))
+        self.extend_years_input.setText(str(schedule.get('extend_period_years', '') or ''))
+        self.extend_rounds_input.setText(str(schedule.get('extend_rounds', '') or ''))
 
         # 중간보고서 (행 5 - 예/아니오)
         report_interim = schedule.get('report_interim', 0)
@@ -2347,7 +2428,7 @@ class ScheduleManagementTab(QWidget):
             'storage': (self.storage_label, self.storage_value),
             'food_type': (self.food_type_label, self.food_type_value),
             'period': (self.period_label, self.period_value),
-            'interim_report': (self.interim_report_label, self.interim_report_value),
+            'interim_report': (self.extension_test_label, self.extension_test_value),
             'extension': (self.extension_label, self.extension_value),
             'sampling_count': (self.sampling_count_label, self.sampling_count_value),
             'sampling_interval': (self.sampling_interval_label, self.sampling_interval_value),
@@ -2630,8 +2711,8 @@ class ScheduleManagementTab(QWidget):
 
         from PyQt5.QtWidgets import QInputDialog
 
-        options = ["요청", "미요청"]
-        current_value = self.interim_report_value.text()
+        options = ["예", "아니오"]
+        current_value = self.interim_report_yn_value.text()
         old_value = current_value  # 로그용
 
         try:
@@ -2645,9 +2726,16 @@ class ScheduleManagementTab(QWidget):
         )
 
         if ok and new_value:
-            is_requested = (new_value == "요청")
+            is_requested = (new_value == "예")
             self.current_schedule['report_interim'] = 1 if is_requested else 0
-            self.interim_report_value.setText(new_value)
+
+            # 스타일 업데이트
+            if is_requested:
+                self.interim_report_yn_value.setText("예")
+                self.interim_report_yn_value.setStyleSheet("background-color: #d5f5e3; padding: 3px; border: 1px solid #27ae60; color: #27ae60; font-weight: bold; font-size: 11px; text-decoration: underline;")
+            else:
+                self.interim_report_yn_value.setText("아니오")
+                self.interim_report_yn_value.setStyleSheet("background-color: white; padding: 3px; border: 1px solid #e67e22; color: #2980b9; font-size: 11px; text-decoration: underline;")
 
             # DB에 저장
             try:
@@ -2687,6 +2775,195 @@ class ScheduleManagementTab(QWidget):
 
         # 비용 재계산
         self.recalculate_costs()
+
+    def toggle_extension_test(self):
+        """연장실험 진행/미진행 토글"""
+        # 수정 가능 여부 확인
+        if not self.can_edit_plan():
+            return
+
+        from PyQt5.QtWidgets import QInputDialog
+
+        options = ["진행", "미진행"]
+        current_value = self.extension_test_value.text()
+        old_value = current_value
+
+        try:
+            current_index = options.index(current_value)
+        except ValueError:
+            current_index = 1
+
+        new_value, ok = QInputDialog.getItem(
+            self, "연장실험 설정", "연장실험 진행 여부:",
+            options, current_index, False
+        )
+
+        if ok and new_value:
+            is_extension = (new_value == "진행")
+            self.current_schedule['extension_test'] = 1 if is_extension else 0
+            self.extension_test_value.setText(new_value)
+
+            # 연장실험 진행 시 연장기간 입력 활성화
+            self._update_extension_fields_visibility(is_extension)
+
+            # DB에 저장
+            try:
+                from models.schedules import Schedule
+                schedule_id = self.current_schedule.get('id')
+                if schedule_id:
+                    Schedule.update(schedule_id, extension_test=1 if is_extension else 0)
+            except Exception as e:
+                print(f"연장실험 저장 오류: {e}")
+
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_edit',
+                details={'field': '연장실험', 'old_value': old_value, 'new_value': new_value}
+            )
+
+            # 스케줄 저장 시그널 발생
+            self.schedule_saved.emit()
+
+    def _update_extension_fields_visibility(self, is_extension):
+        """연장실험 필드 활성화/비활성화"""
+        enabled = is_extension
+        self.extend_days_input.setEnabled(enabled)
+        self.extend_months_input.setEnabled(enabled)
+        self.extend_years_input.setEnabled(enabled)
+        self.extend_rounds_input.setEnabled(enabled)
+
+        if not enabled:
+            self.extend_days_input.clear()
+            self.extend_months_input.clear()
+            self.extend_years_input.clear()
+            self.extend_rounds_input.clear()
+            self.extend_experiment_period_value.setText("-")
+
+    def on_extend_period_changed(self):
+        """연장기간 변경 시 연장 실험기간 자동 계산"""
+        if not self.current_schedule:
+            return
+
+        try:
+            days = int(self.extend_days_input.text() or 0)
+            months = int(self.extend_months_input.text() or 0)
+            years = int(self.extend_years_input.text() or 0)
+
+            # 총 연장기간 (일수로 변환)
+            total_days = days + (months * 30) + (years * 365)
+
+            if total_days <= 0:
+                self.extend_experiment_period_value.setText("-")
+                return
+
+            # 실험방법에 따른 실험기간 계산
+            test_method = self.current_schedule.get('test_method', 'real')
+
+            if test_method in ['real', 'custom_real']:
+                # 실측: 1.5배
+                experiment_days = int(total_days * 1.5)
+            else:
+                # 가속: 1/2
+                experiment_days = total_days // 2
+
+            # 년/월/일 형식으로 변환
+            exp_years = experiment_days // 365
+            exp_months = (experiment_days % 365) // 30
+            exp_days = experiment_days % 30
+
+            period_parts = []
+            if exp_years > 0:
+                period_parts.append(f"{exp_years}년")
+            if exp_months > 0:
+                period_parts.append(f"{exp_months}개월")
+            if exp_days > 0:
+                period_parts.append(f"{exp_days}일")
+
+            period_str = " ".join(period_parts) if period_parts else f"{experiment_days}일"
+            self.extend_experiment_period_value.setText(period_str)
+
+            # 현재 스케줄에 저장
+            self.current_schedule['extend_period_days'] = days
+            self.current_schedule['extend_period_months'] = months
+            self.current_schedule['extend_period_years'] = years
+            self.current_schedule['extend_experiment_days'] = experiment_days
+
+        except ValueError:
+            self.extend_experiment_period_value.setText("-")
+
+    def on_extend_rounds_changed(self):
+        """연장 회차 변경 시 스케줄 테이블 업데이트"""
+        if not self.current_schedule:
+            return
+
+        try:
+            extend_rounds = int(self.extend_rounds_input.text() or 0)
+
+            if extend_rounds <= 0:
+                return
+
+            # 현재 스케줄에 저장
+            self.current_schedule['extend_rounds'] = extend_rounds
+
+            # 연장 회차 스케줄 생성 및 테이블 업데이트
+            self._add_extension_rounds_to_table(extend_rounds)
+
+        except ValueError:
+            pass
+
+    def _add_extension_rounds_to_table(self, extend_rounds):
+        """연장 회차를 스케줄 테이블에 추가"""
+        if not hasattr(self, 'experiment_table') or not self.current_schedule:
+            return
+
+        from datetime import datetime, timedelta
+
+        # 기존 샘플링 횟수와 간격 가져오기
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        sampling_interval = self.current_schedule.get('sampling_interval', 15) or 15
+
+        # 마지막 실험일 가져오기
+        last_date_str = self.current_schedule.get('last_experiment_date', '')
+        if not last_date_str:
+            last_date_str = self.last_experiment_date_value.text()
+
+        if not last_date_str or last_date_str == '-':
+            return
+
+        try:
+            last_date = datetime.strptime(last_date_str, '%Y-%m-%d')
+        except (ValueError, TypeError):
+            return
+
+        # 시작일 가져오기 (제조후 일수 계산용)
+        start_date_str = self.current_schedule.get('start_date', '')
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            except (ValueError, TypeError):
+                start_date = last_date
+        else:
+            start_date = last_date
+
+        # 연장 회차 데이터 생성
+        extension_schedules = []
+        for i in range(extend_rounds):
+            round_num = sampling_count + i + 1  # 기존 회차에 이어서
+            round_date = last_date + timedelta(days=sampling_interval * (i + 1))
+            days_after_start = (round_date - start_date).days
+
+            extension_schedules.append({
+                'round': round_num,
+                'date': round_date.strftime('%Y-%m-%d'),
+                'days_after': days_after_start
+            })
+
+        # 현재 스케줄에 연장 데이터 저장
+        self.current_schedule['extension_schedules'] = extension_schedules
+
+        # 테이블 업데이트는 display_schedule_detail에서 처리
+        # 여기서는 시그널만 발생
+        self.schedule_saved.emit()
 
     def edit_last_experiment_date_with_calendar(self):
         """달력을 통해 마지막 실험일 수정"""
