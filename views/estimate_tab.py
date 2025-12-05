@@ -1005,11 +1005,28 @@ class EstimateTab(QWidget):
             total_months += 1
 
         # 검사 소요기간 문구 생성
-        # 중간 보고서 날짜 가져오기 (스케쥴 관리에서)
+        # 중간 보고서 날짜 및 회차 정보 가져오기 (스케쥴 관리에서)
         report1_date = schedule.get('report1_date', '') or ''
         report2_date = schedule.get('report2_date', '') or ''
         report3_date = schedule.get('report3_date', '') or ''
+        interim1_round = schedule.get('interim1_round', 0) or 0
+        interim2_round = schedule.get('interim2_round', 0) or 0
+        interim3_round = schedule.get('interim3_round', 0) or 0
         report_interim = schedule.get('report_interim', False)
+
+        # 회차별 제조후 일수 계산 함수
+        def get_days_for_round(round_num):
+            if round_num <= 0 or sampling_count <= 0:
+                return 0
+            if round_num == 1:
+                return 0
+            if round_num >= sampling_count:
+                return total_experiment_days
+            # 중간 회차: 균등 분배
+            if sampling_count > 1:
+                interval = total_experiment_days / (sampling_count - 1)
+                return int(round((round_num - 1) * interval))
+            return 0
 
         test_period_text = ""
 
@@ -1018,17 +1035,20 @@ class EstimateTab(QWidget):
 
         # 중간 보고서 1 날짜가 있는 경우
         if report1_date and report1_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
+            days_for_interim1 = get_days_for_round(interim1_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim1}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
             has_report_dates = True
 
         # 중간 보고서 2 날짜가 있는 경우
         if report2_date and report2_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
+            days_for_interim2 = get_days_for_round(interim2_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim2}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
             has_report_dates = True
 
         # 중간 보고서 3 날짜가 있는 경우
         if report3_date and report3_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
+            days_for_interim3 = get_days_for_round(interim3_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim3}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
             has_report_dates = True
 
         # 날짜가 없고 report_interim이 체크된 경우 기존 로직 사용
