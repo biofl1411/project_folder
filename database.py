@@ -3,344 +3,253 @@
 
 '''
 데이터베이스 연결 및 기본 함수
+MySQL 서버 연결 버전
 '''
 
-import sqlite3
 import os
+import json
 import datetime
 
-DB_PATH = 'data/app.db'
+# MySQL 연결 라이브러리
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+    MYSQL_AVAILABLE = True
+except ImportError:
+    MYSQL_AVAILABLE = False
+    print("pymysql이 설치되지 않았습니다. pip install pymysql 명령으로 설치하세요.")
+
+# 설정 파일 경로
+CONFIG_PATH = 'config/db_config.json'
+
+def load_db_config():
+    '''데이터베이스 설정 로드'''
+    # 실행 파일 위치 기준으로 경로 설정
+    import sys
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    config_file = os.path.join(base_path, CONFIG_PATH)
+
+    if os.path.exists(config_file):
+        with open(config_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    else:
+        # 기본 설정
+        return {
+            "host": "192.168.0.96",
+            "port": 3306,
+            "database": "foodlab",
+            "user": "foodlab",
+            "password": "foodlab1234",
+            "charset": "utf8mb4"
+        }
 
 def get_connection():
     '''데이터베이스 연결 객체 반환'''
-    # DB 파일이 있는 디렉토리 확인 및 생성
-    db_dir = os.path.dirname(DB_PATH)
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir)
-        
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # 딕셔너리 형태로 결과 반환
+    if not MYSQL_AVAILABLE:
+        raise Exception("pymysql이 설치되지 않았습니다.")
+
+    config = load_db_config()
+
+    conn = pymysql.connect(
+        host=config['host'],
+        port=config['port'],
+        user=config['user'],
+        password=config['password'],
+        database=config['database'],
+        charset=config['charset'],
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=False
+    )
     return conn
+
+def test_connection():
+    '''데이터베이스 연결 테스트'''
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        return True, "연결 성공"
+    except Exception as e:
+        return False, str(e)
 
 def init_database():
     '''데이터베이스 초기화 및 테이블 생성'''
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     # 실험 항목 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(255) NOT NULL,
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
-    # 수수료 테이블
+
+    # 수수료 테이블 (pricing)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS pricing (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_id INTEGER,
-        food_type TEXT NOT NULL,
-        price REAL NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        item_id INT,
+        food_type VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (item_id) REFERENCES items (id)
-    )
+        FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
-    # 업체정보 테이블 - 필드 수정 (DROP 제거하여 데이터 유지)
-    # cursor.execute('''DROP TABLE IF EXISTS clients''')
 
-    # 식품 유형 테이블 - 초기화 코드 제거 (DROP 제거하여 데이터 유지)
-    # cursor.execute('''DROP TABLE IF EXISTS food_types''')
-    
+    # 업체정보 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS clients (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        ceo TEXT,
-        business_no TEXT,
-        category TEXT,
-        phone TEXT,
-        fax TEXT,
-        contact_person TEXT,
-        email TEXT,
-        sales_rep TEXT,
-        toll_free TEXT,
-        zip_code TEXT,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        ceo VARCHAR(100),
+        business_no VARCHAR(50),
+        category VARCHAR(100),
+        phone VARCHAR(50),
+        fax VARCHAR(50),
+        contact_person VARCHAR(100),
+        email VARCHAR(255),
+        sales_rep VARCHAR(100),
+        toll_free VARCHAR(50),
+        zip_code VARCHAR(20),
         address TEXT,
         notes TEXT,
-        sales_business TEXT,
-        sales_phone TEXT,
-        sales_mobile TEXT,
+        sales_business VARCHAR(255),
+        sales_phone VARCHAR(50),
+        sales_mobile VARCHAR(50),
         sales_address TEXT,
-        mobile TEXT,
+        mobile VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
 
-    # 기존 clients 테이블에 새 컬럼 추가 (마이그레이션)
-    new_columns = [
-        ('business_no', 'TEXT'),
-        ('category', 'TEXT'),
-        ('fax', 'TEXT'),
-        ('email', 'TEXT'),
-        ('toll_free', 'TEXT'),
-        ('zip_code', 'TEXT'),
-        ('sales_business', 'TEXT'),
-        ('sales_phone', 'TEXT'),
-        ('sales_mobile', 'TEXT'),
-        ('sales_address', 'TEXT')
-    ]
-    for col_name, col_type in new_columns:
-        try:
-            cursor.execute(f'ALTER TABLE clients ADD COLUMN {col_name} {col_type}')
-        except Exception:
-            pass  # 컬럼이 이미 존재하면 무시
-    
     # 스케줄 및 견적 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS schedules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        client_id INTEGER,
-        title TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        total_price REAL,
-        product_name TEXT,
-        food_type_id INTEGER,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT,
+        title VARCHAR(255) NOT NULL,
+        start_date VARCHAR(50),
+        end_date VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'pending',
+        total_price DECIMAL(15,2),
+        product_name VARCHAR(255),
+        food_type_id INT,
         test_method TEXT,
-        storage_condition TEXT,
-        test_period_days INTEGER DEFAULT 0,
-        test_period_months INTEGER DEFAULT 0,
-        test_period_years INTEGER DEFAULT 0,
-        sampling_count INTEGER DEFAULT 6,
-        report_interim INTEGER DEFAULT 0,
-        report_korean INTEGER DEFAULT 1,
-        report_english INTEGER DEFAULT 0,
-        extension_test INTEGER DEFAULT 0,
+        storage_condition VARCHAR(255),
+        test_period_days INT DEFAULT 0,
+        test_period_months INT DEFAULT 0,
+        test_period_years INT DEFAULT 0,
+        sampling_count INT DEFAULT 6,
+        report_interim INT DEFAULT 0,
+        report_korean INT DEFAULT 1,
+        report_english INT DEFAULT 0,
+        extension_test INT DEFAULT 0,
         custom_temperatures TEXT,
         memo TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (client_id) REFERENCES clients (id)
-    )
+        packaging_weight INT DEFAULT 0,
+        packaging_unit VARCHAR(20) DEFAULT 'g',
+        additional_test_items TEXT,
+        removed_test_items TEXT,
+        experiment_schedule_data TEXT,
+        custom_dates TEXT,
+        actual_experiment_days INT,
+        estimate_date VARCHAR(50),
+        expected_date VARCHAR(50),
+        interim_report_date VARCHAR(50),
+        FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-
-    # 기존 테이블에 memo 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN memo TEXT")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 포장단위 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN packaging_weight INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN packaging_unit TEXT DEFAULT 'g'")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 추가된 검사항목 저장 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN additional_test_items TEXT")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 삭제된 기본 검사항목 저장 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN removed_test_items TEXT")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 실험 스케줄 O/X 상태 저장 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN experiment_schedule_data TEXT")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 사용자 수정 날짜 저장 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN custom_dates TEXT")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # 실제 실험일수 저장 컬럼 추가 (없는 경우) - 날짜 수정 시 계산된 값
-    try:
-        cursor.execute("ALTER TABLE schedules ADD COLUMN actual_experiment_days INTEGER")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-
-    # start_date, end_date NOT NULL 제약 조건 제거 마이그레이션
-    # 기존 테이블이 NOT NULL 제약이 있는 경우 NULL 허용하도록 재생성
-    try:
-        # 현재 테이블 구조 확인
-        cursor.execute("PRAGMA table_info(schedules)")
-        columns_info = cursor.fetchall()
-
-        # start_date 컬럼의 NOT NULL 여부 확인 (notnull = 1이면 NOT NULL)
-        start_date_notnull = False
-        for col in columns_info:
-            if col[1] == 'start_date' and col[3] == 1:  # col[3]이 notnull 플래그
-                start_date_notnull = True
-                break
-
-        if start_date_notnull:
-            print("schedules 테이블 마이그레이션 시작: start_date, end_date NULL 허용")
-
-            # 기존 컬럼 목록 가져오기
-            column_names = [col[1] for col in columns_info]
-            columns_str = ', '.join(column_names)
-
-            # 임시 테이블로 데이터 백업
-            cursor.execute(f"CREATE TABLE schedules_backup AS SELECT * FROM schedules")
-
-            # 기존 테이블 삭제
-            cursor.execute("DROP TABLE schedules")
-
-            # 새 테이블 생성 (start_date, end_date NULL 허용, 모든 추가 컬럼 포함)
-            cursor.execute('''
-            CREATE TABLE schedules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                title TEXT NOT NULL,
-                start_date TEXT,
-                end_date TEXT,
-                status TEXT DEFAULT 'pending',
-                total_price REAL,
-                product_name TEXT,
-                food_type_id INTEGER,
-                test_method TEXT,
-                storage_condition TEXT,
-                test_period_days INTEGER DEFAULT 0,
-                test_period_months INTEGER DEFAULT 0,
-                test_period_years INTEGER DEFAULT 0,
-                sampling_count INTEGER DEFAULT 6,
-                report_interim INTEGER DEFAULT 0,
-                report_korean INTEGER DEFAULT 1,
-                report_english INTEGER DEFAULT 0,
-                extension_test INTEGER DEFAULT 0,
-                custom_temperatures TEXT,
-                memo TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                packaging_weight INTEGER DEFAULT 0,
-                packaging_unit TEXT DEFAULT 'g',
-                additional_test_items TEXT,
-                removed_test_items TEXT,
-                experiment_schedule_data TEXT,
-                custom_dates TEXT,
-                actual_experiment_days INTEGER,
-                estimate_date TEXT,
-                expected_date TEXT,
-                interim_report_date TEXT,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-            ''')
-
-            # 백업 테이블의 컬럼 중 새 테이블에 있는 컬럼만 복사
-            cursor.execute("PRAGMA table_info(schedules)")
-            new_columns = [col[1] for col in cursor.fetchall()]
-            common_columns = [col for col in column_names if col in new_columns]
-            common_columns_str = ', '.join(common_columns)
-
-            # 데이터 복원
-            cursor.execute(f"INSERT INTO schedules ({common_columns_str}) SELECT {common_columns_str} FROM schedules_backup")
-
-            # 백업 테이블 삭제
-            cursor.execute("DROP TABLE schedules_backup")
-
-            conn.commit()
-            print("schedules 테이블 마이그레이션 완료")
-    except Exception as e:
-        print(f"마이그레이션 중 오류 (무시됨): {e}")
 
     # 스케줄 항목 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS schedule_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        schedule_id INTEGER,
-        item_id INTEGER,
-        quantity INTEGER DEFAULT 1,
-        price REAL,
-        discount REAL DEFAULT 0,
-        FOREIGN KEY (schedule_id) REFERENCES schedules (id),
-        FOREIGN KEY (item_id) REFERENCES items (id)
-    )
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        schedule_id INT,
+        item_id INT,
+        quantity INT DEFAULT 1,
+        price DECIMAL(10,2),
+        discount DECIMAL(5,2) DEFAULT 0,
+        FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE,
+        FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
     # 사용자 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        role TEXT DEFAULT 'user',
-        last_login TIMESTAMP,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        last_login TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
     # 설정 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        `key` VARCHAR(100) UNIQUE NOT NULL,
         value TEXT NOT NULL,
         description TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
     # 로그 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        action TEXT NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT,
+        action VARCHAR(255) NOT NULL,
         details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
     # 식품 유형 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS food_types (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type_name TEXT NOT NULL,
-        category TEXT,
-        sterilization TEXT,
-        pasteurization TEXT,
-        appearance TEXT,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type_name VARCHAR(255) NOT NULL,
+        category VARCHAR(100),
+        sterilization VARCHAR(100),
+        pasteurization VARCHAR(100),
+        appearance VARCHAR(255),
         test_items TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
     # 수수료 테이블
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS fees (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        test_item TEXT NOT NULL,
-        food_category TEXT,
-        price REAL NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_item VARCHAR(255) NOT NULL,
+        food_category VARCHAR(255),
+        price DECIMAL(10,2) NOT NULL,
         description TEXT,
+        sample_quantity INT DEFAULT 0,
+        display_order INT DEFAULT 100,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
 
-    # 수수료 테이블에 sample_quantity 컬럼 추가 (없는 경우)
-    try:
-        cursor.execute("ALTER TABLE fees ADD COLUMN sample_quantity INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass  # 이미 컬럼이 존재하는 경우
-    
+    conn.commit()
+
     # 기본 설정 데이터 삽입
     default_settings = [
         ('tax_rate', '10', '부가세율 (%)'),
@@ -348,22 +257,22 @@ def init_database():
         ('output_path', 'output', '기본 출력 파일 저장 경로'),
         ('template_path', 'templates', '템플릿 파일 경로')
     ]
-    
+
     for key, value, description in default_settings:
         cursor.execute('''
-        INSERT OR IGNORE INTO settings (key, value, description)
-        VALUES (?, ?, ?)
+        INSERT IGNORE INTO settings (`key`, value, description)
+        VALUES (%s, %s, %s)
         ''', (key, value, description))
-    
+
     # 관리자 계정 생성 (기본 비밀번호: admin123)
     cursor.execute('''
-    INSERT OR IGNORE INTO users (username, password, name, role)
-    VALUES (?, ?, ?, ?)
+    INSERT IGNORE INTO users (username, password, name, role)
+    VALUES (%s, %s, %s, %s)
     ''', ('admin', 'admin123', '관리자', 'admin'))
-    
+
     # 샘플 업체 데이터 (테이블이 비어있을 때만 삽입)
-    cursor.execute("SELECT COUNT(*) FROM clients")
-    if cursor.fetchone()[0] == 0:
+    cursor.execute("SELECT COUNT(*) as cnt FROM clients")
+    if cursor.fetchone()['cnt'] == 0:
         sample_clients = [
             ('계림농장', '김대표', '02-123-4567', '경기도 용인시 처인구', '김담당', '010-1234-5678', '박영업'),
             ('거성씨푸드', '이사장', '051-987-6543', '부산시 해운대구 우동', '최담당', '010-8765-4321', '정영업')
@@ -371,13 +280,13 @@ def init_database():
 
         for name, ceo, phone, address, contact, mobile, sales_rep in sample_clients:
             cursor.execute('''
-            INSERT OR IGNORE INTO clients (name, ceo, phone, address, contact_person, mobile, sales_rep)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (name, ceo, phone, address, contact_person, mobile, sales_rep)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ''', (name, ceo, phone, address, contact, mobile, sales_rep))
-    
+
     # 샘플 식품 유형 데이터 (테이블이 비어있을 때만 삽입)
-    cursor.execute("SELECT COUNT(*) FROM food_types")
-    if cursor.fetchone()[0] == 0:
+    cursor.execute("SELECT COUNT(*) as cnt FROM food_types")
+    if cursor.fetchone()['cnt'] == 0:
         sample_food_types = [
             ('일반제품', '일반', '살균', '멸균', '성상', '관능평가, 대장균군(정량), 세균수, 수분'),
             ('과채음료', '음료', '살균', '', '성상', '관능평가, 대장균군(정량), 세균수, pH'),
@@ -392,13 +301,13 @@ def init_database():
 
         for type_name, category, sterilization, pasteurization, appearance, test_items in sample_food_types:
             cursor.execute('''
-            INSERT OR IGNORE INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ''', (type_name, category, sterilization, pasteurization, appearance, test_items))
-    
+
     # 수수료 데이터가 비어있으면 cash_db.xlsx에서 자동 가져오기
-    cursor.execute("SELECT COUNT(*) FROM fees")
-    if cursor.fetchone()[0] == 0:
+    cursor.execute("SELECT COUNT(*) as cnt FROM fees")
+    if cursor.fetchone()['cnt'] == 0:
         # cash_db.xlsx 파일 찾기
         excel_paths = ['cash_db.xlsx', '../cash_db.xlsx', 'data/cash_db.xlsx']
         excel_file = None
@@ -412,12 +321,6 @@ def init_database():
                 import openpyxl
                 wb = openpyxl.load_workbook(excel_file)
                 ws = wb.active
-
-                # display_order 컬럼 추가 (없는 경우)
-                try:
-                    cursor.execute("ALTER TABLE fees ADD COLUMN display_order INTEGER DEFAULT 100")
-                except sqlite3.OperationalError:
-                    pass
 
                 # Excel 데이터 삽입 (첫 번째 행은 헤더)
                 inserted_count = 0
@@ -434,7 +337,7 @@ def init_database():
 
                     cursor.execute('''
                         INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     ''', (test_item, food_category, price, "", display_order, sample_qty))
                     inserted_count += 1
 
@@ -448,7 +351,13 @@ def init_database():
     conn.close()
 
     print("데이터베이스 초기화 완료!")
-        
+
 
 if __name__ == "__main__":
-    init_database()
+    # 연결 테스트
+    success, message = test_connection()
+    if success:
+        print(f"MySQL 서버 연결 성공!")
+        init_database()
+    else:
+        print(f"MySQL 서버 연결 실패: {message}")

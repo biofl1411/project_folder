@@ -1,0 +1,8 @@
+{
+    "host": "192.168.0.96",
+    "port": 3306,
+    "database": "foodlab",
+    "user": "foodlab",
+    "password": "foodlab1234",
+    "charset": "utf8mb4"
+}
