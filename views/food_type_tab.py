@@ -688,7 +688,7 @@ class FoodTypeTab(QWidget):
                     
                     # 데이터 삽입
                     cursor.execute(
-                        "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO food_types (type_name, category, sterilization, pasteurization, appearance, test_items) VALUES (%s, %s, %s, %s, %s, %s)",
                         (
                             food_type_data["type_name"],
                             food_type_data.get("category", ""),
@@ -919,9 +919,9 @@ class FoodTypeTab(QWidget):
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA database_list")
+            cursor.execute("SELECT DATABASE()")
             db_info = cursor.fetchone()
-            db_path = db_info[2] if db_info else "Unknown"
+            db_path = db_info['DATABASE()'] if db_info else "Unknown"
             conn.close()
             
             QMessageBox.information(

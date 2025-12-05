@@ -26,7 +26,7 @@ def get_status_settings():
         from database import get_connection
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'custom_statuses'")
+        cursor.execute("SELECT value FROM settings WHERE `key` = 'custom_statuses'")
         result = cursor.fetchone()
         conn.close()
 
@@ -1029,14 +1029,14 @@ class SettingsDialog(QDialog):
 
             for key, value in settings:
                 cursor.execute("""
-                    UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE key = ?
+                    UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE `key` = %s
                 """, (value, key))
 
                 # 없으면 새로 추가
                 if cursor.rowcount == 0:
                     cursor.execute("""
-                        INSERT INTO settings (key, value) VALUES (?, ?)
+                        INSERT INTO settings (`key`, value) VALUES (%s, %s)
                     """, (key, value))
 
             conn.commit()

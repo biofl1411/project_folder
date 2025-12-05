@@ -17,8 +17,8 @@ class Client:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(clients)")
-            columns = [col[1] for col in cursor.fetchall()]
+            cursor.execute("SHOW COLUMNS FROM clients")
+            columns = [col['Field'] for col in cursor.fetchall()]
             if 'detail_address' not in columns:
                 cursor.execute("ALTER TABLE clients ADD COLUMN detail_address TEXT")
                 conn.commit()
