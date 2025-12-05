@@ -133,7 +133,7 @@ class ActivityLog:
                 INSERT INTO activity_logs
                 (user_id, username, user_name, department, action_type, action_name,
                  target_type, target_id, target_name, details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 user.get('id'),
                 user.get('username', ''),
@@ -167,9 +167,9 @@ class ActivityLog:
 
             cursor.execute('''
                 SELECT * FROM activity_logs
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
+                LIMIT %s OFFSET %s
             ''', (user_id, limit, offset))
 
             logs = cursor.fetchall()
@@ -207,30 +207,30 @@ class ActivityLog:
 
             if filters:
                 if filters.get('user_id'):
-                    query += " AND user_id = ?"
+                    query += " AND user_id = %s"
                     params.append(filters['user_id'])
 
                 if filters.get('username'):
-                    query += " AND username LIKE ?"
+                    query += " AND username LIKE %s"
                     params.append(f"%{filters['username']}%")
 
                 if filters.get('action_type'):
-                    query += " AND action_type = ?"
+                    query += " AND action_type = %s"
                     params.append(filters['action_type'])
 
                 if filters.get('date_from'):
-                    query += " AND date(created_at) >= ?"
+                    query += " AND date(created_at) >= %s"
                     params.append(filters['date_from'])
 
                 if filters.get('date_to'):
-                    query += " AND date(created_at) <= ?"
+                    query += " AND date(created_at) <= %s"
                     params.append(filters['date_to'])
 
                 if filters.get('target_type'):
-                    query += " AND target_type = ?"
+                    query += " AND target_type = %s"
                     params.append(filters['target_type'])
 
-            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
             params.extend([limit, offset])
 
             cursor.execute(query, params)
@@ -256,23 +256,23 @@ class ActivityLog:
 
             if filters:
                 if filters.get('user_id'):
-                    query += " AND user_id = ?"
+                    query += " AND user_id = %s"
                     params.append(filters['user_id'])
 
                 if filters.get('username'):
-                    query += " AND username LIKE ?"
+                    query += " AND username LIKE %s"
                     params.append(f"%{filters['username']}%")
 
                 if filters.get('action_type'):
-                    query += " AND action_type = ?"
+                    query += " AND action_type = %s"
                     params.append(filters['action_type'])
 
                 if filters.get('date_from'):
-                    query += " AND date(created_at) >= ?"
+                    query += " AND date(created_at) >= %s"
                     params.append(filters['date_from'])
 
                 if filters.get('date_to'):
-                    query += " AND date(created_at) <= ?"
+                    query += " AND date(created_at) <= %s"
                     params.append(filters['date_to'])
 
             cursor.execute(query, params)
@@ -327,7 +327,7 @@ class ActivityLog:
 
             cursor.execute('''
                 DELETE FROM activity_logs
-                WHERE date(created_at) < ?
+                WHERE date(created_at) < %s
             ''', (cutoff_date,))
 
             deleted_count = cursor.rowcount

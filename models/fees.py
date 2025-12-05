@@ -38,7 +38,7 @@ class Fee:
         """검사 항목으로 수수료 조회"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM fees WHERE test_item = ?", (test_item,))
+        cursor.execute("SELECT * FROM fees WHERE test_item = %s", (test_item,))
         fee = cursor.fetchone()
         conn.close()
         return fee
@@ -50,7 +50,7 @@ class Fee:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (%s, %s, %s, %s, %s, %s)",
                 (test_item, food_category, price, description, display_order, sample_quantity)
             )
         except Exception as e:
@@ -67,7 +67,7 @@ class Fee:
                     pass
                 # 다시 삽입 시도
                 cursor.execute(
-                    "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity) VALUES (%s, %s, %s, %s, %s, %s)",
                     (test_item, food_category, price, description, display_order, sample_quantity)
                 )
             else:
@@ -85,7 +85,7 @@ class Fee:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                "UPDATE fees SET test_item = %s, food_category = %s, price = %s, description = %s, display_order = %s, sample_quantity = %s WHERE id = %s",
                 (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
             )
         except Exception as e:
@@ -102,7 +102,7 @@ class Fee:
                     pass
                 # 다시 업데이트 시도
                 cursor.execute(
-                    "UPDATE fees SET test_item = ?, food_category = ?, price = ?, description = ?, display_order = ?, sample_quantity = ? WHERE id = ?",
+                    "UPDATE fees SET test_item = %s, food_category = %s, price = %s, description = %s, display_order = %s, sample_quantity = %s WHERE id = %s",
                     (test_item, food_category, price, description, display_order or 100, sample_quantity or 0, fee_id)
                 )
             else:
@@ -118,7 +118,7 @@ class Fee:
         """수수료 삭제"""
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM fees WHERE id = ?", (fee_id,))
+        cursor.execute("DELETE FROM fees WHERE id = %s", (fee_id,))
         conn.commit()
         rowcount = cursor.rowcount
         conn.close()
@@ -141,7 +141,7 @@ class Fee:
 
         total_price = 0
         for item in items_list:
-            cursor.execute("SELECT price FROM fees WHERE test_item = ?", (item,))
+            cursor.execute("SELECT price FROM fees WHERE test_item = %s", (item,))
             fee = cursor.fetchone()
             if fee:
                 total_price += fee['price']
@@ -208,7 +208,7 @@ class Fee:
 
                 cursor.execute("""
                     INSERT INTO fees (test_item, food_category, price, description, display_order, sample_quantity)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, (test_item, food_category, price, "", display_order, sample_qty))
                 inserted_count += 1
 

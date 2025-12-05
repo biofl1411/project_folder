@@ -208,7 +208,7 @@ class User:
                 cursor.execute("""
                     SELECT id, username, password, name, role, department, permissions, is_active
                     FROM users
-                    WHERE username = ? AND password = ?
+                    WHERE username = %s AND password = %s
                 """, (username, password))
 
             user = cursor.fetchone()
@@ -222,7 +222,7 @@ class User:
 
                 # 마지막 로그인 시간 업데이트
                 cursor.execute("""
-                    UPDATE users SET last_login = ? WHERE id = ?
+                    UPDATE users SET last_login = %s WHERE id = %s
                 """, (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
                 conn.commit()
 
@@ -397,7 +397,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE users SET password = ? WHERE id = ?
+                UPDATE users SET password = %s WHERE id = %s
             """, (new_password, user_id))
             success = cursor.rowcount > 0
             conn.commit()
@@ -414,7 +414,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id FROM users WHERE id = ? AND password = ?
+                SELECT id FROM users WHERE id = %s AND password = %s
             """, (user_id, password))
             result = cursor.fetchone()
             conn.close()
@@ -429,7 +429,7 @@ class User:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             success = cursor.rowcount > 0
             conn.commit()
             conn.close()
@@ -474,12 +474,12 @@ class User:
             if activate:
                 # 활성화 시 초기 비밀번호로 설정
                 cursor.execute("""
-                    UPDATE users SET is_active = 1, password = ? WHERE id = ?
+                    UPDATE users SET is_active = 1, password = %s WHERE id = %s
                 """, (DEFAULT_PASSWORD, user_id))
             else:
                 # 비활성화
                 cursor.execute("""
-                    UPDATE users SET is_active = 0 WHERE id = ?
+                    UPDATE users SET is_active = 0 WHERE id = %s
                 """, (user_id,))
 
             success = cursor.rowcount > 0
