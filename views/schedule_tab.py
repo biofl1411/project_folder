@@ -41,7 +41,9 @@ class ScheduleDisplaySettingsDialog(QDialog):
         ('sampling_count', '샘플링횟수', False),
         ('report_type', '보고서종류', False),
         ('extension_test', '연장실험', False),
-        ('interim_date', '중간보고일', True),
+        ('report1_date', '중간보고1', True),
+        ('report2_date', '중간보고2', True),
+        ('report3_date', '중간보고3', True),
         # 포장/기타
         ('packaging', '포장단위', False),
         # 일정
@@ -269,7 +271,9 @@ class ScheduleTab(QWidget):
         ('sampling_count', '샘플링횟수', 'sampling_count'),
         ('report_type', '보고서종류', 'report_type'),
         ('extension_test', '연장실험', 'extension_test'),
-        ('interim_date', '중간보고일', 'interim_date'),
+        ('report1_date', '중간보고1', 'report1_date'),
+        ('report2_date', '중간보고2', 'report2_date'),
+        ('report3_date', '중간보고3', 'report3_date'),
         # 포장/기타
         ('packaging', '포장단위', 'packaging'),
         # 일정
@@ -448,7 +452,9 @@ class ScheduleTab(QWidget):
             'sampling_count': 70,
             'report_type': 100,
             'extension_test': 70,
-            'interim_date': 90,
+            'report1_date': 90,
+            'report2_date': 90,
+            'report3_date': 90,
             'packaging': 80,
             'start_date': 90,
             'end_date': 90,
@@ -692,36 +698,12 @@ class ScheduleTab(QWidget):
                             temp_text = temp_map.get(storage, '')
                             self.schedule_table.setItem(row, col_index, QTableWidgetItem(temp_text))
 
-                    elif col_key == 'interim_date':
-                        # 중간보고일 계산 (스케줄 관리 탭과 동일한 로직)
-                        report_interim = schedule.get('report_interim', False)
-                        start_date = schedule.get('start_date', '') or ''
-                        sampling_count = schedule.get('sampling_count', 6) or 6
-
-                        # 실험기간 계산
-                        test_method = schedule.get('test_method', 'real') or 'real'
-                        days = schedule.get('test_period_days', 0) or 0
-                        months = schedule.get('test_period_months', 0) or 0
-                        years = schedule.get('test_period_years', 0) or 0
-                        total_expiry_days = days + (months * 30) + (years * 365)
-
-                        if test_method in ['acceleration', 'custom_acceleration']:
-                            experiment_days = total_expiry_days // 2
-                        else:
-                            experiment_days = int(total_expiry_days * 1.5)
-
-                        interim_date_text = '-'
-                        if report_interim and start_date and experiment_days > 0 and sampling_count >= 6:
-                            try:
-                                from datetime import datetime, timedelta
-                                start = datetime.strptime(start_date, '%Y-%m-%d')
-                                interval = experiment_days // sampling_count
-                                interim_date = start + timedelta(days=interval * 6)
-                                interim_date_text = interim_date.strftime('%Y-%m-%d')
-                            except (ValueError, TypeError, ZeroDivisionError):
-                                interim_date_text = '-'
-
-                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(interim_date_text))
+                    elif col_key in ['report1_date', 'report2_date', 'report3_date']:
+                        # 중간보고 1, 2, 3 날짜 표시 (스케줄 관리에서 저장된 값)
+                        date_value = schedule.get(col_key, '') or ''
+                        if not date_value or date_value == '-':
+                            date_value = '-'
+                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(date_value))
 
                     elif col_key == 'sales_rep':
                         # 영업담당

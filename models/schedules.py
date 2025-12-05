@@ -24,7 +24,10 @@ class Schedule:
                 'report_date': 'TEXT',
                 'report1_date': 'TEXT',
                 'report2_date': 'TEXT',
-                'report3_date': 'TEXT'
+                'report3_date': 'TEXT',
+                'interim1_round': 'INTEGER DEFAULT 0',
+                'interim2_round': 'INTEGER DEFAULT 0',
+                'interim3_round': 'INTEGER DEFAULT 0'
             }
 
             for col_name, col_type in new_columns.items():

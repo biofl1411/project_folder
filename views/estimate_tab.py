@@ -413,6 +413,33 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addLayout(footer_layout)
 
+        # 8. 저장 버튼 (인쇄/메일 전송 시 숨김)
+        self.save_btn_widget = QWidget()
+        save_btn_layout = QHBoxLayout(self.save_btn_widget)
+        save_btn_layout.setContentsMargins(0, 10, 0, 0)
+        save_btn_layout.addStretch()
+
+        self.save_remark_btn = QPushButton("Remark 저장")
+        self.save_remark_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #219a52;
+            }
+        """)
+        self.save_remark_btn.clicked.connect(self.save_remark_content)
+        save_btn_layout.addWidget(self.save_remark_btn)
+        save_btn_layout.addStretch()
+
+        self.estimate_layout.addWidget(self.save_btn_widget)
+
     def add_separator(self):
         """구분선 추가"""
         separator = QFrame()
@@ -935,6 +962,19 @@ class EstimateTab(QWidget):
         """Remark 섹션 업데이트"""
         from datetime import datetime, timedelta
 
+        # 저장된 Remark 내용이 있는지 확인
+        field_name = {
+            'first': 'remark_first',
+            'suspend': 'remark_suspend',
+            'extend': 'remark_extend'
+        }.get(self.estimate_type, 'remark_first')
+
+        saved_remark = schedule.get(field_name, '') or ''
+        if saved_remark:
+            # 저장된 내용이 있으면 그대로 사용
+            self.remark_text.setPlainText(saved_remark)
+            return
+
         sampling_count = schedule.get('sampling_count', 6) or 6
         test_method = schedule.get('test_method', 'real')
 
@@ -1005,11 +1045,28 @@ class EstimateTab(QWidget):
             total_months += 1
 
         # 검사 소요기간 문구 생성
-        # 중간 보고서 날짜 가져오기 (스케쥴 관리에서)
+        # 중간 보고서 날짜 및 회차 정보 가져오기 (스케쥴 관리에서)
         report1_date = schedule.get('report1_date', '') or ''
         report2_date = schedule.get('report2_date', '') or ''
         report3_date = schedule.get('report3_date', '') or ''
+        interim1_round = schedule.get('interim1_round', 0) or 0
+        interim2_round = schedule.get('interim2_round', 0) or 0
+        interim3_round = schedule.get('interim3_round', 0) or 0
         report_interim = schedule.get('report_interim', False)
+
+        # 회차별 제조후 일수 계산 함수
+        def get_days_for_round(round_num):
+            if round_num <= 0 or sampling_count <= 0:
+                return 0
+            if round_num == 1:
+                return 0
+            if round_num >= sampling_count:
+                return total_experiment_days
+            # 중간 회차: 균등 분배
+            if sampling_count > 1:
+                interval = total_experiment_days / (sampling_count - 1)
+                return int(round((round_num - 1) * interval))
+            return 0
 
         test_period_text = ""
 
@@ -1018,17 +1075,20 @@ class EstimateTab(QWidget):
 
         # 중간 보고서 1 날짜가 있는 경우
         if report1_date and report1_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
+            days_for_interim1 = get_days_for_round(interim1_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim1}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
             has_report_dates = True
 
         # 중간 보고서 2 날짜가 있는 경우
         if report2_date and report2_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
+            days_for_interim2 = get_days_for_round(interim2_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim2}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
             has_report_dates = True
 
         # 중간 보고서 3 날짜가 있는 경우
         if report3_date and report3_date != '-':
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
+            days_for_interim3 = get_days_for_round(interim3_round)
+            test_period_text += f"→ 실험 기간 : {days_for_interim3}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
             has_report_dates = True
 
         # 날짜가 없고 report_interim이 체크된 경우 기존 로직 사용
@@ -1097,6 +1157,55 @@ class EstimateTab(QWidget):
 
         self.remark_text.setPlainText(remark_text)
 
+    def save_remark_content(self):
+        """Remark 내용 저장"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "저장 실패", "먼저 스케줄을 선택해주세요.")
+            return
+
+        try:
+            from database import get_connection
+
+            schedule_id = self.current_schedule.get('id')
+            if not schedule_id:
+                QMessageBox.warning(self, "저장 실패", "스케줄 ID를 찾을 수 없습니다.")
+                return
+
+            # Remark 내용 가져오기
+            remark_content = self.remark_text.toPlainText()
+
+            # 견적서 유형에 따라 다른 필드에 저장
+            field_name = {
+                'first': 'remark_first',
+                'suspend': 'remark_suspend',
+                'extend': 'remark_extend'
+            }.get(self.estimate_type, 'remark_first')
+
+            # 데이터베이스 업데이트
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 컬럼이 없으면 추가
+            cursor.execute("SHOW COLUMNS FROM schedules")
+            columns = [col['Field'] for col in cursor.fetchall()]
+            for col in ['remark_first', 'remark_suspend', 'remark_extend']:
+                if col not in columns:
+                    cursor.execute(f"ALTER TABLE schedules ADD COLUMN {col} TEXT")
+
+            cursor.execute(f"""
+                UPDATE schedules SET {field_name} = %s WHERE id = %s
+            """, (remark_content, schedule_id))
+
+            conn.commit()
+            conn.close()
+
+            QMessageBox.information(self, "저장 완료", "Remark 내용이 저장되었습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
     def print_estimate(self):
         """견적서 인쇄 - A4 사이즈 전체 활용"""
         from PyQt5.QtCore import QMarginsF
@@ -1114,6 +1223,9 @@ class EstimateTab(QWidget):
 
         dialog = QPrintDialog(printer, self)
         if dialog.exec_() == QPrintDialog.Accepted:
+            # 저장 버튼 숨기기
+            self.save_btn_widget.setVisible(False)
+
             painter = QPainter()
             if painter.begin(printer):
                 # 페이지 크기
@@ -1138,6 +1250,9 @@ class EstimateTab(QWidget):
                 painter.scale(scale, scale)
                 widget.render(painter)
                 painter.end()
+
+            # 저장 버튼 다시 표시
+            self.save_btn_widget.setVisible(True)
 
     def save_as_pdf(self):
         """PDF로 저장"""
@@ -1236,6 +1351,9 @@ class EstimateTab(QWidget):
 
         # PDF 생성
         try:
+            # 저장 버튼 숨기기
+            self.save_btn_widget.setVisible(False)
+
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
@@ -1283,7 +1401,12 @@ class EstimateTab(QWidget):
             else:
                 QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
 
+            # 저장 버튼 다시 표시
+            self.save_btn_widget.setVisible(True)
+
         except Exception as e:
+            # 저장 버튼 다시 표시
+            self.save_btn_widget.setVisible(True)
             QMessageBox.critical(self, "오류", f"PDF 저장 중 오류가 발생했습니다:\n{str(e)}")
 
     def save_as_excel(self):

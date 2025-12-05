@@ -2079,17 +2079,55 @@ class ScheduleManagementTab(QWidget):
         headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
         table.setHorizontalHeaderLabels(headers)
 
-        # 행 수: 날짜 + 제조후시간 + 검사항목들 + 1회기준
-        row_count = 2 + len(test_items) + 1
+        # 행 수: 중간보고서 + 날짜 + 제조후시간 + 검사항목들 + 1회기준
+        row_count = 3 + len(test_items) + 1
         table.setRowCount(row_count)
 
-        # 행 0: 날짜
+        # 행 0: 중간보고서 시점 선택
+        interim_label = QTableWidgetItem("중간보고서")
+        interim_label.setBackground(QColor('#E8D0FF'))  # 연보라색
+        table.setItem(0, 0, interim_label)
+
+        # 중간보고서 콤보박스 저장용 딕셔너리
+        if not hasattr(self, 'interim_report_combos'):
+            self.interim_report_combos = {}
+        else:
+            self.interim_report_combos.clear()
+
+        # 저장된 중간보고서 회차 선택값 가져오기
+        interim1_round = schedule.get('interim1_round', 0) or 0
+        interim2_round = schedule.get('interim2_round', 0) or 0
+        interim3_round = schedule.get('interim3_round', 0) or 0
+
+        for i in range(sampling_count):
+            col_idx = i + 1
+            combo = QComboBox()
+            combo.addItems(['', '1차', '2차', '3차'])
+            combo.setStyleSheet("font-size: 10px;")
+
+            # 저장된 값 복원
+            round_num = i + 1
+            if interim1_round == round_num:
+                combo.setCurrentText('1차')
+            elif interim2_round == round_num:
+                combo.setCurrentText('2차')
+            elif interim3_round == round_num:
+                combo.setCurrentText('3차')
+
+            combo.setProperty('round_col', col_idx)
+            combo.currentTextChanged.connect(self.on_interim_report_combo_changed)
+            self.interim_report_combos[col_idx] = combo
+            table.setCellWidget(0, col_idx, combo)
+
+        table.setItem(0, col_count - 1, QTableWidgetItem(""))
+
+        # 행 1: 날짜
         date_label = QTableWidgetItem("날짜")
         date_label.setBackground(QColor('#ADD8E6'))
-        table.setItem(0, 0, date_label)
+        table.setItem(1, 0, date_label)
 
-        # 각 회차별 날짜 저장 (제조후 일수 계산용)
-        sample_dates = {}
+        # 각 회차별 날짜 저장 (제조후 일수 계산용 + 중간보고서 날짜 계산용)
+        self.sample_dates = {}
 
         # 공휴일 목록 가져오기 (날짜 색상 결정용)
         holidays = set()
@@ -2104,7 +2142,7 @@ class ScheduleManagementTab(QWidget):
             if col_idx in self.custom_dates:
                 sample_date = self.custom_dates[col_idx]
                 date_value = sample_date.strftime('%Y-%m-%d')  # 연-월-일 형식
-                sample_dates[col_idx] = sample_date
+                self.sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
 
@@ -2126,7 +2164,7 @@ class ScheduleManagementTab(QWidget):
                     days_offset = round(i * interval_days)
                 sample_date = start_date + timedelta(days=days_offset)
                 date_value = sample_date.strftime('%Y-%m-%d')  # 연-월-일 형식
-                sample_dates[col_idx] = sample_date
+                self.sample_dates[col_idx] = sample_date
                 date_item = QTableWidgetItem(date_value)
                 date_item.setTextAlignment(Qt.AlignCenter)
 
@@ -2145,20 +2183,20 @@ class ScheduleManagementTab(QWidget):
                 date_item.setTextAlignment(Qt.AlignCenter)
                 date_item.setBackground(QColor('#E6F3FF'))
 
-            table.setItem(0, col_idx, date_item)
-        table.setItem(0, col_count - 1, QTableWidgetItem(""))
+            table.setItem(1, col_idx, date_item)
+        table.setItem(1, col_count - 1, QTableWidgetItem(""))
 
-        # 행 1: 제조후 일수
+        # 행 2: 제조후 일수
         time_item = QTableWidgetItem("제조후 일수")
         time_item.setBackground(QColor('#90EE90'))
-        table.setItem(1, 0, time_item)
+        table.setItem(2, 0, time_item)
 
         for i in range(sampling_count):
             col_idx = i + 1
 
-            # sample_dates에 날짜가 있으면 시작일로부터 일수 계산
-            if col_idx in sample_dates and start_date:
-                days_elapsed = (sample_dates[col_idx] - start_date).days
+            # self.sample_dates에 날짜가 있으면 시작일로부터 일수 계산
+            if col_idx in self.sample_dates and start_date:
+                days_elapsed = (self.sample_dates[col_idx] - start_date).days
                 # 사용자 정의 날짜인 경우 강조 표시
                 is_custom = col_idx in self.custom_dates
             else:
@@ -2174,14 +2212,14 @@ class ScheduleManagementTab(QWidget):
             item.setTextAlignment(Qt.AlignCenter)
             if is_custom:
                 item.setBackground(QColor('#FFE4B5'))  # 수정된 값 강조
-            table.setItem(1, col_idx, item)
-        table.setItem(1, col_count - 1, QTableWidgetItem(""))
+            table.setItem(2, col_idx, item)
+        table.setItem(2, col_count - 1, QTableWidgetItem(""))
 
         total_price_per_test = 0
         for row_idx, test_item in enumerate(test_items):
             item_label = QTableWidgetItem(test_item)
             item_label.setBackground(QColor('#90EE90'))
-            table.setItem(row_idx + 2, 0, item_label)  # +2 because of date and time rows
+            table.setItem(row_idx + 3, 0, item_label)  # +3 because of interim, date and time rows
 
             # 저장된 O/X 상태 불러오기
             saved_row_data = self.saved_experiment_data.get(test_item, [])
@@ -2194,13 +2232,13 @@ class ScheduleManagementTab(QWidget):
                     check_value = "O"
                 check_item = QTableWidgetItem(check_value)
                 check_item.setTextAlignment(Qt.AlignCenter)
-                table.setItem(row_idx + 2, i + 1, check_item)
+                table.setItem(row_idx + 3, i + 1, check_item)
 
             price = int(fees.get(test_item, 0))
             total_price_per_test += price
             price_item = QTableWidgetItem(f"{price:,}")
             price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            table.setItem(row_idx + 2, col_count - 1, price_item)
+            table.setItem(row_idx + 3, col_count - 1, price_item)
 
         basis_item = QTableWidgetItem("(1회 기준)")
         basis_item.setBackground(QColor('#FFFF99'))
@@ -2607,6 +2645,14 @@ class ScheduleManagementTab(QWidget):
             # 실제 실험일수 (날짜 수정 시 계산된 값)
             actual_experiment_days = self.current_schedule.get('actual_experiment_days')
 
+            # 중간보고서 날짜 및 회차 정보
+            report1_date = self.current_schedule.get('report1_date', '') or ''
+            report2_date = self.current_schedule.get('report2_date', '') or ''
+            report3_date = self.current_schedule.get('report3_date', '') or ''
+            interim1_round = self.current_schedule.get('interim1_round', 0) or 0
+            interim2_round = self.current_schedule.get('interim2_round', 0) or 0
+            interim3_round = self.current_schedule.get('interim3_round', 0) or 0
+
             # 데이터베이스 업데이트
             conn = get_connection()
             cursor = conn.cursor()
@@ -2620,10 +2666,18 @@ class ScheduleManagementTab(QWidget):
                     report_interim = %s,
                     start_date = %s,
                     custom_dates = %s,
-                    actual_experiment_days = %s
+                    actual_experiment_days = %s,
+                    report1_date = %s,
+                    report2_date = %s,
+                    report3_date = %s,
+                    interim1_round = %s,
+                    interim2_round = %s,
+                    interim3_round = %s
                 WHERE id = %s
             """, (additional_items_json, removed_items_json, experiment_data_json,
-                  status, report_interim, start_date, custom_dates_json, actual_experiment_days, schedule_id))
+                  status, report_interim, start_date, custom_dates_json, actual_experiment_days,
+                  report1_date, report2_date, report3_date,
+                  interim1_round, interim2_round, interim3_round, schedule_id))
 
             conn.commit()
             conn.close()
@@ -2655,8 +2709,8 @@ class ScheduleManagementTab(QWidget):
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
         row_count = self.experiment_table.rowCount()
 
-        # 검사항목 행 (행 2부터 마지막 가격 행 제외)
-        for row in range(2, row_count - 1):
+        # 검사항목 행 (행 3부터 마지막 가격 행 제외 - 중간보고서, 날짜, 제조후일수 행 다음)
+        for row in range(3, row_count - 1):
             item_cell = self.experiment_table.item(row, 0)
             if not item_cell:
                 continue
@@ -2933,6 +2987,95 @@ class ScheduleManagementTab(QWidget):
 
         except ValueError:
             self.extend_experiment_period_value.setText("-")
+
+    def add_business_days(self, start_date, num_days):
+        """영업일 기준으로 날짜 계산 (주말 및 공휴일 제외)"""
+        from datetime import timedelta
+
+        holidays = get_korean_holidays(start_date.year)
+        holidays.update(get_korean_holidays(start_date.year + 1))
+
+        current_date = start_date
+        days_added = 0
+
+        while days_added < num_days:
+            current_date += timedelta(days=1)
+            # 주말(토=5, 일=6) 또는 공휴일이면 건너뜀
+            current_date_only = current_date.date() if hasattr(current_date, 'date') else current_date
+            if current_date.weekday() < 5 and current_date_only not in holidays:
+                days_added += 1
+
+        return current_date
+
+    def on_interim_report_combo_changed(self, text):
+        """중간보고서 시점 선택 변경 시 처리"""
+        if not self.current_schedule:
+            return
+
+        sender = self.sender()
+        if not sender:
+            return
+
+        col_idx = sender.property('round_col')
+        if col_idx is None:
+            return
+
+        round_num = col_idx  # 회차 번호 (1, 2, 3, ...)
+
+        # 다른 콤보박스에서 같은 값이 선택되어 있으면 해제
+        if text:
+            for idx, combo in self.interim_report_combos.items():
+                if idx != col_idx and combo.currentText() == text:
+                    combo.blockSignals(True)
+                    combo.setCurrentText('')
+                    combo.blockSignals(False)
+
+        # 선택된 회차의 날짜 가져오기
+        if col_idx in self.sample_dates and text:
+            sample_date = self.sample_dates[col_idx]
+            # 영업일 기준 +15일 계산
+            report_date = self.add_business_days(sample_date, 15)
+            report_date_str = report_date.strftime('%Y-%m-%d')
+
+            # 해당 중간보고서 날짜 업데이트
+            if text == '1차':
+                self.report1_value.setText(report_date_str)
+                if self.current_schedule:
+                    self.current_schedule['report1_date'] = report_date_str
+                    self.current_schedule['interim1_round'] = round_num
+            elif text == '2차':
+                self.report2_value.setText(report_date_str)
+                if self.current_schedule:
+                    self.current_schedule['report2_date'] = report_date_str
+                    self.current_schedule['interim2_round'] = round_num
+            elif text == '3차':
+                self.report3_value.setText(report_date_str)
+                if self.current_schedule:
+                    self.current_schedule['report3_date'] = report_date_str
+                    self.current_schedule['interim3_round'] = round_num
+        else:
+            # 선택 해제된 경우 해당 보고서 날짜 초기화
+            if text == '' and self.current_schedule:
+                # 어떤 보고서가 해제되었는지 확인
+                for report_num in ['1차', '2차', '3차']:
+                    found = False
+                    for idx, combo in self.interim_report_combos.items():
+                        if combo.currentText() == report_num:
+                            found = True
+                            break
+                    if not found:
+                        if report_num == '1차':
+                            self.report1_value.setText('-')
+                            self.current_schedule['report1_date'] = ''
+                            self.current_schedule['interim1_round'] = 0
+                        elif report_num == '2차':
+                            self.report2_value.setText('-')
+                            self.current_schedule['report2_date'] = ''
+                            self.current_schedule['interim2_round'] = 0
+                        elif report_num == '3차':
+                            self.report3_value.setText('-')
+                            self.current_schedule['report3_date'] = ''
+                            self.current_schedule['interim3_round'] = 0
 
     def on_extend_rounds_changed(self):
         """연장 회차 변경 시 스케줄 테이블 업데이트"""
@@ -3243,14 +3386,18 @@ class ScheduleManagementTab(QWidget):
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
 
-        # 행 0: 날짜 클릭 시 달력으로 날짜 수정
-        if row == 0 and col >= 1 and col <= sampling_count:
+        # 행 0: 중간보고서 - 콤보박스가 있으므로 클릭 무시
+        if row == 0:
+            return
+
+        # 행 1: 날짜 클릭 시 달력으로 날짜 수정
+        if row == 1 and col >= 1 and col <= sampling_count:
             self.edit_date_with_calendar(col)
             return
 
-        # 검사항목 행 범위 확인 (행 2부터 마지막 행-1까지가 검사항목)
-        # 행 0: 날짜, 행 1: 제조후 일수, 행 2~n-1: 검사항목, 행 n: 1회 기준
-        test_item_start_row = 2
+        # 검사항목 행 범위 확인 (행 3부터 마지막 행-1까지가 검사항목)
+        # 행 0: 중간보고서, 행 1: 날짜, 행 2: 제조후 일수, 행 3~n-1: 검사항목, 행 n: 1회 기준
+        test_item_start_row = 3
         test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
 
         # 검사항목 셀만 토글 가능 (열 1~sampling_count)
