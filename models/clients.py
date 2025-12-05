@@ -107,10 +107,10 @@ class Client:
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM clients")
-            count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) as cnt FROM clients")
+            result = cursor.fetchone()
             conn.close()
-            return count
+            return result['cnt'] if result else 0
         except Exception as e:
             print(f"업체 수 조회 중 오류: {str(e)}")
             return 0
@@ -164,8 +164,9 @@ class Client:
                 where_clause = "WHERE " + " AND ".join(where_conditions)
 
             # 총 개수 조회
-            cursor.execute(f"SELECT COUNT(*) FROM clients {where_clause}", params)
-            total_count = cursor.fetchone()[0]
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM clients {where_clause}", params)
+            result = cursor.fetchone()
+            total_count = result['cnt'] if result else 0
 
             # 데이터 조회
             cursor.execute(f"""
