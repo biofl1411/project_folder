@@ -359,63 +359,24 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addWidget(self.items_table)
 
-        # 5. Remark 섹션 (스크롤 없이 전체 표시)
+        # 5. Remark 섹션 (편집 가능)
         remark_group = QGroupBox("※ Remark")
         remark_layout = QVBoxLayout(remark_group)
 
-        self.remark_text = QLabel()
-        self.remark_text.setWordWrap(True)
+        self.remark_text = QTextEdit()
         self.remark_text.setStyleSheet("""
-            QLabel {
+            QTextEdit {
                 font-size: 11px;
                 line-height: 1.4;
                 padding: 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
             }
         """)
+        self.remark_text.setMinimumHeight(200)
         remark_layout.addWidget(self.remark_text)
 
         self.estimate_layout.addWidget(remark_group)
-
-        # 6. 메모 섹션 (사용자 입력 가능)
-        memo_group = QGroupBox("※ 메모")
-        memo_layout = QVBoxLayout(memo_group)
-
-        # 메모 입력 영역
-        self.memo_text = QTextEdit()
-        self.memo_text.setPlaceholderText("추가 메모를 입력하세요 (선택사항)")
-        self.memo_text.setMaximumHeight(80)
-        self.memo_text.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                padding: 5px;
-                font-size: 11px;
-            }
-        """)
-        memo_layout.addWidget(self.memo_text)
-
-        # 메모 버튼 영역
-        memo_btn_layout = QHBoxLayout()
-        memo_btn_layout.addStretch()
-
-        self.memo_delete_btn = QPushButton("메모 삭제")
-        self.memo_delete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
-                padding: 5px 15px;
-                border: none;
-                border-radius: 3px;
-            }
-            QPushButton:hover {
-                background-color: #d32f2f;
-            }
-        """)
-        self.memo_delete_btn.clicked.connect(self.delete_memo)
-        memo_btn_layout.addWidget(self.memo_delete_btn)
-
-        memo_layout.addLayout(memo_btn_layout)
-        self.estimate_layout.addWidget(memo_group)
 
         # 6. 합계 금액
         total_frame = QFrame()
@@ -987,6 +948,11 @@ class EstimateTab(QWidget):
 
         total_samples = sampling_count * zone_count
 
+        # 연장실험 여부 확인 (연장×2)
+        extension_test = schedule.get('extension_test', 0)
+        if extension_test:
+            total_samples = total_samples * 2
+
         # 포장단위 정보 가져오기
         packaging_weight = schedule.get('packaging_weight', 0) or 0
         packaging_unit = schedule.get('packaging_unit', 'g') or 'g'
@@ -1039,13 +1005,24 @@ class EstimateTab(QWidget):
             total_months += 1
 
         # 검사 소요기간 문구 생성
-        report_interim = schedule.get('report_interim', False)
+        # 중간 보고서 날짜 가져오기 (스케쥴 관리에서)
+        report1_date = schedule.get('report1_date', '') or ''
+        report2_date = schedule.get('report2_date', '') or ''
+        report3_date = schedule.get('report3_date', '') or ''
 
         test_period_text = ""
-        # 중간보고서가 체크된 경우에만 중간보고서 라인 추가
-        if report_interim:
-            interim_date_text = f" / {interim_expected_date}" if interim_expected_date else ""
-            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. ({total_months // 2}개월 중간 보고서{interim_date_text})\n"
+
+        # 중간 보고서 1 날짜가 있는 경우
+        if report1_date and report1_date != '-':
+            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
+
+        # 중간 보고서 2 날짜가 있는 경우
+        if report2_date and report2_date != '-':
+            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
+
+        # 중간 보고서 3 날짜가 있는 경우
+        if report3_date and report3_date != '-':
+            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
 
         # 최종 보고서 라인
         final_date_text = f" / {final_expected_date}" if final_expected_date else ""
@@ -1104,10 +1081,9 @@ class EstimateTab(QWidget):
 * 견적 금액은 검사비용 외 보관비 및 보고서작성 비용 포함입니다.
 * 지표 항목의 수정(추가)이나 삭제가 필요한 경우 사전 연락을 해주시고 문의사항은 연락 바랍니다.
 * 온도 구간별 1회 시험을 하며, 반복 실험이 필요한 경우 연락 바랍니다.
-
 * 소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다."""
 
-        self.remark_text.setText(remark_text)
+        self.remark_text.setPlainText(remark_text)
 
     def print_estimate(self):
         """견적서 인쇄 - A4 사이즈 전체 활용"""
@@ -1760,23 +1736,6 @@ class EstimateTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"PDF 저장 중 오류: {str(e)}")
             return None
-
-    def delete_memo(self):
-        """메모 삭제"""
-        if not self.memo_text.toPlainText().strip():
-            QMessageBox.information(self, "알림", "삭제할 메모가 없습니다.")
-            return
-
-        reply = QMessageBox.question(
-            self, "메모 삭제",
-            "작성된 메모를 삭제하시겠습니까?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            self.memo_text.clear()
-            QMessageBox.information(self, "완료", "메모가 삭제되었습니다.")
 
     def switch_estimate_type(self, estimate_type):
         """견적서 유형 전환 (1차, 중단, 연장)"""
