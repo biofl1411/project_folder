@@ -373,7 +373,7 @@ class EstimateTab(QWidget):
                 border-radius: 3px;
             }
         """)
-        self.remark_text.setMinimumHeight(200)
+        self.remark_text.setMinimumHeight(300)
         remark_layout.addWidget(self.remark_text)
 
         self.estimate_layout.addWidget(remark_group)
@@ -1009,20 +1009,32 @@ class EstimateTab(QWidget):
         report1_date = schedule.get('report1_date', '') or ''
         report2_date = schedule.get('report2_date', '') or ''
         report3_date = schedule.get('report3_date', '') or ''
+        report_interim = schedule.get('report_interim', False)
 
         test_period_text = ""
+
+        # 중간 보고서 날짜가 있는 경우 (스케쥴 관리에서 입력된 날짜 사용)
+        has_report_dates = False
 
         # 중간 보고서 1 날짜가 있는 경우
         if report1_date and report1_date != '-':
             test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 1 / {report1_date})\n"
+            has_report_dates = True
 
         # 중간 보고서 2 날짜가 있는 경우
         if report2_date and report2_date != '-':
             test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 2 / {report2_date})\n"
+            has_report_dates = True
 
         # 중간 보고서 3 날짜가 있는 경우
         if report3_date and report3_date != '-':
             test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. (중간 보고서 3 / {report3_date})\n"
+            has_report_dates = True
+
+        # 날짜가 없고 report_interim이 체크된 경우 기존 로직 사용
+        if not has_report_dates and report_interim:
+            interim_date_text = f" / {interim_expected_date}" if interim_expected_date else ""
+            test_period_text += f"→ 실험 기간 : {interim_experiment_days}일 + 데이터 분석시간(약 7일~15일) 소요 예정입니다. ({total_months}개월 중간 보고서{interim_date_text})\n"
 
         # 최종 보고서 라인
         final_date_text = f" / {final_expected_date}" if final_expected_date else ""
