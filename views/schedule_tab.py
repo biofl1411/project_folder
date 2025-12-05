@@ -14,7 +14,7 @@ from PyQt5.QtGui import QColor
 
 # ScheduleCreateDialog 클래스를 schedule_dialog.py에서 임포트
 from .schedule_dialog import ScheduleCreateDialog
-from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
+from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_text_colors, get_status_names, get_status_code_by_name
 from utils.logger import log_message, log_error, log_exception
 
 
@@ -614,15 +614,11 @@ class ScheduleTab(QWidget):
                         self.schedule_table.setItem(row, col_index, QTableWidgetItem(f"{test_days}일" if test_days > 0 else ''))
 
                     elif col_key == 'report_type':
-                        # 보고서 종류
-                        types = []
+                        # 보고서 종류 - 중간보고서만 표시
                         if schedule.get('report_interim'):
-                            types.append('중간')
-                        if schedule.get('report_korean'):
-                            types.append('국문')
-                        if schedule.get('report_english'):
-                            types.append('영문')
-                        self.schedule_table.setItem(row, col_index, QTableWidgetItem(', '.join(types)))
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem('중간'))
+                        else:
+                            self.schedule_table.setItem(row, col_index, QTableWidgetItem('-'))
 
                     elif col_key == 'extension_test':
                         # 연장실험
@@ -649,14 +645,17 @@ class ScheduleTab(QWidget):
                         status = schedule.get('status', 'pending') or 'pending'
                         status_map = get_status_map()
                         status_colors = get_status_colors()
+                        status_text_colors = get_status_text_colors()
                         status_text = status_map.get(status, status)
                         status_item = QTableWidgetItem(status_text)
                         # 커스텀 색상 적용
                         if status in status_colors:
-                            color = QColor(status_colors[status])
-                            status_item.setBackground(color)
-                            # 배경색이 어두우면 흰색 글씨, 밝으면 검정색 글씨
-                            if color.lightness() < 128:
+                            bg_color = QColor(status_colors[status])
+                            status_item.setBackground(bg_color)
+                            # text_color가 있으면 사용, 없으면 자동 계산
+                            if status in status_text_colors:
+                                status_item.setForeground(QColor(status_text_colors[status]))
+                            elif bg_color.lightness() < 128:
                                 status_item.setForeground(QColor('#FFFFFF'))
                             else:
                                 status_item.setForeground(QColor('#000000'))

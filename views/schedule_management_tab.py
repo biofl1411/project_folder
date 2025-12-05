@@ -1364,41 +1364,53 @@ class ScheduleManagementTab(QWidget):
         grid.addWidget(self.temp_zone3_value, 5, 7)
 
         # 행 7: 연장기간, 연장 실험기간, 연장 회차
-        extension_label_style = "font-weight: bold; background-color: #e8f8f5; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
-        extension_value_style = "background-color: white; padding: 1px; border: 1px solid #1abc9c; font-size: 11px;"
+        extension_label_style = "font-weight: bold; background-color: #e8f8f5; padding: 2px; border: 1px solid #1abc9c; font-size: 11px;"
+        extension_value_style = "background-color: white; padding: 2px; border: 1px solid #1abc9c; font-size: 11px;"
 
         self.extend_period_label = self._create_label("연장기간", extension_label_style)
         grid.addWidget(self.extend_period_label, 6, 0)
 
-        # 연장기간 입력 위젯 (일, 월, 년)
+        # 연장기간 입력 위젯 (일, 월, 년) - 1.5배 크기
         extend_period_widget = QWidget()
         extend_period_layout = QHBoxLayout(extend_period_widget)
-        extend_period_layout.setContentsMargins(2, 0, 2, 0)
-        extend_period_layout.setSpacing(2)
+        extend_period_layout.setContentsMargins(2, 2, 2, 2)
+        extend_period_layout.setSpacing(3)
 
         self.extend_days_input = QLineEdit()
-        self.extend_days_input.setFixedWidth(30)
+        self.extend_days_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_days_input.setFixedHeight(24)  # 높이도 키움
         self.extend_days_input.setAlignment(Qt.AlignCenter)
         self.extend_days_input.setPlaceholderText("0")
+        self.extend_days_input.setStyleSheet("font-size: 12px;")
         self.extend_days_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_days_input)
-        extend_period_layout.addWidget(QLabel("일"))
+        day_label = QLabel("일")
+        day_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(day_label)
 
         self.extend_months_input = QLineEdit()
-        self.extend_months_input.setFixedWidth(30)
+        self.extend_months_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_months_input.setFixedHeight(24)
         self.extend_months_input.setAlignment(Qt.AlignCenter)
         self.extend_months_input.setPlaceholderText("0")
+        self.extend_months_input.setStyleSheet("font-size: 12px;")
         self.extend_months_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_months_input)
-        extend_period_layout.addWidget(QLabel("월"))
+        month_label = QLabel("월")
+        month_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(month_label)
 
         self.extend_years_input = QLineEdit()
-        self.extend_years_input.setFixedWidth(30)
+        self.extend_years_input.setFixedWidth(45)  # 30 * 1.5 = 45
+        self.extend_years_input.setFixedHeight(24)
         self.extend_years_input.setAlignment(Qt.AlignCenter)
         self.extend_years_input.setPlaceholderText("0")
+        self.extend_years_input.setStyleSheet("font-size: 12px;")
         self.extend_years_input.textChanged.connect(self.on_extend_period_changed)
         extend_period_layout.addWidget(self.extend_years_input)
-        extend_period_layout.addWidget(QLabel("년"))
+        year_label = QLabel("년")
+        year_label.setStyleSheet("font-size: 12px;")
+        extend_period_layout.addWidget(year_label)
         extend_period_layout.addStretch()
 
         grid.addWidget(extend_period_widget, 6, 1, 1, 3)
@@ -1409,22 +1421,26 @@ class ScheduleManagementTab(QWidget):
         self.extend_experiment_period_value = self._create_value_label("-", extension_value_style)
         grid.addWidget(self.extend_experiment_period_value, 6, 5)
 
-        # 연장 회차
+        # 연장 회차 - 1.5배 크기
         self.extend_rounds_label = self._create_label("연장회차", extension_label_style)
         grid.addWidget(self.extend_rounds_label, 6, 6)
 
         extend_rounds_widget = QWidget()
         extend_rounds_layout = QHBoxLayout(extend_rounds_widget)
-        extend_rounds_layout.setContentsMargins(2, 0, 2, 0)
-        extend_rounds_layout.setSpacing(2)
+        extend_rounds_layout.setContentsMargins(2, 2, 2, 2)
+        extend_rounds_layout.setSpacing(3)
 
         self.extend_rounds_input = QLineEdit()
-        self.extend_rounds_input.setFixedWidth(40)
+        self.extend_rounds_input.setFixedWidth(60)  # 40 * 1.5 = 60
+        self.extend_rounds_input.setFixedHeight(24)
         self.extend_rounds_input.setAlignment(Qt.AlignCenter)
         self.extend_rounds_input.setPlaceholderText("0")
+        self.extend_rounds_input.setStyleSheet("font-size: 12px;")
         self.extend_rounds_input.textChanged.connect(self.on_extend_rounds_changed)
         extend_rounds_layout.addWidget(self.extend_rounds_input)
-        extend_rounds_layout.addWidget(QLabel("회"))
+        rounds_label = QLabel("회")
+        rounds_label.setStyleSheet("font-size: 12px;")
+        extend_rounds_layout.addWidget(rounds_label)
         extend_rounds_layout.addStretch()
 
         grid.addWidget(extend_rounds_widget, 6, 7)
@@ -2392,6 +2408,16 @@ class ScheduleManagementTab(QWidget):
         except Exception as e:
             print(f"비용 정보 추가 중 오류: {e}")
 
+        # 완료 회차 정보 추가 (중단 견적서용)
+        schedule_data['completed_rounds'] = self.count_completed_rounds()
+
+        # 연장 회차 정보 추가 (연장 견적서용)
+        try:
+            extend_rounds = int(self.extend_rounds_input.text() or 0)
+            schedule_data['extend_rounds'] = extend_rounds
+        except (ValueError, AttributeError):
+            schedule_data['extend_rounds'] = 0
+
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
 
@@ -3251,6 +3277,46 @@ class ScheduleManagementTab(QWidget):
 
         # 비용 재계산
         self.recalculate_costs()
+
+    def count_completed_rounds(self):
+        """온도조건별 실험 테이블에서 완료된(O 표시된) 회차 수를 계산
+
+        중단 견적서에서 실제 완료된 회차만 정산하기 위해 사용
+        각 회차(열)에서 최소 하나의 검사항목에 O 표시가 있으면 완료로 간주
+        """
+        if not hasattr(self, 'experiment_table') or not self.current_schedule:
+            return 0
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # 검사항목 행 범위 (행 2부터 마지막-1 행까지)
+        test_item_start_row = 2
+        test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
+
+        if test_item_end_row < test_item_start_row:
+            return 0
+
+        completed_rounds = 0
+
+        # 각 회차(열) 확인
+        for col in range(1, sampling_count + 1):
+            has_completed_item = False
+
+            # 해당 회차의 모든 검사항목 확인
+            for row in range(test_item_start_row, test_item_end_row + 1):
+                item = table.item(row, col)
+                if item and item.text() == 'O':
+                    has_completed_item = True
+                    break
+
+            if has_completed_item:
+                completed_rounds += 1
+            else:
+                # O 표시가 없는 첫 회차에서 중단 (연속된 완료 회차만 카운트)
+                break
+
+        return completed_rounds
 
     def edit_date_with_calendar(self, col):
         """달력을 통해 날짜 수정 - 1회차 날짜 변경 시 시작일도 연동"""

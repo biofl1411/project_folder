@@ -13,13 +13,13 @@ def get_status_settings():
     """데이터베이스에서 상태 설정을 가져옴
 
     Returns:
-        list: [{'code': 'pending', 'name': '대기', 'color': '#FFFFFF'}, ...]
+        list: [{'code': 'pending', 'name': '대기', 'color': '#FFFFFF', 'text_color': '#333333'}, ...]
     """
     default_statuses = [
-        {'code': 'pending', 'name': '대기', 'color': '#FFFFFF'},
-        {'code': 'scheduled', 'name': '입고예정', 'color': '#00FFFF'},
-        {'code': 'received', 'name': '입고', 'color': '#FFFF00'},
-        {'code': 'completed', 'name': '종료', 'color': '#00FF00'},
+        {'code': 'pending', 'name': '대기', 'color': '#FFFFFF', 'text_color': '#2196F3'},      # 파란색 글씨
+        {'code': 'received', 'name': '입고', 'color': '#FFFFFF', 'text_color': '#4CAF50'},     # 초록색 글씨
+        {'code': 'suspended', 'name': '중단', 'color': '#FFFFFF', 'text_color': '#FF9800'},    # 주황색 글씨
+        {'code': 'completed', 'name': '완료', 'color': '#FFFFFF', 'text_color': '#9C27B0'},    # 보라색 글씨
     ]
 
     try:
@@ -50,13 +50,23 @@ def get_status_map():
 
 
 def get_status_colors():
-    """상태 코드 -> 색상 매핑 반환
+    """상태 코드 -> 배경색상 매핑 반환
 
     Returns:
-        dict: {'pending': '#FFFFFF', 'scheduled': '#00FFFF', ...}
+        dict: {'pending': '#FFFFFF', 'received': '#FFFFFF', ...}
     """
     statuses = get_status_settings()
     return {s['code']: s['color'] for s in statuses}
+
+
+def get_status_text_colors():
+    """상태 코드 -> 글자색상 매핑 반환
+
+    Returns:
+        dict: {'pending': '#2196F3', 'received': '#4CAF50', ...}
+    """
+    statuses = get_status_settings()
+    return {s['code']: s.get('text_color', '#333333') for s in statuses}
 
 
 def get_status_names():
@@ -722,11 +732,14 @@ class SettingsDialog(QDialog):
         for status in self.custom_statuses:
             item = QListWidgetItem(f"{status['name']} ({status['code']})")
             item.setData(Qt.UserRole, status)
-            # 색상 표시
-            color = QColor(status.get('color', '#FFFFFF'))
-            item.setBackground(color)
-            # 대비되는 텍스트 색상
-            if color.lightness() < 128:
+            # 배경색 표시
+            bg_color = QColor(status.get('color', '#FFFFFF'))
+            item.setBackground(bg_color)
+            # 글자색 표시 (text_color가 있으면 사용, 없으면 자동 계산)
+            text_color = status.get('text_color', '')
+            if text_color:
+                item.setForeground(QColor(text_color))
+            elif bg_color.lightness() < 128:
                 item.setForeground(QColor('#FFFFFF'))
             self.status_list_widget.addItem(item)
 
