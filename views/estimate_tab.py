@@ -728,7 +728,38 @@ class EstimateTab(QWidget):
             # 여러 온도는 슬래시로 구분하여 한 줄에 표시
             temp_str = " / ".join([f"{t}℃" for t in temps])
 
-        food_type_text = f"""{food_type}
+        # 견적 유형에 따라 표시 내용 변경
+        if self.estimate_type == "suspend":
+            # 중단 견적서: 완료 회차 표시
+            completed_rounds = schedule.get('completed_rounds', 0)
+            if completed_rounds is None or completed_rounds == 0:
+                completed_rounds = max(1, sampling_count // 2)  # 기본값
+            food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temp_str}
+※ 중단 정산
+완료 회차: {completed_rounds}회 / 전체 {sampling_count}회
+실험 주기: {experiment_interval}일"""
+        elif self.estimate_type == "extend":
+            # 연장 견적서: 연장 회차 표시
+            extend_rounds = schedule.get('extend_rounds', 0)
+            if extend_rounds is None or extend_rounds == 0:
+                extend_rounds = 3  # 기본값
+            food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temp_str}
+※ 연장 실험
+연장 회차: {extend_rounds}회
+실험 주기: {experiment_interval}일"""
+        else:
+            # 1차 견적서: 기존 내용
+            food_type_text = f"""{food_type}
 
 소비기한 : {storage} {period_str}
 시험기간 : {test_duration}
@@ -802,7 +833,13 @@ class EstimateTab(QWidget):
         # 견적 유형에 따른 계산
         if self.estimate_type == "suspend":
             # 중단 견적: 완료된 회차만 계산
-            completed = completed_rounds if completed_rounds else schedule.get('completed_rounds', 3) or 3
+            if completed_rounds is not None:
+                completed = completed_rounds
+            else:
+                completed = schedule.get('completed_rounds', 0)
+                # 완료 회차가 없으면 기본값으로 전체 회차의 절반 사용
+                if completed is None or completed == 0:
+                    completed = max(1, sampling_count // 2)
             return self._calculate_suspend_price(schedule, completed, zone_count)
         elif self.estimate_type == "extend":
             # 연장 견적: 연장 비용만 계산
@@ -866,8 +903,10 @@ class EstimateTab(QWidget):
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 연장 실험: 기본 3회차 추가로 계산
-        extend_rounds = schedule.get('extend_rounds', 3) or 3
+        # 연장 실험: 연장 회차 사용 (미설정 시 기본 3회차)
+        extend_rounds = schedule.get('extend_rounds', 0)
+        if extend_rounds is None or extend_rounds == 0:
+            extend_rounds = 3  # 기본값
 
         # 검사항목 수수료 계산 (연장 회차)
         test_items = schedule.get('test_items', '')
@@ -1015,11 +1054,13 @@ class EstimateTab(QWidget):
         # 견적 유형에 따른 Remark 생성
         if self.estimate_type == "suspend":
             # 중단 견적서 Remark
-            completed_rounds = schedule.get('completed_rounds', 3) or 3
+            completed_rounds = schedule.get('completed_rounds', 0)
+            if completed_rounds is None or completed_rounds == 0:
+                completed_rounds = max(1, sampling_count // 2)  # 기본값: 전체의 절반
             remark_text = f"""※ 중단 정산 내역
 
 → 실험 중단 사유: 품질한계 도달 / 의뢰자 요청
-→ 완료된 실험 회차: {completed_rounds}회 (온도 {zone_count}구간)
+→ 완료된 실험 회차: {completed_rounds}회 / 전체 {sampling_count}회 (온도 {zone_count}구간)
 → 정산 기준: 완료된 회차까지의 검사비용 + 보고서 비용(50%)
 
 ※ 정산 안내
@@ -1030,7 +1071,9 @@ class EstimateTab(QWidget):
 
         elif self.estimate_type == "extend":
             # 연장 견적서 Remark
-            extend_rounds = schedule.get('extend_rounds', 3) or 3
+            extend_rounds = schedule.get('extend_rounds', 0)
+            if extend_rounds is None or extend_rounds == 0:
+                extend_rounds = 3  # 기본값: 3회
             remark_text = f"""※ 연장실험 안내
 
 → 연장 실험 회차: {extend_rounds}회 (온도 {zone_count}구간)

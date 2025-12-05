@@ -2408,6 +2408,16 @@ class ScheduleManagementTab(QWidget):
         except Exception as e:
             print(f"비용 정보 추가 중 오류: {e}")
 
+        # 완료 회차 정보 추가 (중단 견적서용)
+        schedule_data['completed_rounds'] = self.count_completed_rounds()
+
+        # 연장 회차 정보 추가 (연장 견적서용)
+        try:
+            extend_rounds = int(self.extend_rounds_input.text() or 0)
+            schedule_data['extend_rounds'] = extend_rounds
+        except (ValueError, AttributeError):
+            schedule_data['extend_rounds'] = 0
+
         # 시그널 발생
         self.show_estimate_requested.emit(schedule_data)
 
@@ -3267,6 +3277,46 @@ class ScheduleManagementTab(QWidget):
 
         # 비용 재계산
         self.recalculate_costs()
+
+    def count_completed_rounds(self):
+        """온도조건별 실험 테이블에서 완료된(O 표시된) 회차 수를 계산
+
+        중단 견적서에서 실제 완료된 회차만 정산하기 위해 사용
+        각 회차(열)에서 최소 하나의 검사항목에 O 표시가 있으면 완료로 간주
+        """
+        if not hasattr(self, 'experiment_table') or not self.current_schedule:
+            return 0
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # 검사항목 행 범위 (행 2부터 마지막-1 행까지)
+        test_item_start_row = 2
+        test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
+
+        if test_item_end_row < test_item_start_row:
+            return 0
+
+        completed_rounds = 0
+
+        # 각 회차(열) 확인
+        for col in range(1, sampling_count + 1):
+            has_completed_item = False
+
+            # 해당 회차의 모든 검사항목 확인
+            for row in range(test_item_start_row, test_item_end_row + 1):
+                item = table.item(row, col)
+                if item and item.text() == 'O':
+                    has_completed_item = True
+                    break
+
+            if has_completed_item:
+                completed_rounds += 1
+            else:
+                # O 표시가 없는 첫 회차에서 중단 (연속된 완료 회차만 카운트)
+                break
+
+        return completed_rounds
 
     def edit_date_with_calendar(self, col):
         """달력을 통해 날짜 수정 - 1회차 날짜 변경 시 시작일도 연동"""
