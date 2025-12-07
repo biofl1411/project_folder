@@ -1,7 +1,7 @@
 {
     "host": "192.168.0.96",
     "port": 3306,
-    "database": "biofl",
+    "database": "foodlab",
     "user": "foodlab",
     "password": "bphsk*1411**",
     "charset": "utf8mb4"
