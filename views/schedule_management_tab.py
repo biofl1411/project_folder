@@ -3324,6 +3324,10 @@ class ScheduleManagementTab(QWidget):
                 'days_after': days_after_start
             })
 
+            # 연장 회차 날짜를 sample_dates에 저장 (중간보고서 날짜 계산용)
+            col_idx = sampling_count + 1 + i
+            self.sample_dates[col_idx] = round_date
+
         # 현재 스케줄에 연장 데이터 저장
         self.current_schedule['extension_schedules'] = extension_schedules
 
@@ -3372,6 +3376,18 @@ class ScheduleManagementTab(QWidget):
             combo.addItems(['', '1차', '2차', '3차'])
             combo.setStyleSheet("font-size: 10px; background-color: #90EE90; color: #000000;")  # 연두색 배경 (활성화)
             combo.setEnabled(True)
+
+            # 저장된 중간보고서 값 복원
+            interim1_round = self.current_schedule.get('interim1_round', 0) or 0
+            interim2_round = self.current_schedule.get('interim2_round', 0) or 0
+            interim3_round = self.current_schedule.get('interim3_round', 0) or 0
+            if interim1_round == col_idx:
+                combo.setCurrentText('1차')
+            elif interim2_round == col_idx:
+                combo.setCurrentText('2차')
+            elif interim3_round == col_idx:
+                combo.setCurrentText('3차')
+
             combo.setProperty('round_col', col_idx)
             combo.currentTextChanged.connect(self.on_interim_report_combo_changed)
             self.interim_report_combos[col_idx] = combo
