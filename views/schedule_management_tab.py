@@ -1566,38 +1566,38 @@ class ScheduleManagementTab(QWidget):
     def create_cost_summary(self, parent_layout):
         """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
         self.cost_frame = QFrame()
-        cost_frame = self.cost_frame  # 기존 코드 호환을 위한 로컬 참조
-        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 3px; padding: 1px;")
+        cost_frame = self.cost_frame
+        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
+        cost_frame.setFixedHeight(38)  # 고정 높이 (위아래 여백 축소)
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(2)
-        cost_layout.setContentsMargins(3, 2, 3, 2)
+        cost_layout.setContentsMargins(5, 1, 5, 1)  # 위아래 여백 최소화
 
         # 좌측: 2줄 레이아웃
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(1)
+        left_layout.setSpacing(0)  # 행 간격 최소화
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 공통 스타일 (크기 절반 축소)
-        label_style = "font-size: 9px; letter-spacing: 0px;"
-        bold_style = "font-size: 9px; letter-spacing: 0px; font-weight: bold;"
+        # 공통 스타일
+        label_style = "font-size: 9px;"
+        bold_style = "font-size: 9px; font-weight: bold;"
         input_style = "font-size: 9px; background-color: white; border: 1px solid #ccc; padding: 0px;"
-        formula_style = "font-size: 9px; letter-spacing: 0px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 1px 3px; border-radius: 2px;"
+        formula_style = "font-size: 9px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 1px 3px; border-radius: 2px;"
 
-        # 1행: 항목별 비용 내역 (자동 줄바꿈 지원, 전체 너비 사용)
+        # 1행: 항목별 비용 내역
         row1 = QHBoxLayout()
         row1.setSpacing(5)
-
-        # 항목별 비용 내역
+        row1.setContentsMargins(0, 0, 0, 0)
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        self.item_cost_detail.setWordWrap(True)  # 자동 줄바꿈 활성화
-        self.item_cost_detail.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # 가로로 확장
+        self.item_cost_detail.setFixedHeight(15)
         row1.addWidget(self.item_cost_detail)
-
         left_layout.addLayout(row1)
 
-        # 2행: | 1회/회차/보고서/중간/계산식 (한 줄에 모두)
+        # 2행: | 1회/회차/보고서/중간/계산식
         row2 = QHBoxLayout()
         row2.setSpacing(4)
+        row2.setContentsMargins(0, 0, 0, 0)
 
         separator = QLabel("|")
         separator.setStyleSheet(label_style)
@@ -1624,6 +1624,7 @@ class ScheduleManagementTab(QWidget):
         self.report_cost_input.setAlignment(Qt.AlignRight)
         self.report_cost_input.setStyleSheet(input_style)
         self.report_cost_input.setFixedWidth(55)
+        self.report_cost_input.setFixedHeight(16)
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row2.addWidget(self.report_cost_input)
 
@@ -1634,12 +1635,12 @@ class ScheduleManagementTab(QWidget):
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
         self.interim_report_cost_input.setStyleSheet(input_style)
         self.interim_report_cost_input.setFixedWidth(55)
+        self.interim_report_cost_input.setFixedHeight(16)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row2.addWidget(self.interim_report_cost_input)
         self.interim_cost_label.hide()
         self.interim_report_cost_input.hide()
 
-        # 계산식을 2행에 추가
         self.final_cost_formula = QLabel("-")
         self.final_cost_formula.setStyleSheet(formula_style)
         row2.addWidget(self.final_cost_formula)
@@ -1651,7 +1652,7 @@ class ScheduleManagementTab(QWidget):
 
         # 우측: 공급가 + 세액 = 총계
         self.final_cost_with_vat = QLabel("-")
-        self.final_cost_with_vat.setStyleSheet("font-size: 10px; letter-spacing: 1px; font-weight: bold; color: white; background-color: #e67e22; padding: 2px 5px; border-radius: 2px;")
+        self.final_cost_with_vat.setStyleSheet("font-size: 10px; font-weight: bold; color: white; background-color: #e67e22; padding: 2px 8px; border-radius: 2px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
         self.final_cost_with_vat.setMinimumWidth(180)
         cost_layout.addWidget(self.final_cost_with_vat)
