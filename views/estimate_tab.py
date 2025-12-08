@@ -1265,6 +1265,9 @@ class EstimateTab(QWidget):
             conn.commit()
             conn.close()
 
+            # current_schedule도 업데이트하여 다시 로드할 때 반영되도록
+            self.current_schedule[field_name] = remark_content
+
             QMessageBox.information(self, "저장 완료", "Remark 내용이 저장되었습니다.")
 
         except Exception as e:
