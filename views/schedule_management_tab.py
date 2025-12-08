@@ -1575,8 +1575,8 @@ class ScheduleManagementTab(QWidget):
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
         cost_layout = QVBoxLayout(cost_frame)
-        cost_layout.setSpacing(0)
-        cost_layout.setContentsMargins(2, 0, 2, 0)
+        cost_layout.setSpacing(1)  # 행간 간격 1px
+        cost_layout.setContentsMargins(2, 1, 2, 1)
 
         # 공통 스타일 (폰트 11px - 2포인트 증가)
         label_style = "font-size: 11px;"
@@ -1591,14 +1591,14 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 1행: 1차 견적 ==========
         self.row_first_widget = QWidget()
-        self.row_first_widget.setFixedHeight(25)  # 실험 계획안과 동일한 높이
+        self.row_first_widget.setMinimumHeight(25)  # 최소 높이 (줄바꿈 시 확장)
         row_first = QHBoxLayout(self.row_first_widget)
         row_first.setSpacing(4)
         row_first.setContentsMargins(0, 0, 0, 0)
 
         first_type_label = QLabel("1차")
         first_type_label.setStyleSheet(first_label_style)
-        first_type_label.setFixedWidth(28)
+        first_type_label.setFixedWidth(32)
         row_first.addWidget(first_type_label)
 
         # 항목 (넓은 영역, 줄바꿈 가능)
@@ -1656,14 +1656,14 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 2행: 중단 견적 ==========
         self.row_suspend_widget = QWidget()
-        self.row_suspend_widget.setFixedHeight(25)
+        self.row_suspend_widget.setMinimumHeight(25)  # 최소 높이 (줄바꿈 시 확장)
         row_suspend = QHBoxLayout(self.row_suspend_widget)
         row_suspend.setSpacing(4)
         row_suspend.setContentsMargins(0, 0, 0, 0)
 
         suspend_type_label = QLabel("중단")
         suspend_type_label.setStyleSheet(suspend_label_style)
-        suspend_type_label.setFixedWidth(28)
+        suspend_type_label.setFixedWidth(32)
         row_suspend.addWidget(suspend_type_label)
 
         self.suspend_item_cost_detail = QLabel("-")
@@ -1719,14 +1719,14 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 3행: 연장 견적 ==========
         self.row_extend_widget = QWidget()
-        self.row_extend_widget.setFixedHeight(25)
+        self.row_extend_widget.setMinimumHeight(25)  # 최소 높이 (줄바꿈 시 확장)
         row_extend = QHBoxLayout(self.row_extend_widget)
         row_extend.setSpacing(4)
         row_extend.setContentsMargins(0, 0, 0, 0)
 
         extend_type_label = QLabel("연장")
         extend_type_label.setStyleSheet(extend_label_style)
-        extend_type_label.setFixedWidth(28)
+        extend_type_label.setFixedWidth(32)
         row_extend.addWidget(extend_type_label)
 
         self.extend_item_cost_detail = QLabel("-")
