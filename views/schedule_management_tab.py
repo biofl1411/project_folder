@@ -1617,11 +1617,12 @@ class ScheduleManagementTab(QWidget):
         # 회차 비용 (라벨+값 합침)
         self.total_rounds_cost = QLabel("회차:-")
         self.total_rounds_cost.setStyleSheet(bold_style)
-        self.total_rounds_cost.setMinimumWidth(100)
+        self.total_rounds_cost.setFixedWidth(110)
         row_first.addWidget(self.total_rounds_cost)
 
         lbl3 = QLabel("보고서:")
         lbl3.setStyleSheet(label_style)
+        lbl3.setFixedWidth(40)
         row_first.addWidget(lbl3)
         self.first_report_cost_input = QLineEdit("300,000")
         self.first_report_cost_input.setAlignment(Qt.AlignRight)
@@ -1633,6 +1634,7 @@ class ScheduleManagementTab(QWidget):
 
         self.first_interim_cost_label = QLabel("중간:")
         self.first_interim_cost_label.setStyleSheet(label_style)
+        self.first_interim_cost_label.setFixedWidth(30)
         row_first.addWidget(self.first_interim_cost_label)
         self.first_interim_cost_input = QLineEdit("200,000")
         self.first_interim_cost_input.setAlignment(Qt.AlignRight)
@@ -1646,10 +1648,12 @@ class ScheduleManagementTab(QWidget):
 
         self.first_cost_formula = QLabel("-")
         self.first_cost_formula.setStyleSheet(formula_style)
+        self.first_cost_formula.setMinimumWidth(250)
         row_first.addWidget(self.first_cost_formula)
 
         self.first_cost_vat = QLabel("-")
         self.first_cost_vat.setStyleSheet(vat_style)
+        self.first_cost_vat.setFixedWidth(130)
         row_first.addWidget(self.first_cost_vat)
 
         cost_layout.addWidget(self.row_first_widget)
@@ -1679,11 +1683,12 @@ class ScheduleManagementTab(QWidget):
 
         self.suspend_rounds_cost = QLabel("회차:-")
         self.suspend_rounds_cost.setStyleSheet(bold_style)
-        self.suspend_rounds_cost.setMinimumWidth(100)
+        self.suspend_rounds_cost.setFixedWidth(110)
         row_suspend.addWidget(self.suspend_rounds_cost)
 
         lbl_s2 = QLabel("보고서:")
         lbl_s2.setStyleSheet(label_style)
+        lbl_s2.setFixedWidth(40)
         row_suspend.addWidget(lbl_s2)
         self.suspend_report_cost_input = QLineEdit("300,000")
         self.suspend_report_cost_input.setAlignment(Qt.AlignRight)
@@ -1695,6 +1700,7 @@ class ScheduleManagementTab(QWidget):
 
         self.suspend_interim_cost_label = QLabel("중간:")
         self.suspend_interim_cost_label.setStyleSheet(label_style)
+        self.suspend_interim_cost_label.setFixedWidth(30)
         row_suspend.addWidget(self.suspend_interim_cost_label)
         self.suspend_interim_cost_input = QLineEdit("200,000")
         self.suspend_interim_cost_input.setAlignment(Qt.AlignRight)
@@ -1708,10 +1714,12 @@ class ScheduleManagementTab(QWidget):
 
         self.suspend_cost_formula = QLabel("-")
         self.suspend_cost_formula.setStyleSheet(formula_style)
+        self.suspend_cost_formula.setMinimumWidth(250)
         row_suspend.addWidget(self.suspend_cost_formula)
 
         self.suspend_cost_vat = QLabel("-")
         self.suspend_cost_vat.setStyleSheet(vat_style)
+        self.suspend_cost_vat.setFixedWidth(130)
         row_suspend.addWidget(self.suspend_cost_vat)
 
         self.row_suspend_widget.hide()
@@ -1742,11 +1750,12 @@ class ScheduleManagementTab(QWidget):
 
         self.extend_rounds_cost = QLabel("회차:-")
         self.extend_rounds_cost.setStyleSheet(bold_style)
-        self.extend_rounds_cost.setMinimumWidth(100)
+        self.extend_rounds_cost.setFixedWidth(110)
         row_extend.addWidget(self.extend_rounds_cost)
 
         lbl_e2 = QLabel("보고서:")
         lbl_e2.setStyleSheet(label_style)
+        lbl_e2.setFixedWidth(40)
         row_extend.addWidget(lbl_e2)
         self.extend_report_cost_input = QLineEdit("300,000")
         self.extend_report_cost_input.setAlignment(Qt.AlignRight)
@@ -1758,6 +1767,7 @@ class ScheduleManagementTab(QWidget):
 
         self.extend_interim_cost_label = QLabel("중간:")
         self.extend_interim_cost_label.setStyleSheet(label_style)
+        self.extend_interim_cost_label.setFixedWidth(30)
         row_extend.addWidget(self.extend_interim_cost_label)
         self.extend_interim_cost_input = QLineEdit("200,000")
         self.extend_interim_cost_input.setAlignment(Qt.AlignRight)
@@ -1771,10 +1781,12 @@ class ScheduleManagementTab(QWidget):
 
         self.extend_cost_formula = QLabel("-")
         self.extend_cost_formula.setStyleSheet(formula_style)
+        self.extend_cost_formula.setMinimumWidth(250)
         row_extend.addWidget(self.extend_cost_formula)
 
         self.extend_cost_vat = QLabel("-")
         self.extend_cost_vat.setStyleSheet(vat_style)
+        self.extend_cost_vat.setFixedWidth(130)
         row_extend.addWidget(self.extend_cost_vat)
 
         self.row_extend_widget.hide()
