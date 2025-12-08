@@ -899,10 +899,32 @@ class EstimateTab(QWidget):
         return int(total)
 
     def _calculate_suspend_price(self, schedule, completed_rounds, zone_count):
-        """중단 견적 금액 계산 - 완료된 회차까지만 정산"""
+        """중단 견적 금액 계산 - 완료된 회차까지만 정산 (스케줄 관리에서 변경된 비용 반영)"""
         total = 0
         test_method = schedule.get('test_method', 'real')
 
+        # 스케줄 관리에서 계산된 비용 정보가 있으면 사용
+        if schedule.get('total_rounds_cost') is not None:
+            # 1회당 검사비용 계산
+            sampling_count = schedule.get('sampling_count', 6) or 6
+            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
+            cost_per_round = total_rounds_cost / sampling_count if sampling_count > 0 else 0
+
+            # 완료된 회차까지의 검사비용
+            total += int(cost_per_round * completed_rounds * zone_count)
+
+            # 보고서 비용 (스케줄에서 저장된 값의 50% 적용)
+            report_cost = schedule.get('report_cost', 0) or 0
+            total += int(report_cost * 0.5)
+
+            # 중간 보고서 비용 (진행된 중간보고서가 있으면 포함)
+            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+            if interim_report_cost > 0:
+                total += interim_report_cost
+
+            return int(total)
+
+        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
         # 검사항목 수수료 계산 (완료된 회차만)
         test_items = schedule.get('test_items', '')
         if test_items:
