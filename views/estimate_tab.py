@@ -980,11 +980,11 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * extend_rounds * zone_count
 
-        # 연장 보고서 비용 (50%)
+        # 연장 보고서 비용
         if test_method in ['real', 'custom_real']:
-            report_cost = 100000
+            report_cost = 200000
         else:
-            report_cost = 150000
+            report_cost = 300000
         total += report_cost
 
         return int(total)
