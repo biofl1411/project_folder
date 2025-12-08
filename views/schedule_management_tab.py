@@ -3324,6 +3324,27 @@ class ScheduleManagementTab(QWidget):
             if old_price_item:
                 table.setItem(row, new_col_count - 1, old_price_item)
 
+        # 검사항목 가격 정보 가져오기
+        fees = {}
+        try:
+            from models.fee import Fee
+            all_fees = Fee.get_all()
+            for fee in all_fees:
+                fees[fee['test_item']] = fee['price']
+        except Exception:
+            pass
+
+        # 1회 기준 가격 계산용 (기존 테이블에서 가져오기)
+        total_price_per_test = 0
+        test_items_count = row_count - 4  # 전체 행 - (중간보고서 + 날짜 + 제조후시간 + 1회기준)
+
+        for row in range(3, row_count - 1):  # 검사항목 행들
+            item_cell = table.item(row, 0)
+            if item_cell:
+                test_item_name = item_cell.text()
+                price = int(fees.get(test_item_name, 0))
+                total_price_per_test += price
+
         # 연장 회차 데이터 채우기
         for i, ext_schedule in enumerate(extension_schedules):
             col_idx = sampling_count + 1 + i  # 기존 회차 다음 열
@@ -3350,12 +3371,18 @@ class ScheduleManagementTab(QWidget):
             days_item.setBackground(QColor('#90EE90'))  # 연두색
             table.setItem(2, col_idx, days_item)
 
-            # 행 3 이후: 검사항목 (빈 셀 또는 체크박스)
+            # 행 3 이후: 검사항목에 O 표시
             for row in range(3, row_count - 1):  # 마지막 행(1회기준)은 제외
-                empty_item = QTableWidgetItem("")
-                empty_item.setTextAlignment(Qt.AlignCenter)
-                empty_item.setBackground(QColor('#F0FFF0'))  # 연한 연두색
-                table.setItem(row, col_idx, empty_item)
+                o_item = QTableWidgetItem("O")
+                o_item.setTextAlignment(Qt.AlignCenter)
+                o_item.setBackground(QColor('#F0FFF0'))  # 연한 연두색
+                table.setItem(row, col_idx, o_item)
+
+            # 마지막 행: 1회기준 소계
+            cost_item = QTableWidgetItem(f"{total_price_per_test:,}")
+            cost_item.setTextAlignment(Qt.AlignCenter)
+            cost_item.setBackground(QColor('#FFFF99'))  # 노란색 (1회기준 행)
+            table.setItem(row_count - 1, col_idx, cost_item)
 
         # 스케줄 저장 시그널 발생
         self.schedule_saved.emit()
