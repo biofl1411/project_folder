@@ -453,6 +453,25 @@ class EstimateTab(QWidget):
         """)
         self.save_remark_btn.clicked.connect(self.save_remark_content)
         save_btn_layout.addWidget(self.save_remark_btn)
+
+        # Remark 초기화 버튼
+        self.reset_remark_btn = QPushButton("Remark 초기화")
+        self.reset_remark_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f57c00;
+            }
+        """)
+        self.reset_remark_btn.clicked.connect(self.reset_remark_content)
+        save_btn_layout.addWidget(self.reset_remark_btn)
+
         save_btn_layout.addStretch()
 
         self.estimate_layout.addWidget(self.save_btn_widget)
@@ -1296,6 +1315,56 @@ class EstimateTab(QWidget):
             QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다:\n{str(e)}")
             import traceback
             traceback.print_exc()
+
+    def reset_remark_content(self):
+        """Remark 내용 초기화 - 저장된 내용 삭제 후 기본 템플릿 적용"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "초기화 실패", "먼저 스케줄을 선택해주세요.")
+            return
+
+        reply = QMessageBox.question(
+            self, "Remark 초기화",
+            "저장된 Remark 내용을 삭제하고 기본 템플릿으로 초기화하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            from database import get_connection
+
+            schedule_id = self.current_schedule.get('id')
+            if not schedule_id:
+                return
+
+            # 견적서 유형에 따라 다른 필드 초기화
+            field_name = {
+                'first': 'remark_first',
+                'suspend': 'remark_suspend',
+                'extend': 'remark_extend'
+            }.get(self.estimate_type, 'remark_first')
+
+            # 데이터베이스에서 해당 필드 초기화
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                UPDATE schedules SET {field_name} = NULL WHERE id = %s
+            """, (schedule_id,))
+            conn.commit()
+            conn.close()
+
+            # current_schedule에서도 삭제
+            if field_name in self.current_schedule:
+                self.current_schedule[field_name] = None
+
+            # 새 템플릿으로 Remark 업데이트
+            self.update_remark(self.current_schedule)
+
+            QMessageBox.information(self, "초기화 완료", "Remark가 기본 템플릿으로 초기화되었습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"초기화 중 오류가 발생했습니다:\n{str(e)}")
 
     def print_estimate(self):
         """견적서 인쇄 - A4 사이즈 전체 활용"""
