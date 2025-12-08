@@ -1570,7 +1570,7 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
+        """비용 요약 (3줄 레이아웃) - 1행: 1차 항목비용, 2행: 1차 계산, 3행: 중단 항목/계산"""
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
@@ -1593,24 +1593,26 @@ class ScheduleManagementTab(QWidget):
         suspend_label_style = "font-size: 11px; font-weight: bold; color: white; background-color: #e74c3c; padding: 1px 4px; border-radius: 2px;"
         extend_label_style = "font-size: 11px; font-weight: bold; color: white; background-color: #9b59b6; padding: 1px 4px; border-radius: 2px;"
 
-        # 1행: 항목별 비용 내역
+        # 1행: 1차 견적 - 항목별 비용 내역
         row1 = QHBoxLayout()
-        row1.setSpacing(5)
+        row1.setSpacing(4)
         row1.setContentsMargins(0, 0, 0, 0)
+
+        first_type_label = QLabel("1차")
+        first_type_label.setStyleSheet(first_label_style)
+        row1.addWidget(first_type_label)
+
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
         self.item_cost_detail.setFixedHeight(18)
         row1.addWidget(self.item_cost_detail)
+        row1.addStretch()
         left_layout.addLayout(row1)
 
-        # 2행: 1차 견적 | 1회/회차/보고서/중간/계산식
+        # 2행: 1차 견적 계산 | 1회/회차/보고서/중간/계산식
         row_first = QHBoxLayout()
         row_first.setSpacing(4)
-        row_first.setContentsMargins(0, 0, 0, 0)
-
-        first_type_label = QLabel("1차")
-        first_type_label.setStyleSheet(first_label_style)
-        row_first.addWidget(first_type_label)
+        row_first.setContentsMargins(20, 0, 0, 0)  # 들여쓰기
 
         lbl1 = QLabel("1회:")
         lbl1.setStyleSheet(label_style)
@@ -1657,7 +1659,7 @@ class ScheduleManagementTab(QWidget):
         row_first.addStretch()
         left_layout.addLayout(row_first)
 
-        # 3행: 중단 견적 | 회차/보고서/중간/계산식
+        # 3행: 중단 견적 | 항목비용 + 회차/보고서/중간/계산식
         self.row_suspend_widget = QWidget()
         row_suspend = QHBoxLayout(self.row_suspend_widget)
         row_suspend.setSpacing(4)
@@ -1666,6 +1668,11 @@ class ScheduleManagementTab(QWidget):
         suspend_type_label = QLabel("중단")
         suspend_type_label.setStyleSheet(suspend_label_style)
         row_suspend.addWidget(suspend_type_label)
+
+        # 중단 항목별 비용 내역
+        self.suspend_item_cost_detail = QLabel("-")
+        self.suspend_item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
+        row_suspend.addWidget(self.suspend_item_cost_detail)
 
         lbl_s1 = QLabel("회차:")
         lbl_s1.setStyleSheet(label_style)
@@ -4326,17 +4333,23 @@ class ScheduleManagementTab(QWidget):
             unit_price = int(fees.get(test_item, 0))
             item_costs[test_item] = o_count * unit_price
 
-        # 항목별 비용 내역 텍스트 생성
-        detail_parts = []
+        # 1차 견적 항목별 비용 내역 텍스트 생성 (전체 회차 기준 - 모든 항목 O로 가정)
+        first_detail_parts = []
+        for test_item in test_items:
+            unit_price = int(fees.get(test_item, 0))
+            full_cost = unit_price * sampling_count
+            first_detail_parts.append(f"{test_item}({sampling_count}회)={full_cost:,}원")
+        self.item_cost_detail.setText(" | ".join(first_detail_parts))
+
+        # 중단 견적 항목별 비용 내역 텍스트 생성 (O로 체크된 것만)
+        suspend_detail_parts = []
         for test_item in test_items:
             o_count = item_o_counts.get(test_item, 0)
             total_cost = item_costs.get(test_item, 0)
             if o_count > 0:
-                detail_parts.append(f"{test_item}({o_count}회)={total_cost:,}원")
-            else:
-                detail_parts.append(f"{test_item}(제외)")
-
-        self.item_cost_detail.setText(" | ".join(detail_parts))
+                suspend_detail_parts.append(f"{test_item}({o_count}회)={total_cost:,}원")
+        if hasattr(self, 'suspend_item_cost_detail'):
+            self.suspend_item_cost_detail.setText(" | ".join(suspend_detail_parts) if suspend_detail_parts else "-")
 
         # (1회 기준) 행 업데이트
         basis_row = table.rowCount() - 1
