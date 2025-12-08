@@ -1570,49 +1570,37 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (3줄 레이아웃) - 1행: 1차 항목비용, 2행: 1차 계산, 3행: 중단 항목/계산"""
+        """비용 요약 (3줄 레이아웃) - 1차/중단/연장 각각 한 줄씩"""
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
-        cost_frame.setMinimumHeight(25)  # 최소 높이
-        cost_layout = QHBoxLayout(cost_frame)
-        cost_layout.setSpacing(2)
-        cost_layout.setContentsMargins(5, 1, 5, 1)
+        cost_frame.setMinimumHeight(20)  # 최소 높이
+        cost_layout = QVBoxLayout(cost_frame)
+        cost_layout.setSpacing(1)
+        cost_layout.setContentsMargins(3, 1, 3, 1)
 
-        # 좌측: 여러 줄 레이아웃 (견적 유형별)
-        left_layout = QVBoxLayout()
-        left_layout.setSpacing(2)  # 행 간격
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        # 공통 스타일
+        label_style = "font-size: 10px;"
+        bold_style = "font-size: 10px; font-weight: bold;"
+        input_style = "font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 0px;"
+        formula_style = "font-size: 10px; font-weight: bold; color: #d35400;"
+        vat_style = "font-size: 10px; font-weight: bold; color: #27ae60;"
+        first_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #3498db; padding: 0px 3px; border-radius: 2px;"
+        suspend_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #e74c3c; padding: 0px 3px; border-radius: 2px;"
+        extend_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #9b59b6; padding: 0px 3px; border-radius: 2px;"
 
-        # 공통 스타일 (폰트 +2포인트)
-        label_style = "font-size: 11px;"
-        bold_style = "font-size: 11px; font-weight: bold;"
-        input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 0px;"
-        formula_style = "font-size: 11px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 1px 3px; border-radius: 2px;"
-        first_label_style = "font-size: 11px; font-weight: bold; color: white; background-color: #3498db; padding: 1px 4px; border-radius: 2px;"
-        suspend_label_style = "font-size: 11px; font-weight: bold; color: white; background-color: #e74c3c; padding: 1px 4px; border-radius: 2px;"
-        extend_label_style = "font-size: 11px; font-weight: bold; color: white; background-color: #9b59b6; padding: 1px 4px; border-radius: 2px;"
-
-        # 1행: 1차 견적 - 항목별 비용 내역
-        row1 = QHBoxLayout()
-        row1.setSpacing(4)
-        row1.setContentsMargins(0, 0, 0, 0)
+        # ========== 1행: 1차 견적 ==========
+        row_first = QHBoxLayout()
+        row_first.setSpacing(3)
+        row_first.setContentsMargins(0, 0, 0, 0)
 
         first_type_label = QLabel("1차")
         first_type_label.setStyleSheet(first_label_style)
-        row1.addWidget(first_type_label)
+        row_first.addWidget(first_type_label)
 
         self.item_cost_detail = QLabel("-")
         self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        self.item_cost_detail.setFixedHeight(18)
-        row1.addWidget(self.item_cost_detail)
-        row1.addStretch()
-        left_layout.addLayout(row1)
-
-        # 2행: 1차 견적 계산 | 1회/회차/보고서/중간/계산식
-        row_first = QHBoxLayout()
-        row_first.setSpacing(4)
-        row_first.setContentsMargins(20, 0, 0, 0)  # 들여쓰기
+        row_first.addWidget(self.item_cost_detail)
 
         lbl1 = QLabel("1회:")
         lbl1.setStyleSheet(label_style)
@@ -1634,8 +1622,8 @@ class ScheduleManagementTab(QWidget):
         self.first_report_cost_input = QLineEdit("300,000")
         self.first_report_cost_input.setAlignment(Qt.AlignRight)
         self.first_report_cost_input.setStyleSheet(input_style)
-        self.first_report_cost_input.setFixedWidth(55)
-        self.first_report_cost_input.setFixedHeight(18)
+        self.first_report_cost_input.setFixedWidth(50)
+        self.first_report_cost_input.setFixedHeight(16)
         self.first_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_first.addWidget(self.first_report_cost_input)
 
@@ -1645,8 +1633,8 @@ class ScheduleManagementTab(QWidget):
         self.first_interim_cost_input = QLineEdit("200,000")
         self.first_interim_cost_input.setAlignment(Qt.AlignRight)
         self.first_interim_cost_input.setStyleSheet(input_style)
-        self.first_interim_cost_input.setFixedWidth(55)
-        self.first_interim_cost_input.setFixedHeight(18)
+        self.first_interim_cost_input.setFixedWidth(50)
+        self.first_interim_cost_input.setFixedHeight(16)
         self.first_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_first.addWidget(self.first_interim_cost_input)
         self.first_interim_cost_label.hide()
@@ -1656,23 +1644,33 @@ class ScheduleManagementTab(QWidget):
         self.first_cost_formula.setStyleSheet(formula_style)
         row_first.addWidget(self.first_cost_formula)
 
-        row_first.addStretch()
-        left_layout.addLayout(row_first)
+        self.first_cost_vat = QLabel("-")
+        self.first_cost_vat.setStyleSheet(vat_style)
+        row_first.addWidget(self.first_cost_vat)
 
-        # 3행: 중단 견적 | 항목비용 + 회차/보고서/중간/계산식
+        row_first.addStretch()
+        cost_layout.addLayout(row_first)
+
+        # ========== 2행: 중단 견적 ==========
         self.row_suspend_widget = QWidget()
         row_suspend = QHBoxLayout(self.row_suspend_widget)
-        row_suspend.setSpacing(4)
+        row_suspend.setSpacing(3)
         row_suspend.setContentsMargins(0, 0, 0, 0)
 
         suspend_type_label = QLabel("중단")
         suspend_type_label.setStyleSheet(suspend_label_style)
         row_suspend.addWidget(suspend_type_label)
 
-        # 중단 항목별 비용 내역
         self.suspend_item_cost_detail = QLabel("-")
         self.suspend_item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
         row_suspend.addWidget(self.suspend_item_cost_detail)
+
+        lbl_s0 = QLabel("1회:")
+        lbl_s0.setStyleSheet(label_style)
+        row_suspend.addWidget(lbl_s0)
+        self.suspend_cost_per_test = QLabel("-")
+        self.suspend_cost_per_test.setStyleSheet(bold_style)
+        row_suspend.addWidget(self.suspend_cost_per_test)
 
         lbl_s1 = QLabel("회차:")
         lbl_s1.setStyleSheet(label_style)
@@ -1687,8 +1685,8 @@ class ScheduleManagementTab(QWidget):
         self.suspend_report_cost_input = QLineEdit("300,000")
         self.suspend_report_cost_input.setAlignment(Qt.AlignRight)
         self.suspend_report_cost_input.setStyleSheet(input_style)
-        self.suspend_report_cost_input.setFixedWidth(55)
-        self.suspend_report_cost_input.setFixedHeight(18)
+        self.suspend_report_cost_input.setFixedWidth(50)
+        self.suspend_report_cost_input.setFixedHeight(16)
         self.suspend_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_suspend.addWidget(self.suspend_report_cost_input)
 
@@ -1698,8 +1696,8 @@ class ScheduleManagementTab(QWidget):
         self.suspend_interim_cost_input = QLineEdit("200,000")
         self.suspend_interim_cost_input.setAlignment(Qt.AlignRight)
         self.suspend_interim_cost_input.setStyleSheet(input_style)
-        self.suspend_interim_cost_input.setFixedWidth(55)
-        self.suspend_interim_cost_input.setFixedHeight(18)
+        self.suspend_interim_cost_input.setFixedWidth(50)
+        self.suspend_interim_cost_input.setFixedHeight(16)
         self.suspend_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_suspend.addWidget(self.suspend_interim_cost_input)
         self.suspend_interim_cost_label.hide()
@@ -1709,19 +1707,34 @@ class ScheduleManagementTab(QWidget):
         self.suspend_cost_formula.setStyleSheet(formula_style)
         row_suspend.addWidget(self.suspend_cost_formula)
 
-        row_suspend.addStretch()
-        self.row_suspend_widget.hide()  # 중단 상태일 때만 표시
-        left_layout.addWidget(self.row_suspend_widget)
+        self.suspend_cost_vat = QLabel("-")
+        self.suspend_cost_vat.setStyleSheet(vat_style)
+        row_suspend.addWidget(self.suspend_cost_vat)
 
-        # 4행: 연장 견적 | 회차/보고서/계산식
+        row_suspend.addStretch()
+        self.row_suspend_widget.hide()
+        cost_layout.addWidget(self.row_suspend_widget)
+
+        # ========== 3행: 연장 견적 ==========
         self.row_extend_widget = QWidget()
         row_extend = QHBoxLayout(self.row_extend_widget)
-        row_extend.setSpacing(4)
+        row_extend.setSpacing(3)
         row_extend.setContentsMargins(0, 0, 0, 0)
 
         extend_type_label = QLabel("연장")
         extend_type_label.setStyleSheet(extend_label_style)
         row_extend.addWidget(extend_type_label)
+
+        self.extend_item_cost_detail = QLabel("-")
+        self.extend_item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
+        row_extend.addWidget(self.extend_item_cost_detail)
+
+        lbl_e0 = QLabel("1회:")
+        lbl_e0.setStyleSheet(label_style)
+        row_extend.addWidget(lbl_e0)
+        self.extend_cost_per_test = QLabel("-")
+        self.extend_cost_per_test.setStyleSheet(bold_style)
+        row_extend.addWidget(self.extend_cost_per_test)
 
         lbl_e1 = QLabel("회차:")
         lbl_e1.setStyleSheet(label_style)
@@ -1736,33 +1749,42 @@ class ScheduleManagementTab(QWidget):
         self.extend_report_cost_input = QLineEdit("300,000")
         self.extend_report_cost_input.setAlignment(Qt.AlignRight)
         self.extend_report_cost_input.setStyleSheet(input_style)
-        self.extend_report_cost_input.setFixedWidth(55)
-        self.extend_report_cost_input.setFixedHeight(18)
+        self.extend_report_cost_input.setFixedWidth(50)
+        self.extend_report_cost_input.setFixedHeight(16)
         self.extend_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_extend.addWidget(self.extend_report_cost_input)
+
+        self.extend_interim_cost_label = QLabel("중간:")
+        self.extend_interim_cost_label.setStyleSheet(label_style)
+        row_extend.addWidget(self.extend_interim_cost_label)
+        self.extend_interim_cost_input = QLineEdit("200,000")
+        self.extend_interim_cost_input.setAlignment(Qt.AlignRight)
+        self.extend_interim_cost_input.setStyleSheet(input_style)
+        self.extend_interim_cost_input.setFixedWidth(50)
+        self.extend_interim_cost_input.setFixedHeight(16)
+        self.extend_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
+        row_extend.addWidget(self.extend_interim_cost_input)
+        self.extend_interim_cost_label.hide()
+        self.extend_interim_cost_input.hide()
 
         self.extend_cost_formula = QLabel("-")
         self.extend_cost_formula.setStyleSheet(formula_style)
         row_extend.addWidget(self.extend_cost_formula)
 
-        row_extend.addStretch()
-        self.row_extend_widget.hide()  # 연장 계획 있을 때만 표시
-        left_layout.addWidget(self.row_extend_widget)
+        self.extend_cost_vat = QLabel("-")
+        self.extend_cost_vat.setStyleSheet(vat_style)
+        row_extend.addWidget(self.extend_cost_vat)
 
-        # 호환성을 위한 기존 변수 참조 (기존 코드에서 사용)
+        row_extend.addStretch()
+        self.row_extend_widget.hide()
+        cost_layout.addWidget(self.row_extend_widget)
+
+        # 호환성을 위한 기존 변수 참조
         self.report_cost_input = self.first_report_cost_input
         self.interim_report_cost_input = self.first_interim_cost_input
         self.interim_cost_label = self.first_interim_cost_label
         self.final_cost_formula = self.first_cost_formula
-
-        cost_layout.addLayout(left_layout)
-
-        # 우측: 공급가 + 세액 = 총계
-        self.final_cost_with_vat = QLabel("-")
-        self.final_cost_with_vat.setStyleSheet("font-size: 12px; font-weight: bold; color: white; background-color: #e67e22; padding: 2px 8px; border-radius: 2px;")
-        self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
-        self.final_cost_with_vat.setMinimumWidth(180)
-        cost_layout.addWidget(self.final_cost_with_vat)
+        self.final_cost_with_vat = self.first_cost_vat
 
         parent_layout.addWidget(cost_frame)
 
@@ -4389,22 +4411,38 @@ class ScheduleManagementTab(QWidget):
 
         first_cost_no_vat = int(first_total_rounds * zone_count + first_report_cost + first_interim_cost)
         if first_interim_cost > 0:
-            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} + {first_interim_cost:,} = {first_cost_no_vat:,}원"
+            first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}+{first_interim_cost:,}={first_cost_no_vat:,}원"
         else:
-            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} = {first_cost_no_vat:,}원"
+            first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}={first_cost_no_vat:,}원"
         self.first_cost_formula.setText(first_formula)
+
+        # 1차 부가세 포함
+        first_vat = int(first_cost_no_vat * 0.1)
+        first_with_vat = first_cost_no_vat + first_vat
+        if hasattr(self, 'first_cost_vat'):
+            self.first_cost_vat.setText(f"(VAT포함:{first_with_vat:,}원)")
 
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
         if schedule_status == 'suspended':
             self.row_suspend_widget.show()
+
+            # 중단 1회 비용 (O로 체크된 항목들의 평균)
+            suspend_o_count = sum(item_o_counts.values())
+            if suspend_o_count > 0:
+                suspend_per_test = total_rounds_cost // suspend_o_count if suspend_o_count > 0 else 0
+            else:
+                suspend_per_test = 0
+            if hasattr(self, 'suspend_cost_per_test'):
+                self.suspend_cost_per_test.setText(f"{cost_per_test:,}원")
+
             # 중단 견적은 O로 체크된 항목만 비용에 포함
             self.suspend_rounds_cost.setText(f"{total_rounds_cost:,}원")
 
             try:
                 suspend_report_cost = int(self.suspend_report_cost_input.text().replace(',', '').replace('원', ''))
             except (ValueError, TypeError):
-                suspend_report_cost = first_report_cost  # 1차 값으로 초기화
+                suspend_report_cost = first_report_cost
 
             suspend_interim_cost = 0
             if self.suspend_interim_cost_input.isVisible():
@@ -4415,38 +4453,69 @@ class ScheduleManagementTab(QWidget):
 
             suspend_cost_no_vat = int(total_rounds_cost * zone_count + suspend_report_cost + suspend_interim_cost)
             if suspend_interim_cost > 0:
-                suspend_formula = f"{total_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} + {suspend_interim_cost:,} = {suspend_cost_no_vat:,}원"
+                suspend_formula = f"{total_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}+{suspend_interim_cost:,}={suspend_cost_no_vat:,}원"
             else:
-                suspend_formula = f"{total_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} = {suspend_cost_no_vat:,}원"
+                suspend_formula = f"{total_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
             self.suspend_cost_formula.setText(suspend_formula)
+
+            # 중단 부가세 포함
+            suspend_vat = int(suspend_cost_no_vat * 0.1)
+            suspend_with_vat = suspend_cost_no_vat + suspend_vat
+            if hasattr(self, 'suspend_cost_vat'):
+                self.suspend_cost_vat.setText(f"(VAT포함:{suspend_with_vat:,}원)")
         else:
             self.row_suspend_widget.hide()
 
         # ========== 연장 견적 계산 (연장 계획 있을 때만) ==========
         if extend_rounds > 0:
             self.row_extend_widget.show()
+
             # 연장 회차 비용 (O로 체크된 것만)
-            extend_total_cost = sum(column_costs[sampling_count:])  # 연장 회차만
+            extend_total_cost = sum(column_costs[sampling_count:])
             self.extend_rounds_cost.setText(f"{extend_total_cost:,}원")
+
+            # 연장 1회 비용
+            if hasattr(self, 'extend_cost_per_test'):
+                self.extend_cost_per_test.setText(f"{cost_per_test:,}원")
+
+            # 연장 항목별 비용 내역
+            extend_detail_parts = []
+            for test_item in test_items:
+                unit_price = int(fees.get(test_item, 0))
+                extend_item_cost = unit_price * extend_rounds
+                extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_item_cost:,}원")
+            if hasattr(self, 'extend_item_cost_detail'):
+                self.extend_item_cost_detail.setText(" | ".join(extend_detail_parts))
 
             try:
                 extend_report_cost = int(self.extend_report_cost_input.text().replace(',', '').replace('원', ''))
             except (ValueError, TypeError):
                 extend_report_cost = first_report_cost
 
-            extend_cost_no_vat = int(extend_total_cost * zone_count + extend_report_cost)
-            extend_formula = f"{extend_total_cost:,} × {zone_count} + {extend_report_cost:,} = {extend_cost_no_vat:,}원"
+            extend_interim_cost = 0
+            if hasattr(self, 'extend_interim_cost_input') and self.extend_interim_cost_input.isVisible():
+                try:
+                    extend_interim_cost = int(self.extend_interim_cost_input.text().replace(',', '').replace('원', ''))
+                except (ValueError, TypeError):
+                    extend_interim_cost = 0
+
+            extend_cost_no_vat = int(extend_total_cost * zone_count + extend_report_cost + extend_interim_cost)
+            if extend_interim_cost > 0:
+                extend_formula = f"{extend_total_cost:,}×{zone_count}+{extend_report_cost:,}+{extend_interim_cost:,}={extend_cost_no_vat:,}원"
+            else:
+                extend_formula = f"{extend_total_cost:,}×{zone_count}+{extend_report_cost:,}={extend_cost_no_vat:,}원"
             self.extend_cost_formula.setText(extend_formula)
+
+            # 연장 부가세 포함
+            extend_vat = int(extend_cost_no_vat * 0.1)
+            extend_with_vat = extend_cost_no_vat + extend_vat
+            if hasattr(self, 'extend_cost_vat'):
+                self.extend_cost_vat.setText(f"(VAT포함:{extend_with_vat:,}원)")
         else:
             self.row_extend_widget.hide()
 
-        # 5. 최종비용 (부가세 포함) - 1차 견적 기준으로 표시
-        vat = int(first_cost_no_vat * 0.1)
-        final_cost_with_vat = first_cost_no_vat + vat
-        self.final_cost_with_vat.setText(f"{first_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
-
         # 금액을 DB에 저장 (1차 견적 기준)
-        self._save_amounts_to_db(first_cost_no_vat, vat, final_cost_with_vat)
+        self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
 
     def _calculate_extend_rounds_cost(self):
         """연장 회차만의 비용 계산 (O/X 상태 반영)"""
@@ -4501,7 +4570,6 @@ class ScheduleManagementTab(QWidget):
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
 
         # ========== 1차 견적 계산 ==========
-        # 1회 기준 비용
         try:
             cost_per_test = int(self.cost_per_test.text().replace(',', '').replace('원', ''))
         except (ValueError, TypeError, AttributeError):
@@ -4523,18 +4591,19 @@ class ScheduleManagementTab(QWidget):
 
         first_cost_no_vat = int(first_total_rounds * zone_count + first_report_cost + first_interim_cost)
         if first_interim_cost > 0:
-            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} + {first_interim_cost:,} = {first_cost_no_vat:,}원"
+            first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}+{first_interim_cost:,}={first_cost_no_vat:,}원"
         else:
-            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} = {first_cost_no_vat:,}원"
+            first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}={first_cost_no_vat:,}원"
         self.first_cost_formula.setText(first_formula)
 
-        # 부가세 포함 금액 (1차 견적 기준)
-        vat = int(first_cost_no_vat * 0.1)
-        final_cost_with_vat = first_cost_no_vat + vat
-        self.final_cost_with_vat.setText(f"{first_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
+        # 1차 부가세 포함
+        first_vat = int(first_cost_no_vat * 0.1)
+        first_with_vat = first_cost_no_vat + first_vat
+        if hasattr(self, 'first_cost_vat'):
+            self.first_cost_vat.setText(f"(VAT포함:{first_with_vat:,}원)")
 
         # 금액을 DB에 저장 (1차 견적 기준)
-        self._save_amounts_to_db(first_cost_no_vat, vat, final_cost_with_vat)
+        self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
 
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
@@ -4558,10 +4627,16 @@ class ScheduleManagementTab(QWidget):
 
             suspend_cost_no_vat = int(suspend_rounds_cost * zone_count + suspend_report_cost + suspend_interim_cost)
             if suspend_interim_cost > 0:
-                suspend_formula = f"{suspend_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} + {suspend_interim_cost:,} = {suspend_cost_no_vat:,}원"
+                suspend_formula = f"{suspend_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}+{suspend_interim_cost:,}={suspend_cost_no_vat:,}원"
             else:
-                suspend_formula = f"{suspend_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} = {suspend_cost_no_vat:,}원"
+                suspend_formula = f"{suspend_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
             self.suspend_cost_formula.setText(suspend_formula)
+
+            # 중단 부가세 포함
+            suspend_vat = int(suspend_cost_no_vat * 0.1)
+            suspend_with_vat = suspend_cost_no_vat + suspend_vat
+            if hasattr(self, 'suspend_cost_vat'):
+                self.suspend_cost_vat.setText(f"(VAT포함:{suspend_with_vat:,}원)")
 
         # ========== 연장 견적 계산 (연장 회차 있을 때만) ==========
         extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
@@ -4576,9 +4651,25 @@ class ScheduleManagementTab(QWidget):
             except (ValueError, TypeError):
                 extend_report_cost = 0
 
-            extend_cost_no_vat = int(extend_rounds_cost * zone_count + extend_report_cost)
-            extend_formula = f"{extend_rounds_cost:,} × {zone_count} + {extend_report_cost:,} = {extend_cost_no_vat:,}원"
+            extend_interim_cost = 0
+            if hasattr(self, 'extend_interim_cost_input') and self.extend_interim_cost_input.isVisible():
+                try:
+                    extend_interim_cost = int(self.extend_interim_cost_input.text().replace(',', '').replace('원', ''))
+                except (ValueError, TypeError):
+                    extend_interim_cost = 0
+
+            extend_cost_no_vat = int(extend_rounds_cost * zone_count + extend_report_cost + extend_interim_cost)
+            if extend_interim_cost > 0:
+                extend_formula = f"{extend_rounds_cost:,}×{zone_count}+{extend_report_cost:,}+{extend_interim_cost:,}={extend_cost_no_vat:,}원"
+            else:
+                extend_formula = f"{extend_rounds_cost:,}×{zone_count}+{extend_report_cost:,}={extend_cost_no_vat:,}원"
             self.extend_cost_formula.setText(extend_formula)
+
+            # 연장 부가세 포함
+            extend_vat = int(extend_cost_no_vat * 0.1)
+            extend_with_vat = extend_cost_no_vat + extend_vat
+            if hasattr(self, 'extend_cost_vat'):
+                self.extend_cost_vat.setText(f"(VAT포함:{extend_with_vat:,}원)")
 
     def save_as_jpg(self):
         """스케줄 관리 화면을 JPG로 저장"""
