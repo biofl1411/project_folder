@@ -3324,26 +3324,18 @@ class ScheduleManagementTab(QWidget):
             if old_price_item:
                 table.setItem(row, new_col_count - 1, old_price_item)
 
-        # 검사항목 가격 정보 가져오기
-        fees = {}
-        try:
-            from models.fee import Fee
-            all_fees = Fee.get_all()
-            for fee in all_fees:
-                fees[fee['test_item']] = fee['price']
-        except Exception:
-            pass
-
-        # 1회 기준 가격 계산용 (기존 테이블에서 가져오기)
+        # 1회 기준 가격 계산용 (기존 1회차 열의 1회기준 값 사용)
         total_price_per_test = 0
-        test_items_count = row_count - 4  # 전체 행 - (중간보고서 + 날짜 + 제조후시간 + 1회기준)
+        basis_row = row_count - 1  # 마지막 행 (1회 기준)
 
-        for row in range(3, row_count - 1):  # 검사항목 행들
-            item_cell = table.item(row, 0)
-            if item_cell:
-                test_item_name = item_cell.text()
-                price = int(fees.get(test_item_name, 0))
-                total_price_per_test += price
+        # 기존 1회차의 1회기준 가격 가져오기
+        basis_item = table.item(basis_row, 1)  # 1회 열
+        if basis_item:
+            try:
+                price_text = basis_item.text().replace(',', '')
+                total_price_per_test = int(price_text)
+            except (ValueError, AttributeError):
+                total_price_per_test = 0
 
         # 연장 회차 데이터 채우기
         for i, ext_schedule in enumerate(extension_schedules):
@@ -3621,12 +3613,14 @@ class ScheduleManagementTab(QWidget):
 
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
 
         # 행 0: 중간보고서 - 콤보박스가 있으므로 클릭 무시
         if row == 0:
             return
 
-        # 행 1: 날짜 클릭 시 달력으로 날짜 수정
+        # 행 1: 날짜 클릭 시 달력으로 날짜 수정 (기존 회차만)
         if row == 1 and col >= 1 and col <= sampling_count:
             self.edit_date_with_calendar(col)
             return
@@ -3636,10 +3630,10 @@ class ScheduleManagementTab(QWidget):
         test_item_start_row = 3
         test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
 
-        # 검사항목 셀만 토글 가능 (열 1~sampling_count)
+        # 검사항목 셀만 토글 가능 (열 1~total_rounds, 연장 회차 포함)
         if row < test_item_start_row or row > test_item_end_row:
             return
-        if col < 1 or col > sampling_count:
+        if col < 1 or col > total_rounds:
             return
 
         # 수정 가능 여부 확인 (대기 또는 중단 상태에서 수정 가능)
@@ -3946,6 +3940,8 @@ class ScheduleManagementTab(QWidget):
 
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
         test_method = self.current_schedule.get('test_method', '') or ''
 
         # 수수료 정보 로드
@@ -3968,9 +3964,9 @@ class ScheduleManagementTab(QWidget):
         item_o_counts = {}  # {항목명: O 체크 수}
         item_costs = {}     # {항목명: 총 비용}
 
-        # 각 회차별 활성 항목 비용 합계 계산
+        # 각 회차별 활성 항목 비용 합계 계산 (연장 회차 포함)
         column_costs = []  # 각 회차별 비용
-        for col_idx in range(1, sampling_count + 1):
+        for col_idx in range(1, total_rounds + 1):
             col_cost = 0
             for row_idx, test_item in enumerate(test_items):
                 item = table.item(test_item_start_row + row_idx, col_idx)
