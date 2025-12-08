@@ -1574,39 +1574,46 @@ class ScheduleManagementTab(QWidget):
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
-        cost_frame.setMinimumHeight(20)  # 최소 높이
         cost_layout = QVBoxLayout(cost_frame)
-        cost_layout.setSpacing(1)
-        cost_layout.setContentsMargins(3, 1, 3, 1)
+        cost_layout.setSpacing(0)
+        cost_layout.setContentsMargins(2, 0, 2, 0)
 
         # 공통 스타일
-        label_style = "font-size: 10px;"
-        bold_style = "font-size: 10px; font-weight: bold;"
-        input_style = "font-size: 10px; background-color: white; border: 1px solid #ccc; padding: 0px;"
-        formula_style = "font-size: 10px; font-weight: bold; color: #d35400;"
-        vat_style = "font-size: 10px; font-weight: bold; color: #27ae60;"
-        first_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #3498db; padding: 0px 3px; border-radius: 2px;"
-        suspend_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #e74c3c; padding: 0px 3px; border-radius: 2px;"
-        extend_label_style = "font-size: 10px; font-weight: bold; color: white; background-color: #9b59b6; padding: 0px 3px; border-radius: 2px;"
+        label_style = "font-size: 9px;"
+        bold_style = "font-size: 9px; font-weight: bold;"
+        input_style = "font-size: 9px; background-color: white; border: 1px solid #ccc; padding: 0px;"
+        formula_style = "font-size: 9px; font-weight: bold; color: #d35400;"
+        vat_style = "font-size: 9px; font-weight: bold; color: #27ae60;"
+        first_label_style = "font-size: 9px; font-weight: bold; color: white; background-color: #3498db; padding: 0px 2px; border-radius: 2px;"
+        suspend_label_style = "font-size: 9px; font-weight: bold; color: white; background-color: #e74c3c; padding: 0px 2px; border-radius: 2px;"
+        extend_label_style = "font-size: 9px; font-weight: bold; color: white; background-color: #9b59b6; padding: 0px 2px; border-radius: 2px;"
+        item_style = f"{label_style} color: #555;"
 
         # ========== 1행: 1차 견적 ==========
-        row_first = QHBoxLayout()
-        row_first.setSpacing(3)
+        self.row_first_widget = QWidget()
+        self.row_first_widget.setFixedHeight(20)
+        row_first = QHBoxLayout(self.row_first_widget)
+        row_first.setSpacing(2)
         row_first.setContentsMargins(0, 0, 0, 0)
 
         first_type_label = QLabel("1차")
         first_type_label.setStyleSheet(first_label_style)
+        first_type_label.setFixedWidth(22)
         row_first.addWidget(first_type_label)
 
+        # 항목 (절반 너비, 넘치면 ...으로 표시)
         self.item_cost_detail = QLabel("-")
-        self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        row_first.addWidget(self.item_cost_detail)
+        self.item_cost_detail.setStyleSheet(item_style)
+        self.item_cost_detail.setMaximumWidth(450)
+        self.item_cost_detail.setTextFormat(Qt.PlainText)
+        row_first.addWidget(self.item_cost_detail, 1)
 
         lbl1 = QLabel("1회:")
         lbl1.setStyleSheet(label_style)
         row_first.addWidget(lbl1)
         self.cost_per_test = QLabel("-")
         self.cost_per_test.setStyleSheet(bold_style)
+        self.cost_per_test.setFixedWidth(55)
         row_first.addWidget(self.cost_per_test)
 
         lbl2 = QLabel("회차:")
@@ -1614,6 +1621,7 @@ class ScheduleManagementTab(QWidget):
         row_first.addWidget(lbl2)
         self.total_rounds_cost = QLabel("-")
         self.total_rounds_cost.setStyleSheet(bold_style)
+        self.total_rounds_cost.setFixedWidth(65)
         row_first.addWidget(self.total_rounds_cost)
 
         lbl3 = QLabel("보고서:")
@@ -1622,8 +1630,8 @@ class ScheduleManagementTab(QWidget):
         self.first_report_cost_input = QLineEdit("300,000")
         self.first_report_cost_input.setAlignment(Qt.AlignRight)
         self.first_report_cost_input.setStyleSheet(input_style)
-        self.first_report_cost_input.setFixedWidth(50)
-        self.first_report_cost_input.setFixedHeight(16)
+        self.first_report_cost_input.setFixedWidth(45)
+        self.first_report_cost_input.setFixedHeight(14)
         self.first_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_first.addWidget(self.first_report_cost_input)
 
@@ -1633,8 +1641,8 @@ class ScheduleManagementTab(QWidget):
         self.first_interim_cost_input = QLineEdit("200,000")
         self.first_interim_cost_input.setAlignment(Qt.AlignRight)
         self.first_interim_cost_input.setStyleSheet(input_style)
-        self.first_interim_cost_input.setFixedWidth(50)
-        self.first_interim_cost_input.setFixedHeight(16)
+        self.first_interim_cost_input.setFixedWidth(45)
+        self.first_interim_cost_input.setFixedHeight(14)
         self.first_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_first.addWidget(self.first_interim_cost_input)
         self.first_interim_cost_label.hide()
@@ -1648,28 +1656,31 @@ class ScheduleManagementTab(QWidget):
         self.first_cost_vat.setStyleSheet(vat_style)
         row_first.addWidget(self.first_cost_vat)
 
-        row_first.addStretch()
-        cost_layout.addLayout(row_first)
+        cost_layout.addWidget(self.row_first_widget)
 
         # ========== 2행: 중단 견적 ==========
         self.row_suspend_widget = QWidget()
+        self.row_suspend_widget.setFixedHeight(20)
         row_suspend = QHBoxLayout(self.row_suspend_widget)
-        row_suspend.setSpacing(3)
+        row_suspend.setSpacing(2)
         row_suspend.setContentsMargins(0, 0, 0, 0)
 
         suspend_type_label = QLabel("중단")
         suspend_type_label.setStyleSheet(suspend_label_style)
+        suspend_type_label.setFixedWidth(22)
         row_suspend.addWidget(suspend_type_label)
 
         self.suspend_item_cost_detail = QLabel("-")
-        self.suspend_item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        row_suspend.addWidget(self.suspend_item_cost_detail)
+        self.suspend_item_cost_detail.setStyleSheet(item_style)
+        self.suspend_item_cost_detail.setMaximumWidth(450)
+        row_suspend.addWidget(self.suspend_item_cost_detail, 1)
 
         lbl_s0 = QLabel("1회:")
         lbl_s0.setStyleSheet(label_style)
         row_suspend.addWidget(lbl_s0)
         self.suspend_cost_per_test = QLabel("-")
         self.suspend_cost_per_test.setStyleSheet(bold_style)
+        self.suspend_cost_per_test.setFixedWidth(55)
         row_suspend.addWidget(self.suspend_cost_per_test)
 
         lbl_s1 = QLabel("회차:")
@@ -1677,6 +1688,7 @@ class ScheduleManagementTab(QWidget):
         row_suspend.addWidget(lbl_s1)
         self.suspend_rounds_cost = QLabel("-")
         self.suspend_rounds_cost.setStyleSheet(bold_style)
+        self.suspend_rounds_cost.setFixedWidth(65)
         row_suspend.addWidget(self.suspend_rounds_cost)
 
         lbl_s2 = QLabel("보고서:")
@@ -1685,8 +1697,8 @@ class ScheduleManagementTab(QWidget):
         self.suspend_report_cost_input = QLineEdit("300,000")
         self.suspend_report_cost_input.setAlignment(Qt.AlignRight)
         self.suspend_report_cost_input.setStyleSheet(input_style)
-        self.suspend_report_cost_input.setFixedWidth(50)
-        self.suspend_report_cost_input.setFixedHeight(16)
+        self.suspend_report_cost_input.setFixedWidth(45)
+        self.suspend_report_cost_input.setFixedHeight(14)
         self.suspend_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_suspend.addWidget(self.suspend_report_cost_input)
 
@@ -1696,8 +1708,8 @@ class ScheduleManagementTab(QWidget):
         self.suspend_interim_cost_input = QLineEdit("200,000")
         self.suspend_interim_cost_input.setAlignment(Qt.AlignRight)
         self.suspend_interim_cost_input.setStyleSheet(input_style)
-        self.suspend_interim_cost_input.setFixedWidth(50)
-        self.suspend_interim_cost_input.setFixedHeight(16)
+        self.suspend_interim_cost_input.setFixedWidth(45)
+        self.suspend_interim_cost_input.setFixedHeight(14)
         self.suspend_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_suspend.addWidget(self.suspend_interim_cost_input)
         self.suspend_interim_cost_label.hide()
@@ -1711,29 +1723,32 @@ class ScheduleManagementTab(QWidget):
         self.suspend_cost_vat.setStyleSheet(vat_style)
         row_suspend.addWidget(self.suspend_cost_vat)
 
-        row_suspend.addStretch()
         self.row_suspend_widget.hide()
         cost_layout.addWidget(self.row_suspend_widget)
 
         # ========== 3행: 연장 견적 ==========
         self.row_extend_widget = QWidget()
+        self.row_extend_widget.setFixedHeight(20)
         row_extend = QHBoxLayout(self.row_extend_widget)
-        row_extend.setSpacing(3)
+        row_extend.setSpacing(2)
         row_extend.setContentsMargins(0, 0, 0, 0)
 
         extend_type_label = QLabel("연장")
         extend_type_label.setStyleSheet(extend_label_style)
+        extend_type_label.setFixedWidth(22)
         row_extend.addWidget(extend_type_label)
 
         self.extend_item_cost_detail = QLabel("-")
-        self.extend_item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
-        row_extend.addWidget(self.extend_item_cost_detail)
+        self.extend_item_cost_detail.setStyleSheet(item_style)
+        self.extend_item_cost_detail.setMaximumWidth(450)
+        row_extend.addWidget(self.extend_item_cost_detail, 1)
 
         lbl_e0 = QLabel("1회:")
         lbl_e0.setStyleSheet(label_style)
         row_extend.addWidget(lbl_e0)
         self.extend_cost_per_test = QLabel("-")
         self.extend_cost_per_test.setStyleSheet(bold_style)
+        self.extend_cost_per_test.setFixedWidth(55)
         row_extend.addWidget(self.extend_cost_per_test)
 
         lbl_e1 = QLabel("회차:")
@@ -1741,6 +1756,7 @@ class ScheduleManagementTab(QWidget):
         row_extend.addWidget(lbl_e1)
         self.extend_rounds_cost = QLabel("-")
         self.extend_rounds_cost.setStyleSheet(bold_style)
+        self.extend_rounds_cost.setFixedWidth(65)
         row_extend.addWidget(self.extend_rounds_cost)
 
         lbl_e2 = QLabel("보고서:")
@@ -1749,8 +1765,8 @@ class ScheduleManagementTab(QWidget):
         self.extend_report_cost_input = QLineEdit("300,000")
         self.extend_report_cost_input.setAlignment(Qt.AlignRight)
         self.extend_report_cost_input.setStyleSheet(input_style)
-        self.extend_report_cost_input.setFixedWidth(50)
-        self.extend_report_cost_input.setFixedHeight(16)
+        self.extend_report_cost_input.setFixedWidth(45)
+        self.extend_report_cost_input.setFixedHeight(14)
         self.extend_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_extend.addWidget(self.extend_report_cost_input)
 
@@ -1760,8 +1776,8 @@ class ScheduleManagementTab(QWidget):
         self.extend_interim_cost_input = QLineEdit("200,000")
         self.extend_interim_cost_input.setAlignment(Qt.AlignRight)
         self.extend_interim_cost_input.setStyleSheet(input_style)
-        self.extend_interim_cost_input.setFixedWidth(50)
-        self.extend_interim_cost_input.setFixedHeight(16)
+        self.extend_interim_cost_input.setFixedWidth(45)
+        self.extend_interim_cost_input.setFixedHeight(14)
         self.extend_interim_cost_input.textChanged.connect(self.on_cost_input_changed)
         row_extend.addWidget(self.extend_interim_cost_input)
         self.extend_interim_cost_label.hide()
@@ -1775,7 +1791,6 @@ class ScheduleManagementTab(QWidget):
         self.extend_cost_vat.setStyleSheet(vat_style)
         row_extend.addWidget(self.extend_cost_vat)
 
-        row_extend.addStretch()
         self.row_extend_widget.hide()
         cost_layout.addWidget(self.row_extend_widget)
 
