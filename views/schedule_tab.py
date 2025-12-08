@@ -948,6 +948,10 @@ class ScheduleTab(QWidget):
             # 상태를 'pending'(대기)으로 변경
             original_data['status'] = 'pending'
 
+            # 견적 작성일을 오늘 날짜로 설정
+            from datetime import datetime
+            original_data['estimate_date'] = datetime.now().strftime('%Y-%m-%d')
+
             # INSERT 쿼리 생성
             columns = [k for k in original_data.keys() if k not in exclude_columns]
             values = [original_data[k] for k in columns]
