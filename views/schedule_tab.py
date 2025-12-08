@@ -958,6 +958,14 @@ class ScheduleTab(QWidget):
             from datetime import datetime
             original_data['estimate_date'] = datetime.now().strftime('%Y-%m-%d')
 
+            # O/X 상태 초기화 (모든 실험 항목을 O로 리셋)
+            original_data['experiment_schedule_data'] = None
+
+            # 관련 비용 정보 초기화 (새로 계산되도록)
+            original_data['total_rounds_cost'] = None
+            original_data['completed_rounds'] = None
+            original_data['extend_rounds_cost'] = None
+
             # INSERT 쿼리 생성
             columns = [k for k in original_data.keys() if k not in exclude_columns]
             values = [original_data[k] for k in columns]

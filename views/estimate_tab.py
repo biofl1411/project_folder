@@ -910,7 +910,7 @@ class EstimateTab(QWidget):
         """1차 견적 금액 계산 - 상태 변경과 무관하게 원래 전체 비용 계산
 
         O/X 상태 변경과 관계없이 모든 검사항목이 O인 것으로 가정한 원래 비용 계산
-        보고서 비용과 중간보고서 비용은 스케줄에 저장된 값 사용
+        1차 견적 전용 보고서/중간보고서 비용 사용 (first_report_cost, first_interim_cost)
         """
         total = 0
         test_method = schedule.get('test_method', 'real')
@@ -927,18 +927,17 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * sampling_count * zone_count
 
-        # 보고서 비용 (스케줄에 저장된 값 사용)
-        report_cost = schedule.get('report_cost', 0) or 0
+        # 1차 견적 전용 보고서 비용 (first_report_cost 우선 사용)
+        report_cost = schedule.get('first_report_cost', 0) or schedule.get('report_cost', 0) or 0
         if report_cost == 0:
-            # 저장된 값이 없으면 기본값 사용
             if test_method in ['real', 'custom_real']:
                 report_cost = 200000
             else:
                 report_cost = 300000
         total += report_cost
 
-        # 중간보고서 비용 (스케줄에 저장된 값 사용)
-        interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+        # 1차 견적 전용 중간보고서 비용 (first_interim_cost 우선 사용)
+        interim_report_cost = schedule.get('first_interim_cost', 0) or schedule.get('interim_report_cost', 0) or 0
         total += interim_report_cost
 
         return int(total)
@@ -947,8 +946,7 @@ class EstimateTab(QWidget):
         """중단 견적 금액 계산 - O로 체크된 항목만 비용 계산
 
         상태가 '중단'이고 체크 설정이 O인 경우만 비용에 포함
-        total_rounds_cost는 스케줄 관리에서 O/X 상태를 반영하여 계산된 값
-        보고서 비용과 중간보고서 비용은 스케줄에 저장된 값 사용
+        중단 견적 전용 보고서/중간보고서 비용 사용 (suspend_report_cost, suspend_interim_cost)
         """
         total = 0
         test_method = schedule.get('test_method', 'real')
@@ -965,18 +963,17 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * completed_rounds * zone_count
 
-        # 보고서 비용 (스케줄에 저장된 값 사용)
-        report_cost = schedule.get('report_cost', 0) or 0
+        # 중단 견적 전용 보고서 비용 (suspend_report_cost 우선 사용)
+        report_cost = schedule.get('suspend_report_cost', 0) or schedule.get('report_cost', 0) or 0
         if report_cost == 0:
-            # 저장된 값이 없으면 기본값 사용
             if test_method in ['real', 'custom_real']:
                 report_cost = 200000
             else:
                 report_cost = 300000
         total += report_cost
 
-        # 중간보고서 비용 (스케줄에 저장된 값 사용)
-        interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+        # 중단 견적 전용 중간보고서 비용 (suspend_interim_cost 우선 사용)
+        interim_report_cost = schedule.get('suspend_interim_cost', 0) or schedule.get('interim_report_cost', 0) or 0
         total += interim_report_cost
 
         return int(total)
@@ -984,7 +981,7 @@ class EstimateTab(QWidget):
     def _calculate_extend_price(self, schedule, zone_count):
         """연장 견적 금액 계산 - 추가 실험 비용 (O/X 상태 반영)
 
-        연장 회차 비용과 보고서 비용은 스케줄에 저장된 값 사용
+        연장 견적 전용 보고서 비용 사용 (extend_report_cost)
         """
         total = 0
         test_method = schedule.get('test_method', 'real')
@@ -1005,10 +1002,9 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * extend_rounds * zone_count
 
-        # 보고서 비용 (스케줄에 저장된 값 사용)
-        report_cost = schedule.get('report_cost', 0) or 0
+        # 연장 견적 전용 보고서 비용 (extend_report_cost 우선 사용)
+        report_cost = schedule.get('extend_report_cost', 0) or schedule.get('report_cost', 0) or 0
         if report_cost == 0:
-            # 저장된 값이 없으면 기본값 사용
             if test_method in ['real', 'custom_real']:
                 report_cost = 200000
             else:
