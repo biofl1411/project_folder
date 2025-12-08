@@ -600,6 +600,25 @@ class EstimateTab(QWidget):
                 self.estimate_type = "first"
                 self.first_estimate_btn.setStyleSheet(self.btn_active_style)
 
+        # 연장 실험 계획 확인하여 연장 버튼 활성화/비활성화
+        extend_rounds = schedule.get('extend_rounds', 0) or 0
+        extension_test = schedule.get('extension_test', 0) or 0
+        if extend_rounds > 0 or extension_test:
+            # 연장 실험 계획이 있으면 연장 버튼 활성화
+            self.extend_estimate_btn.setEnabled(True)
+            if self.estimate_type == "extend":
+                self.extend_estimate_btn.setStyleSheet(self.btn_active_style)
+            else:
+                self.extend_estimate_btn.setStyleSheet(self.btn_inactive_style)
+        else:
+            # 연장 실험 계획이 없으면 연장 버튼 비활성화
+            self.extend_estimate_btn.setEnabled(False)
+            self.extend_estimate_btn.setStyleSheet(self.btn_disabled_style)
+            # 현재 연장 견적서를 보고 있었다면 1차로 전환
+            if self.estimate_type == "extend":
+                self.estimate_type = "first"
+                self.first_estimate_btn.setStyleSheet(self.btn_active_style)
+
         # 회사 정보 로드
         self.load_company_info()
 
@@ -2036,16 +2055,22 @@ class EstimateTab(QWidget):
         """견적서 유형 전환 (1차, 중단, 연장)"""
         self.estimate_type = estimate_type
 
-        # 버튼 스타일 업데이트
+        # 버튼 스타일 업데이트 (비활성화된 버튼은 disabled 스타일 유지)
         self.first_estimate_btn.setStyleSheet(
             self.btn_active_style if estimate_type == "first" else self.btn_inactive_style
         )
-        self.suspend_estimate_btn.setStyleSheet(
-            self.btn_active_style if estimate_type == "suspend" else self.btn_inactive_style
-        )
-        self.extend_estimate_btn.setStyleSheet(
-            self.btn_active_style if estimate_type == "extend" else self.btn_inactive_style
-        )
+
+        # 중단 버튼: 활성화된 경우에만 스타일 변경
+        if self.suspend_estimate_btn.isEnabled():
+            self.suspend_estimate_btn.setStyleSheet(
+                self.btn_active_style if estimate_type == "suspend" else self.btn_inactive_style
+            )
+
+        # 연장 버튼: 활성화된 경우에만 스타일 변경
+        if self.extend_estimate_btn.isEnabled():
+            self.extend_estimate_btn.setStyleSheet(
+                self.btn_active_style if estimate_type == "extend" else self.btn_inactive_style
+            )
 
         # 현재 스케줄이 있으면 견적서 다시 로드
         if self.current_schedule:
