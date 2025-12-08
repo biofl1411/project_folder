@@ -918,7 +918,7 @@ class EstimateTab(QWidget):
         return int(total)
 
     def _calculate_suspend_price(self, schedule, completed_rounds, zone_count):
-        """중단 견적 금액 계산 - 완료된 회차까지만 정산 (스케줄 관리에서 변경된 비용 반영)"""
+        """중단 견적 금액 계산 - 완료된 회차까지의 비용 (스케줄 관리에서 변경된 비용 반영)"""
         total = 0
         test_method = schedule.get('test_method', 'real')
 
@@ -932,11 +932,11 @@ class EstimateTab(QWidget):
             # 완료된 회차까지의 검사비용
             total += int(cost_per_round * completed_rounds * zone_count)
 
-            # 보고서 비용 (스케줄에서 저장된 값의 50% 적용)
+            # 보고서 비용 (전체 적용)
             report_cost = schedule.get('report_cost', 0) or 0
-            total += int(report_cost * 0.5)
+            total += report_cost
 
-            # 중간 보고서 비용 (진행된 중간보고서가 있으면 포함)
+            # 중간 보고서 비용 (있으면 전체 포함)
             interim_report_cost = schedule.get('interim_report_cost', 0) or 0
             if interim_report_cost > 0:
                 total += interim_report_cost
@@ -950,11 +950,11 @@ class EstimateTab(QWidget):
             item_cost = Fee.calculate_total_fee(test_items)
             total += item_cost * completed_rounds * zone_count
 
-        # 중단 시에는 보고서 비용의 50% 적용
+        # 보고서 비용 (전체 적용)
         if test_method in ['real', 'custom_real']:
-            report_cost = 100000  # 200,000 × 50%
+            report_cost = 200000
         else:
-            report_cost = 150000  # 300,000 × 50%
+            report_cost = 300000
         total += report_cost
 
         return int(total)
@@ -980,11 +980,11 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * extend_rounds * zone_count
 
-        # 연장 보고서 비용 (50%)
+        # 연장 보고서 비용
         if test_method in ['real', 'custom_real']:
-            report_cost = 100000
+            report_cost = 200000
         else:
-            report_cost = 150000
+            report_cost = 300000
         total += report_cost
 
         return int(total)
