@@ -49,6 +49,16 @@ def build_executable():
     # 필요한 폴더 생성
     os.makedirs("dist/FoodLabManager/data", exist_ok=True)
     os.makedirs("dist/FoodLabManager/output", exist_ok=True)
+    os.makedirs("dist/FoodLabManager/config", exist_ok=True)
+
+    # config 폴더 복사 (exe 파일과 같은 레벨에)
+    if os.path.exists("config"):
+        for file in os.listdir("config"):
+            src = os.path.join("config", file)
+            dst = os.path.join("dist/FoodLabManager/config", file)
+            if os.path.isfile(src):
+                shutil.copy(src, dst)
+        print("  - config 폴더 복사 완료")
 
     # 데이터베이스 파일 복사 (있는 경우)
     if os.path.exists("data/app.db"):
