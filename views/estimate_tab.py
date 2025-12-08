@@ -17,7 +17,12 @@ class EstimateTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_schedule = None
+        self.current_user = None
         self.initUI()
+
+    def set_current_user(self, user):
+        """로그인 사용자 정보 설정"""
+        self.current_user = user
 
     def initUI(self):
         """UI 초기화"""
@@ -78,13 +83,25 @@ class EstimateTab(QWidget):
                 background-color: #d0d0d0;
             }
         """
+        self.btn_disabled_style = """
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #aaa;
+                padding: 8px 20px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+        """
 
         self.first_estimate_btn = QPushButton("1차")
         self.first_estimate_btn.setStyleSheet(self.btn_active_style)
         self.first_estimate_btn.clicked.connect(lambda: self.switch_estimate_type("first"))
 
         self.suspend_estimate_btn = QPushButton("중단")
-        self.suspend_estimate_btn.setStyleSheet(self.btn_inactive_style)
+        self.suspend_estimate_btn.setStyleSheet(self.btn_disabled_style)
+        self.suspend_estimate_btn.setEnabled(False)  # 초기 비활성화
         self.suspend_estimate_btn.clicked.connect(lambda: self.switch_estimate_type("suspend"))
 
         self.extend_estimate_btn = QPushButton("연장")
@@ -548,6 +565,21 @@ class EstimateTab(QWidget):
             return
 
         from datetime import datetime
+
+        # 스케줄 상태 확인하여 중단 버튼 활성화/비활성화
+        schedule_status = schedule.get('status', '')
+        if schedule_status == 'suspended':
+            # 상태가 '중단'인 경우에만 중단 버튼 활성화
+            self.suspend_estimate_btn.setEnabled(True)
+            self.suspend_estimate_btn.setStyleSheet(self.btn_inactive_style)
+        else:
+            # 중단 상태가 아닌 경우 중단 버튼 비활성화
+            self.suspend_estimate_btn.setEnabled(False)
+            self.suspend_estimate_btn.setStyleSheet(self.btn_disabled_style)
+            # 현재 중단 견적서를 보고 있었다면 1차로 전환
+            if self.estimate_type == "suspend":
+                self.estimate_type = "first"
+                self.first_estimate_btn.setStyleSheet(self.btn_active_style)
 
         # 회사 정보 로드
         self.load_company_info()
@@ -1111,17 +1143,38 @@ class EstimateTab(QWidget):
             completed_rounds = schedule.get('completed_rounds', 0)
             if completed_rounds is None or completed_rounds == 0:
                 completed_rounds = max(1, sampling_count // 2)  # 기본값: 전체의 절반
+
+            # 1차 견적 금액 계산 (부가세 포함)
+            first_price = self._calculate_first_price(schedule, zone_count, sampling_count)
+            first_price_with_vat = int(first_price * 1.1)  # 부가세 10% 포함
+
+            # 중단 시 진행한 실험 비용 계산 (부가세 포함)
+            suspend_price = self._calculate_suspend_price(schedule, completed_rounds, zone_count)
+            suspend_price_with_vat = int(suspend_price * 1.1)  # 부가세 10% 포함
+
+            # 잔여 금액 계산
+            remaining_price = first_price_with_vat - suspend_price_with_vat
+
+            # 로그인 사용자 정보
+            user_name = ""
+            user_phone = ""
+            user_mobile = ""
+            if self.current_user:
+                user_name = self.current_user.get('name', '')
+                user_phone = self.current_user.get('phone', '')
+                user_mobile = self.current_user.get('mobile', '')
+
             remark_text = f"""※ 중단 정산 내역
 
 → 실험 중단 사유: 품질한계 도달 / 의뢰자 요청
 → 완료된 실험 회차: {completed_rounds}회 / 전체 {sampling_count}회 (온도 {zone_count}구간)
-→ 정산 기준: 완료된 회차까지의 검사비용 + 보고서 비용(50%)
+→ 정산 기준: 1차 견적 = {first_price_with_vat:,}원(부가세 포함) - {suspend_price_with_vat:,}원(중단 시 진행한 실험 비용) = {remaining_price:,}원(잔여)
 
 ※ 정산 안내
 * 본 견적서는 실험 중단에 따른 정산 견적서입니다.
 * 완료된 실험 회차까지의 비용만 청구됩니다.
-* 보고서 비용은 중단보고서 작성 비용(50%)이 포함됩니다.
-* 추가 문의사항은 담당자에게 연락 바랍니다."""
+* 이미 입금이 완료된 경우 환불 또는 다른 검사 비용으로 사용이 가능합니다.
+* 추가 문의사항은 {user_name}, {user_phone}, {user_mobile} 연락 주시기 바랍니다."""
 
         elif self.estimate_type == "extend":
             # 연장 견적서 Remark
@@ -1211,6 +1264,9 @@ class EstimateTab(QWidget):
 
             conn.commit()
             conn.close()
+
+            # current_schedule도 업데이트하여 다시 로드할 때 반영되도록
+            self.current_schedule[field_name] = remark_content
 
             QMessageBox.information(self, "저장 완료", "Remark 내용이 저장되었습니다.")
 
