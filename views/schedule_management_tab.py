@@ -3254,6 +3254,9 @@ class ScheduleManagementTab(QWidget):
             return
 
         from datetime import datetime, timedelta
+        from PyQt5.QtWidgets import QTableWidgetItem, QComboBox
+        from PyQt5.QtGui import QColor
+        from PyQt5.QtCore import Qt
 
         # 기존 샘플링 횟수와 간격 가져오기
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
@@ -3298,8 +3301,63 @@ class ScheduleManagementTab(QWidget):
         # 현재 스케줄에 연장 데이터 저장
         self.current_schedule['extension_schedules'] = extension_schedules
 
-        # 테이블 업데이트는 display_schedule_detail에서 처리
-        # 여기서는 시그널만 발생
+        # 테이블에 연장 회차 열 추가
+        table = self.experiment_table
+        current_col_count = table.columnCount()
+        row_count = table.rowCount()
+
+        # 기존 열 수: 구분(1) + 기존회차(sampling_count) + 가격(1) = sampling_count + 2
+        # 가격 열 위치: 마지막 열
+        price_col = current_col_count - 1
+
+        # 새 열 수: 기존 + 연장 회차
+        new_col_count = sampling_count + 2 + extend_rounds
+        table.setColumnCount(new_col_count)
+
+        # 헤더 업데이트
+        headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count + extend_rounds)] + ['가격']
+        table.setHorizontalHeaderLabels(headers)
+
+        # 가격 열 데이터를 새 마지막 열로 이동
+        for row in range(row_count):
+            old_price_item = table.takeItem(row, price_col)
+            if old_price_item:
+                table.setItem(row, new_col_count - 1, old_price_item)
+
+        # 연장 회차 데이터 채우기
+        for i, ext_schedule in enumerate(extension_schedules):
+            col_idx = sampling_count + 1 + i  # 기존 회차 다음 열
+
+            # 행 0: 중간보고서 콤보박스
+            combo = QComboBox()
+            combo.addItems(['', '1차', '2차', '3차'])
+            combo.setStyleSheet("font-size: 10px;")
+            combo.setProperty('round_col', col_idx)
+            combo.currentTextChanged.connect(self.on_interim_report_combo_changed)
+            self.interim_report_combos[col_idx] = combo
+            table.setCellWidget(0, col_idx, combo)
+
+            # 행 1: 날짜 (연장 회차는 연두색 배경)
+            date_item = QTableWidgetItem(ext_schedule['date'])
+            date_item.setTextAlignment(Qt.AlignCenter)
+            date_item.setBackground(QColor('#90EE90'))  # 연두색 (연장 회차 표시)
+            date_item.setToolTip("연장 회차")
+            table.setItem(1, col_idx, date_item)
+
+            # 행 2: 제조후 일수
+            days_item = QTableWidgetItem(str(ext_schedule['days_after']))
+            days_item.setTextAlignment(Qt.AlignCenter)
+            days_item.setBackground(QColor('#90EE90'))  # 연두색
+            table.setItem(2, col_idx, days_item)
+
+            # 행 3 이후: 검사항목 (빈 셀 또는 체크박스)
+            for row in range(3, row_count - 1):  # 마지막 행(1회기준)은 제외
+                empty_item = QTableWidgetItem("")
+                empty_item.setTextAlignment(Qt.AlignCenter)
+                empty_item.setBackground(QColor('#F0FFF0'))  # 연한 연두색
+                table.setItem(row, col_idx, empty_item)
+
+        # 스케줄 저장 시그널 발생
         self.schedule_saved.emit()
 
     def edit_last_experiment_date_with_calendar(self):
