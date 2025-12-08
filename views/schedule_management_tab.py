@@ -3363,10 +3363,11 @@ class ScheduleManagementTab(QWidget):
         for i, ext_schedule in enumerate(extension_schedules):
             col_idx = sampling_count + 1 + i  # 기존 회차 다음 열
 
-            # 행 0: 중간보고서 콤보박스
+            # 행 0: 중간보고서 콤보박스 (연장 회차는 활성화)
             combo = QComboBox()
             combo.addItems(['', '1차', '2차', '3차'])
-            combo.setStyleSheet("font-size: 10px;")
+            combo.setStyleSheet("font-size: 10px; background-color: #90EE90; color: #000000;")  # 연두색 배경 (활성화)
+            combo.setEnabled(True)
             combo.setProperty('round_col', col_idx)
             combo.currentTextChanged.connect(self.on_interim_report_combo_changed)
             self.interim_report_combos[col_idx] = combo
