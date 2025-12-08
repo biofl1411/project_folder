@@ -1576,7 +1576,7 @@ class ScheduleManagementTab(QWidget):
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
         cost_layout = QVBoxLayout(cost_frame)
         cost_layout.setSpacing(1)  # 행간 간격 1px
-        cost_layout.setContentsMargins(2, 1, 2, 1)
+        cost_layout.setContentsMargins(1, 1, 1, 1)  # 박스 내부 여백 모두 1px
 
         # 공통 스타일 (폰트 11px - 2포인트 증가)
         label_style = "font-size: 11px;"
