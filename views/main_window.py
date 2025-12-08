@@ -773,7 +773,10 @@ class MainWindow(QMainWindow):
             from .settings_dialog import SettingsDialog
 
             dialog = SettingsDialog(self, current_user=self.current_user)
-            dialog.exec_()
+            if dialog.exec_():
+                # 설정이 저장되면 견적서 탭의 회사 정보 새로고침
+                if hasattr(self, 'estimate_tab') and self.estimate_tab:
+                    self.estimate_tab.load_company_info()
         except Exception as e:
             import traceback
             print(f"설정 창 표시 중 오류: {str(e)}")
