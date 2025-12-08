@@ -3419,6 +3419,12 @@ class ScheduleManagementTab(QWidget):
             cost_item.setBackground(QColor('#FFFF99'))  # 노란색 (1회기준 행)
             table.setItem(row_count - 1, col_idx, cost_item)
 
+        # 열 너비 재설정: 구분 열은 자동 조정, 나머지 열은 균등 배분
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 구분 열
+        for col in range(1, new_col_count):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
+
         # 스케줄 저장 시그널 발생
         self.schedule_saved.emit()
 
