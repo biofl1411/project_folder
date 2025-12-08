@@ -49,11 +49,17 @@ class VersionChecker(QThread):
                 file_size = 0
 
                 for asset in data.get('assets', []):
-                    if asset['name'].endswith('.exe'):
+                    # ZIP 파일 우선 (GitHub Actions에서 생성하는 형식)
+                    if asset['name'].endswith('.zip'):
                         download_url = asset['browser_download_url']
                         file_name = asset['name']
                         file_size = asset['size']
                         break
+                    # EXE 파일도 지원 (단일 파일 릴리스)
+                    elif asset['name'].endswith('.exe') and not download_url:
+                        download_url = asset['browser_download_url']
+                        file_name = asset['name']
+                        file_size = asset['size']
 
                 self.finished.emit({
                     'success': True,
@@ -268,16 +274,42 @@ class UpdateDialog(QDialog):
             if getattr(sys, 'frozen', False):
                 # EXE로 실행 중인 경우
                 current_exe = sys.executable
+                app_dir = os.path.dirname(current_exe)
 
-                # 배치 스크립트로 교체 (현재 프로그램 종료 후 교체)
-                batch_script = os.path.join(tempfile.gettempdir(), "update.bat")
-                with open(batch_script, 'w', encoding='utf-8') as f:
-                    f.write('@echo off\n')
-                    f.write('echo 업데이트 중...\n')
-                    f.write('timeout /t 2 /nobreak > nul\n')  # 2초 대기
-                    f.write(f'copy /Y "{self.downloaded_file}" "{current_exe}"\n')
-                    f.write(f'start "" "{current_exe}"\n')
-                    f.write(f'del "%~f0"\n')  # 배치 파일 자체 삭제
+                # ZIP 파일인 경우 압축 해제 후 복사
+                if self.downloaded_file.endswith('.zip'):
+                    import zipfile
+
+                    # 임시 폴더에 압축 해제
+                    extract_dir = os.path.join(tempfile.gettempdir(), "foodlab_update")
+                    if os.path.exists(extract_dir):
+                        import shutil
+                        shutil.rmtree(extract_dir)
+
+                    with zipfile.ZipFile(self.downloaded_file, 'r') as zip_ref:
+                        zip_ref.extractall(extract_dir)
+
+                    # 배치 스크립트로 폴더 전체 복사
+                    batch_script = os.path.join(tempfile.gettempdir(), "update.bat")
+                    with open(batch_script, 'w', encoding='utf-8') as f:
+                        f.write('@echo off\n')
+                        f.write('chcp 65001 > nul\n')
+                        f.write('echo 업데이트 중...\n')
+                        f.write('timeout /t 2 /nobreak > nul\n')  # 2초 대기
+                        f.write(f'xcopy /E /Y /Q "{extract_dir}\\*" "{app_dir}\\"\n')
+                        f.write(f'start "" "{current_exe}"\n')
+                        f.write(f'rmdir /S /Q "{extract_dir}"\n')
+                        f.write(f'del "%~f0"\n')  # 배치 파일 자체 삭제
+                else:
+                    # 단일 EXE 파일인 경우
+                    batch_script = os.path.join(tempfile.gettempdir(), "update.bat")
+                    with open(batch_script, 'w', encoding='utf-8') as f:
+                        f.write('@echo off\n')
+                        f.write('echo 업데이트 중...\n')
+                        f.write('timeout /t 2 /nobreak > nul\n')  # 2초 대기
+                        f.write(f'copy /Y "{self.downloaded_file}" "{current_exe}"\n')
+                        f.write(f'start "" "{current_exe}"\n')
+                        f.write(f'del "%~f0"\n')  # 배치 파일 자체 삭제
 
                 # 배치 스크립트 실행 후 종료
                 subprocess.Popen(['cmd', '/c', batch_script],
