@@ -3401,7 +3401,7 @@ class ScheduleManagementTab(QWidget):
             table.setItem(1, col_idx, date_item)
 
             # 행 2: 제조후 일수
-            days_item = QTableWidgetItem(str(ext_schedule['days_after']))
+            days_item = QTableWidgetItem(f"{ext_schedule['days_after']}일")
             days_item.setTextAlignment(Qt.AlignCenter)
             days_item.setBackground(QColor('#90EE90'))  # 연두색
             table.setItem(2, col_idx, days_item)
@@ -3820,7 +3820,8 @@ class ScheduleManagementTab(QWidget):
             return
 
         table = self.experiment_table
-        current_date_text = table.item(0, col).text() if table.item(0, col) else "-"
+        # 행 1이 날짜 행 (행 0: 중간보고서, 행 1: 날짜, 행 2: 제조후 일수)
+        current_date_text = table.item(1, col).text() if table.item(1, col) else "-"
         old_date = current_date_text  # 로그용
 
         # 시작일 가져오기
@@ -3862,8 +3863,8 @@ class ScheduleManagementTab(QWidget):
                 details={'round': col, 'old_date': old_date, 'new_date': new_date_str}
             )
 
-            # 테이블 날짜 업데이트 (연-월-일 형식)
-            date_item = table.item(0, col)
+            # 테이블 날짜 업데이트 (행 1: 날짜)
+            date_item = table.item(1, col)
             if date_item:
                 date_item.setText(dialog.selected_date.strftime('%Y-%m-%d'))
 
@@ -3888,10 +3889,10 @@ class ScheduleManagementTab(QWidget):
                 # 전체 실험 스케줄 재계산
                 self._recalculate_all_dates(new_start_date)
             else:
-                # 제조후 일수 업데이트 (1회차가 아닌 경우)
+                # 제조후 일수 업데이트 (행 2: 제조후 일수, 1회차가 아닌 경우)
                 if start_date:
                     days_elapsed = (dialog.selected_date - start_date).days
-                    time_item = table.item(1, col)
+                    time_item = table.item(2, col)
                     if time_item:
                         time_item.setText(f"{days_elapsed}일")
                         time_item.setBackground(QColor('#FFE4B5'))
@@ -3936,8 +3937,8 @@ class ScheduleManagementTab(QWidget):
 
                 sample_date = new_start_date + timedelta(days=days_offset)
 
-                # 테이블 업데이트
-                date_item = table.item(0, col_idx)
+                # 테이블 업데이트 (행 1: 날짜)
+                date_item = table.item(1, col_idx)
                 if date_item:
                     date_item.setText(sample_date.strftime('%Y-%m-%d'))
 
@@ -3957,8 +3958,8 @@ class ScheduleManagementTab(QWidget):
                         else:
                             date_item.setBackground(QColor('#E6F3FF'))  # 평일 - 기존 색상
 
-                # 제조후 일수 업데이트
-                time_item = table.item(1, col_idx)
+                # 제조후 일수 업데이트 (행 2: 제조후 일수)
+                time_item = table.item(2, col_idx)
                 if time_item:
                     time_item.setText(f"{days_offset}일")
                     time_item.setBackground(QColor('#90EE90'))
