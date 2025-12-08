@@ -313,9 +313,15 @@ class ScheduleTab(QWidget):
         self.delete_schedule_btn.setStyleSheet("background-color: #e74c3c; color: white;")
         self.delete_schedule_btn.clicked.connect(self.delete_selected_schedule)
 
+        self.copy_schedule_btn = QPushButton("복사하기")
+        self.copy_schedule_btn.setIcon(self.style().standardIcon(self.style().SP_DialogApplyButton))
+        self.copy_schedule_btn.setStyleSheet("background-color: #9b59b6; color: white;")
+        self.copy_schedule_btn.clicked.connect(self.copy_selected_schedule)
+
         button_layout.addWidget(self.new_schedule_btn)
         button_layout.addWidget(self.edit_schedule_btn)
         button_layout.addWidget(self.delete_schedule_btn)
+        button_layout.addWidget(self.copy_schedule_btn)
 
         # 구분선
         button_layout.addSpacing(20)
@@ -902,6 +908,83 @@ class ScheduleTab(QWidget):
         except Exception as e:
             import traceback
             error_msg = f"스케줄 수정 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)
+            QMessageBox.critical(self, "오류", error_msg)
+
+    def copy_selected_schedule(self):
+        """선택된 스케줄 복사 (상태는 대기로 변경)"""
+        selected_rows = self.schedule_table.selectedIndexes()
+        if not selected_rows:
+            QMessageBox.warning(self, "복사 실패", "복사할 스케줄을 선택하세요.")
+            return
+
+        row = selected_rows[0].row()
+        schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
+        if not schedule_id_item:
+            return
+
+        schedule_id = int(schedule_id_item.text())
+
+        try:
+            from database import get_connection
+
+            # 원본 스케줄 데이터 조회
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM schedules WHERE id = %s", (schedule_id,))
+            original = cursor.fetchone()
+
+            if not original:
+                QMessageBox.warning(self, "복사 실패", "스케줄을 찾을 수 없습니다.")
+                conn.close()
+                return
+
+            # 원본 데이터를 딕셔너리로 변환
+            original_data = dict(original)
+
+            # 복사에서 제외할 컬럼들
+            exclude_columns = ['id', 'created_at', 'updated_at']
+
+            # 상태를 'pending'(대기)으로 변경
+            original_data['status'] = 'pending'
+
+            # 견적 작성일을 오늘 날짜로 설정
+            from datetime import datetime
+            original_data['estimate_date'] = datetime.now().strftime('%Y-%m-%d')
+
+            # INSERT 쿼리 생성
+            columns = [k for k in original_data.keys() if k not in exclude_columns]
+            values = [original_data[k] for k in columns]
+            placeholders = ', '.join(['%s'] * len(columns))
+            columns_str = ', '.join(columns)
+
+            cursor.execute(f"""
+                INSERT INTO schedules ({columns_str})
+                VALUES ({placeholders})
+            """, values)
+
+            new_schedule_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+
+            # 복사된 스케줄 정보 표시
+            client_name = original_data.get('client_name', '') or ''
+            product_name = original_data.get('product_name', '') or original_data.get('title', '')
+            QMessageBox.information(
+                self, "복사 완료",
+                f"스케줄이 복사되었습니다.\n\n"
+                f"업체: {client_name}\n"
+                f"제품: {product_name}\n"
+                f"새 스케줄 ID: {new_schedule_id}\n"
+                f"상태: 대기"
+            )
+
+            # 목록 새로고침
+            self.load_schedules()
+
+        except Exception as e:
+            import traceback
+            error_msg = f"스케줄 복사 중 오류 발생:\n{str(e)}\n\n{traceback.format_exc()}"
             print(error_msg)
             QMessageBox.critical(self, "오류", error_msg)
 
