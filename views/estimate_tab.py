@@ -907,79 +907,85 @@ class EstimateTab(QWidget):
             return self._calculate_first_price(schedule, zone_count, sampling_count)
 
     def _calculate_first_price(self, schedule, zone_count, sampling_count):
-        """1차 견적 금액 계산"""
-        # 스케줄 관리에서 계산된 비용 정보가 있으면 그대로 사용
-        if schedule.get('total_rounds_cost') is not None and schedule.get('report_cost') is not None:
-            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
-            report_cost = schedule.get('report_cost', 0) or 0
-            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+        """1차 견적 금액 계산 - 상태 변경과 무관하게 원래 전체 비용 계산
 
-            total = (total_rounds_cost * zone_count) + report_cost + interim_report_cost
-            return int(total)
-
-        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
+        O/X 상태 변경과 관계없이 모든 검사항목이 O인 것으로 가정한 원래 비용 계산
+        보고서 비용과 중간보고서 비용은 스케줄에 저장된 값 사용
+        """
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 검사항목 수수료 계산
-        test_items = schedule.get('test_items', '')
-        if test_items:
-            item_cost = Fee.calculate_total_fee(test_items)
-            total += item_cost * sampling_count * zone_count
-
-        # 보고서 비용
-        if test_method in ['real', 'custom_real']:
-            report_cost = 200000
+        # cost_per_test (1회 기준 비용)가 있으면 사용하여 원래 전체 비용 계산
+        cost_per_test = schedule.get('cost_per_test', 0) or 0
+        if cost_per_test > 0:
+            # 원래 전체 비용 = 1회기준 × 샘플링횟수 × 구간수
+            total += cost_per_test * sampling_count * zone_count
         else:
-            report_cost = 300000
+            # cost_per_test가 없으면 test_items로 계산 (호환성 유지)
+            test_items = schedule.get('test_items', '')
+            if test_items:
+                item_cost = Fee.calculate_total_fee(test_items)
+                total += item_cost * sampling_count * zone_count
+
+        # 보고서 비용 (스케줄에 저장된 값 사용)
+        report_cost = schedule.get('report_cost', 0) or 0
+        if report_cost == 0:
+            # 저장된 값이 없으면 기본값 사용
+            if test_method in ['real', 'custom_real']:
+                report_cost = 200000
+            else:
+                report_cost = 300000
         total += report_cost
+
+        # 중간보고서 비용 (스케줄에 저장된 값 사용)
+        interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+        total += interim_report_cost
 
         return int(total)
 
     def _calculate_suspend_price(self, schedule, completed_rounds, zone_count):
-        """중단 견적 금액 계산 - 완료된 회차까지의 비용 (스케줄 관리에서 변경된 비용 반영)"""
+        """중단 견적 금액 계산 - O로 체크된 항목만 비용 계산
+
+        상태가 '중단'이고 체크 설정이 O인 경우만 비용에 포함
+        total_rounds_cost는 스케줄 관리에서 O/X 상태를 반영하여 계산된 값
+        보고서 비용과 중간보고서 비용은 스케줄에 저장된 값 사용
+        """
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 스케줄 관리에서 계산된 비용 정보가 있으면 사용
-        if schedule.get('total_rounds_cost') is not None:
-            # 1회당 검사비용 계산
-            sampling_count = schedule.get('sampling_count', 6) or 6
-            total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
-            cost_per_round = total_rounds_cost / sampling_count if sampling_count > 0 else 0
-
-            # 완료된 회차까지의 검사비용
-            total += int(cost_per_round * completed_rounds * zone_count)
-
-            # 보고서 비용 (전체 적용)
-            report_cost = schedule.get('report_cost', 0) or 0
-            total += report_cost
-
-            # 중간 보고서 비용 (있으면 전체 포함)
-            interim_report_cost = schedule.get('interim_report_cost', 0) or 0
-            if interim_report_cost > 0:
-                total += interim_report_cost
-
-            return int(total)
-
-        # 전달받은 비용 정보가 없으면 기존 방식으로 계산 (호환성 유지)
-        # 검사항목 수수료 계산 (완료된 회차만)
-        test_items = schedule.get('test_items', '')
-        if test_items:
-            item_cost = Fee.calculate_total_fee(test_items)
-            total += item_cost * completed_rounds * zone_count
-
-        # 보고서 비용 (전체 적용)
-        if test_method in ['real', 'custom_real']:
-            report_cost = 200000
+        # 스케줄 관리에서 계산된 비용 정보 사용 (O로 체크된 항목만 포함됨)
+        total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
+        if total_rounds_cost > 0:
+            # O로 체크된 항목의 비용 × 구간수
+            total += total_rounds_cost * zone_count
         else:
-            report_cost = 300000
+            # total_rounds_cost가 없으면 기존 방식으로 계산 (호환성 유지)
+            test_items = schedule.get('test_items', '')
+            if test_items:
+                item_cost = Fee.calculate_total_fee(test_items)
+                total += item_cost * completed_rounds * zone_count
+
+        # 보고서 비용 (스케줄에 저장된 값 사용)
+        report_cost = schedule.get('report_cost', 0) or 0
+        if report_cost == 0:
+            # 저장된 값이 없으면 기본값 사용
+            if test_method in ['real', 'custom_real']:
+                report_cost = 200000
+            else:
+                report_cost = 300000
         total += report_cost
+
+        # 중간보고서 비용 (스케줄에 저장된 값 사용)
+        interim_report_cost = schedule.get('interim_report_cost', 0) or 0
+        total += interim_report_cost
 
         return int(total)
 
     def _calculate_extend_price(self, schedule, zone_count):
-        """연장 견적 금액 계산 - 추가 실험 비용 (O/X 상태 반영)"""
+        """연장 견적 금액 계산 - 추가 실험 비용 (O/X 상태 반영)
+
+        연장 회차 비용과 보고서 비용은 스케줄에 저장된 값 사용
+        """
         total = 0
         test_method = schedule.get('test_method', 'real')
 
@@ -999,11 +1005,14 @@ class EstimateTab(QWidget):
                 item_cost = Fee.calculate_total_fee(test_items)
                 total += item_cost * extend_rounds * zone_count
 
-        # 연장 보고서 비용
-        if test_method in ['real', 'custom_real']:
-            report_cost = 200000
-        else:
-            report_cost = 300000
+        # 보고서 비용 (스케줄에 저장된 값 사용)
+        report_cost = schedule.get('report_cost', 0) or 0
+        if report_cost == 0:
+            # 저장된 값이 없으면 기본값 사용
+            if test_method in ['real', 'custom_real']:
+                report_cost = 200000
+            else:
+                report_cost = 300000
         total += report_cost
 
         return int(total)

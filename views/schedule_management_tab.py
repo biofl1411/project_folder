@@ -1540,6 +1540,12 @@ class ScheduleManagementTab(QWidget):
         self.remove_item_btn.clicked.connect(self.remove_test_item)
         btn_widget_layout.addWidget(self.remove_item_btn)
 
+        self.bulk_x_btn = QPushButton("선택 영역 X")
+        self.bulk_x_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 5px 15px; font-weight: bold;")
+        self.bulk_x_btn.clicked.connect(self.bulk_set_x)
+        self.bulk_x_btn.setToolTip("테이블에서 드래그로 선택한 영역을 일괄 X로 변경")
+        btn_widget_layout.addWidget(self.bulk_x_btn)
+
         self.save_schedule_btn = QPushButton("저장")
         self.save_schedule_btn.setStyleSheet("background-color: #3498db; color: white; padding: 5px 15px; font-weight: bold;")
         self.save_schedule_btn.clicked.connect(self.save_schedule_changes)
@@ -3151,6 +3157,39 @@ class ScheduleManagementTab(QWidget):
                             self.current_schedule['report3_date'] = ''
                             self.current_schedule['interim3_round'] = 0
 
+    def _update_interim_report_date_for_round(self, round_num):
+        """특정 회차의 날짜가 변경되었을 때 연결된 중간보고서 날짜 재계산"""
+        if not self.current_schedule:
+            return
+
+        # 해당 회차에 연결된 중간보고서 확인
+        interim1_round = self.current_schedule.get('interim1_round', 0) or 0
+        interim2_round = self.current_schedule.get('interim2_round', 0) or 0
+        interim3_round = self.current_schedule.get('interim3_round', 0) or 0
+
+        # 해당 회차의 새 날짜 가져오기
+        if round_num not in self.sample_dates:
+            return
+
+        sample_date = self.sample_dates[round_num]
+
+        # 영업일 기준 +15일 계산
+        report_date = self.add_business_days(sample_date, 15)
+        report_date_str = report_date.strftime('%Y-%m-%d')
+
+        # 해당 회차에 연결된 중간보고서 날짜 업데이트
+        if interim1_round == round_num:
+            self.report1_value.setText(report_date_str)
+            self.current_schedule['report1_date'] = report_date_str
+
+        if interim2_round == round_num:
+            self.report2_value.setText(report_date_str)
+            self.current_schedule['report2_date'] = report_date_str
+
+        if interim3_round == round_num:
+            self.report3_value.setText(report_date_str)
+            self.current_schedule['report3_date'] = report_date_str
+
     def show_extend_rounds_dialog(self):
         """연장 회차 계산 다이얼로그 표시"""
         if not self.current_schedule:
@@ -3759,6 +3798,66 @@ class ScheduleManagementTab(QWidget):
         # 비용 재계산
         self.recalculate_costs()
 
+    def bulk_set_x(self):
+        """선택한 영역의 셀을 일괄 X로 변경"""
+        if not self.current_schedule:
+            return
+
+        # 수정 가능 여부 확인 (대기 또는 중단 상태에서 수정 가능)
+        if not self.can_edit_plan(allow_suspended=True):
+            QMessageBox.warning(self, "수정 불가", "대기 또는 중단 상태에서만 수정 가능합니다.")
+            return
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
+
+        # 검사항목 행 범위 (행 3부터 마지막-1 행까지)
+        test_item_start_row = 3
+        test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
+
+        # 선택된 셀 범위 가져오기
+        selected_ranges = table.selectedRanges()
+        if not selected_ranges:
+            QMessageBox.information(self, "선택 영역 없음", "변경할 영역을 먼저 드래그로 선택해주세요.")
+            return
+
+        changed_count = 0
+
+        for selection in selected_ranges:
+            for row in range(selection.topRow(), selection.bottomRow() + 1):
+                # 검사항목 행만 처리
+                if row < test_item_start_row or row > test_item_end_row:
+                    continue
+
+                for col in range(selection.leftColumn(), selection.rightColumn() + 1):
+                    # 회차 열만 처리 (열 1~total_rounds)
+                    if col < 1 or col > total_rounds:
+                        continue
+
+                    item = table.item(row, col)
+                    if item is None:
+                        continue
+
+                    current_value = item.text()
+                    if current_value != 'X':
+                        item.setText('X')
+                        item.setForeground(QBrush(QColor('#e74c3c')))  # 빨간색
+                        changed_count += 1
+
+        if changed_count > 0:
+            # 활동 로그 기록
+            self.log_activity(
+                'schedule_experiment_bulk_x',
+                details={'changed_cells': changed_count}
+            )
+            # 비용 재계산
+            self.recalculate_costs()
+            QMessageBox.information(self, "일괄 변경 완료", f"{changed_count}개 셀이 X로 변경되었습니다.")
+        else:
+            QMessageBox.information(self, "변경 없음", "변경된 셀이 없습니다.\n검사항목 영역을 선택해주세요.")
+
     def count_completed_rounds(self):
         """온도조건별 실험 테이블에서 완료된 회차 수를 계산
 
@@ -3899,6 +3998,12 @@ class ScheduleManagementTab(QWidget):
 
                 # 실험기간 업데이트 (날짜 변경 반영)
                 self._update_experiment_period_display()
+
+            # sample_dates 업데이트
+            self.sample_dates[col] = dialog.selected_date
+
+            # 해당 회차에 연결된 중간보고서가 있으면 날짜 재계산
+            self._update_interim_report_date_for_round(col)
 
             # 스케줄 저장 시그널 발생 (다른 탭 새로고침용)
             self.schedule_saved.emit()
