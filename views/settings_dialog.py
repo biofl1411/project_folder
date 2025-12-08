@@ -540,8 +540,15 @@ class SettingsDialog(QDialog):
         )
 
         if file_path:
-            # config 폴더에 복사
-            config_dir = "config"
+            # 기본 경로 설정 (실행파일/스크립트 위치 기준)
+            import sys
+            if getattr(sys, 'frozen', False):
+                base_path = os.path.dirname(sys.executable)
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+            # config 폴더에 복사 (절대 경로 사용)
+            config_dir = os.path.join(base_path, "config")
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir)
 

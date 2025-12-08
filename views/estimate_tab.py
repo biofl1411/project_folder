@@ -506,8 +506,21 @@ class EstimateTab(QWidget):
             address = settings_dict.get('company_address', '서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호')
             self.header_address_label.setText(address)
 
+            # 기본 경로 설정 (실행파일/스크립트 위치 기준)
+            import sys
+            if getattr(sys, 'frozen', False):
+                base_path = os.path.dirname(sys.executable)
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
             # 로고 이미지 로드
             logo_path = settings_dict.get('logo_path', '')
+            if logo_path:
+                # 상대 경로인 경우 절대 경로로 변환
+                if not os.path.isabs(logo_path):
+                    logo_path = os.path.join(base_path, logo_path)
+                logo_path = os.path.normpath(logo_path)
+
             if logo_path and os.path.exists(logo_path):
                 pixmap = QPixmap(logo_path)
                 if not pixmap.isNull():
@@ -527,12 +540,20 @@ class EstimateTab(QWidget):
 
             # 직인 이미지 로드
             stamp_path = settings_dict.get('stamp_path', '')
+            if stamp_path:
+                # 상대 경로인 경우 절대 경로로 변환
+                if not os.path.isabs(stamp_path):
+                    stamp_path = os.path.join(base_path, stamp_path)
+                stamp_path = os.path.normpath(stamp_path)
+
             if stamp_path and os.path.exists(stamp_path):
                 stamp_pixmap = QPixmap(stamp_path)
                 if not stamp_pixmap.isNull():
                     # 직인 크기 조정 (60x60px)
                     scaled_stamp = stamp_pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                     self.stamp_label.setPixmap(scaled_stamp)
+                    self.stamp_label.show()
+                    self.stamp_label.raise_()  # 다른 위젯 앞으로 이동
             else:
                 self.stamp_label.clear()
 
