@@ -1574,7 +1574,7 @@ class ScheduleManagementTab(QWidget):
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
-        cost_frame.setMinimumHeight(30)  # 최소 높이 (2/3로 축소)
+        cost_frame.setMinimumHeight(25)  # 최소 높이
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(2)
         cost_layout.setContentsMargins(5, 1, 5, 1)
