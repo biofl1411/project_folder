@@ -33,6 +33,12 @@ def load_db_config():
 
     config_file = os.path.join(base_path, CONFIG_PATH)
 
+    # config 파일이 없으면 _internal/config 경로도 확인 (PyInstaller 빌드용)
+    if not os.path.exists(config_file):
+        internal_config = os.path.join(base_path, '_internal', CONFIG_PATH)
+        if os.path.exists(internal_config):
+            config_file = internal_config
+
     if os.path.exists(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -43,7 +49,7 @@ def load_db_config():
             "port": 3306,
             "database": "foodlab",
             "user": "foodlab",
-            "password": "foodlab1234",
+            "password": "bphsk*1411**",
             "charset": "utf8mb4"
         }
 
