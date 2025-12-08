@@ -2131,10 +2131,14 @@ class ScheduleManagementTab(QWidget):
             col_idx = i + 1
             combo = QComboBox()
             combo.addItems(['', '1차', '2차', '3차'])
-            combo.setStyleSheet("font-size: 10px; background-color: #E0E0E0; color: #888888;")
 
-            # 1~6회차는 중간보고서 선택 비활성화 (연장 회차에서만 선택 가능)
-            combo.setEnabled(False)
+            # 1~5회차는 비활성화, 6회차부터는 활성화
+            if col_idx <= 5:
+                combo.setStyleSheet("font-size: 10px; background-color: #E0E0E0; color: #888888;")
+                combo.setEnabled(False)
+            else:
+                combo.setStyleSheet("font-size: 10px; background-color: #90EE90; color: #000000;")
+                combo.setEnabled(True)
 
             # 저장된 값 복원
             round_num = i + 1
