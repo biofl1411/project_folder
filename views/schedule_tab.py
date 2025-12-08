@@ -832,14 +832,22 @@ class ScheduleTab(QWidget):
             schedule_id = int(schedule_id_item.text())
             self.schedule_double_clicked.emit(schedule_id)
 
+    def get_checked_row(self):
+        """체크박스가 선택된 첫 번째 행 반환 (없으면 None)"""
+        for row in range(self.schedule_table.rowCount()):
+            checkbox_widget = self.schedule_table.cellWidget(row, 0)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    return row
+        return None
+
     def delete_selected_schedule(self):
         """선택된 스케줄 삭제"""
-        selected_rows = self.schedule_table.selectedIndexes()
-        if not selected_rows:
-            QMessageBox.warning(self, "삭제 실패", "삭제할 스케줄을 선택하세요.")
+        row = self.get_checked_row()
+        if row is None:
+            QMessageBox.warning(self, "삭제 실패", "삭제할 스케줄을 체크하세요.")
             return
-
-        row = selected_rows[0].row()
         schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if not schedule_id_item:
             return
@@ -886,12 +894,11 @@ class ScheduleTab(QWidget):
 
     def edit_selected_schedule(self):
         """선택된 스케줄 수정 다이얼로그 표시"""
-        selected_rows = self.schedule_table.selectedIndexes()
-        if not selected_rows:
-            QMessageBox.warning(self, "수정 실패", "수정할 스케줄을 선택하세요.")
+        row = self.get_checked_row()
+        if row is None:
+            QMessageBox.warning(self, "수정 실패", "수정할 스케줄을 체크하세요.")
             return
 
-        row = selected_rows[0].row()
         schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if not schedule_id_item:
             return
@@ -913,12 +920,11 @@ class ScheduleTab(QWidget):
 
     def copy_selected_schedule(self):
         """선택된 스케줄 복사 (상태는 대기로 변경)"""
-        selected_rows = self.schedule_table.selectedIndexes()
-        if not selected_rows:
-            QMessageBox.warning(self, "복사 실패", "복사할 스케줄을 선택하세요.")
+        row = self.get_checked_row()
+        if row is None:
+            QMessageBox.warning(self, "복사 실패", "복사할 스케줄을 체크하세요.")
             return
 
-        row = selected_rows[0].row()
         schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if not schedule_id_item:
             return
