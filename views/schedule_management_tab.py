@@ -1567,24 +1567,24 @@ class ScheduleManagementTab(QWidget):
         """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame  # 기존 코드 호환을 위한 로컬 참조
-        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 5px; padding: 2px;")
+        cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 3px; padding: 1px;")
         cost_layout = QHBoxLayout(cost_frame)
-        cost_layout.setSpacing(3)
-        cost_layout.setContentsMargins(5, 3, 5, 3)
+        cost_layout.setSpacing(2)
+        cost_layout.setContentsMargins(3, 2, 3, 2)
 
         # 좌측: 2줄 레이아웃
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(3)
+        left_layout.setSpacing(1)
 
-        # 공통 스타일
-        label_style = "font-size: 11px; letter-spacing: 1px;"
-        bold_style = "font-size: 11px; letter-spacing: 1px; font-weight: bold;"
-        input_style = "font-size: 11px; background-color: white; border: 1px solid #ccc; padding: 1px;"
-        formula_style = "font-size: 12px; letter-spacing: 1px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 2px 5px; border-radius: 3px;"
+        # 공통 스타일 (크기 절반 축소)
+        label_style = "font-size: 9px; letter-spacing: 0px;"
+        bold_style = "font-size: 9px; letter-spacing: 0px; font-weight: bold;"
+        input_style = "font-size: 9px; background-color: white; border: 1px solid #ccc; padding: 0px;"
+        formula_style = "font-size: 9px; letter-spacing: 0px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 1px 3px; border-radius: 2px;"
 
         # 1행: 항목별 비용 내역 (자동 줄바꿈 지원, 전체 너비 사용)
         row1 = QHBoxLayout()
-        row1.setSpacing(10)
+        row1.setSpacing(5)
 
         # 항목별 비용 내역
         self.item_cost_detail = QLabel("-")
@@ -1597,7 +1597,7 @@ class ScheduleManagementTab(QWidget):
 
         # 2행: | 1회/회차/보고서/중간/계산식 (한 줄에 모두)
         row2 = QHBoxLayout()
-        row2.setSpacing(8)
+        row2.setSpacing(4)
 
         separator = QLabel("|")
         separator.setStyleSheet(label_style)
@@ -1623,7 +1623,7 @@ class ScheduleManagementTab(QWidget):
         self.report_cost_input = QLineEdit("300,000")
         self.report_cost_input.setAlignment(Qt.AlignRight)
         self.report_cost_input.setStyleSheet(input_style)
-        self.report_cost_input.setFixedWidth(70)
+        self.report_cost_input.setFixedWidth(55)
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row2.addWidget(self.report_cost_input)
 
@@ -1633,7 +1633,7 @@ class ScheduleManagementTab(QWidget):
         self.interim_report_cost_input = QLineEdit("200,000")
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
         self.interim_report_cost_input.setStyleSheet(input_style)
-        self.interim_report_cost_input.setFixedWidth(70)
+        self.interim_report_cost_input.setFixedWidth(55)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
         row2.addWidget(self.interim_report_cost_input)
         self.interim_cost_label.hide()
@@ -1651,9 +1651,9 @@ class ScheduleManagementTab(QWidget):
 
         # 우측: 공급가 + 세액 = 총계
         self.final_cost_with_vat = QLabel("-")
-        self.final_cost_with_vat.setStyleSheet("font-size: 13px; letter-spacing: 2px; font-weight: bold; color: white; background-color: #e67e22; padding: 3px 8px; border-radius: 3px;")
+        self.final_cost_with_vat.setStyleSheet("font-size: 10px; letter-spacing: 1px; font-weight: bold; color: white; background-color: #e67e22; padding: 2px 5px; border-radius: 2px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
-        self.final_cost_with_vat.setMinimumWidth(220)
+        self.final_cost_with_vat.setMinimumWidth(180)
         cost_layout.addWidget(self.final_cost_with_vat)
 
         parent_layout.addWidget(cost_frame)
@@ -2130,7 +2130,10 @@ class ScheduleManagementTab(QWidget):
             col_idx = i + 1
             combo = QComboBox()
             combo.addItems(['', '1차', '2차', '3차'])
-            combo.setStyleSheet("font-size: 10px;")
+            combo.setStyleSheet("font-size: 10px; background-color: #E0E0E0; color: #888888;")
+
+            # 1~6회차는 중간보고서 선택 비활성화 (연장 회차에서만 선택 가능)
+            combo.setEnabled(False)
 
             # 저장된 값 복원
             round_num = i + 1
