@@ -1564,14 +1564,19 @@ class ScheduleManagementTab(QWidget):
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
-        """비용 요약 (1줄 레이아웃) - 1회/회차/보고서/계산식/총계"""
+        """비용 요약 (2줄 레이아웃) - 1행: 항목비용, 2행: 1회/회차/보고서/중간/계산식"""
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
-        cost_frame.setFixedHeight(28)  # 고정 높이
+        cost_frame.setFixedHeight(38)  # 고정 높이 (위아래 여백 축소)
         cost_layout = QHBoxLayout(cost_frame)
-        cost_layout.setSpacing(3)
-        cost_layout.setContentsMargins(5, 0, 5, 0)
+        cost_layout.setSpacing(2)
+        cost_layout.setContentsMargins(5, 1, 5, 1)  # 위아래 여백 최소화
+
+        # 좌측: 2줄 레이아웃
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(0)  # 행 간격 최소화
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
         # 공통 스타일
         label_style = "font-size: 9px;"
@@ -1579,67 +1584,77 @@ class ScheduleManagementTab(QWidget):
         input_style = "font-size: 9px; background-color: white; border: 1px solid #ccc; padding: 0px;"
         formula_style = "font-size: 9px; font-weight: bold; color: #d35400; background-color: #fdebd0; padding: 1px 3px; border-radius: 2px;"
 
-        # 항목별 비용 내역 (숨김 처리, 데이터는 유지)
+        # 1행: 항목별 비용 내역
+        row1 = QHBoxLayout()
+        row1.setSpacing(5)
+        row1.setContentsMargins(0, 0, 0, 0)
         self.item_cost_detail = QLabel("-")
-        self.item_cost_detail.hide()
+        self.item_cost_detail.setStyleSheet(f"{label_style} color: #555;")
+        self.item_cost_detail.setFixedHeight(15)
+        row1.addWidget(self.item_cost_detail)
+        left_layout.addLayout(row1)
 
-        # | 1회
+        # 2행: | 1회/회차/보고서/중간/계산식
+        row2 = QHBoxLayout()
+        row2.setSpacing(4)
+        row2.setContentsMargins(0, 0, 0, 0)
+
         separator = QLabel("|")
         separator.setStyleSheet(label_style)
-        cost_layout.addWidget(separator)
+        row2.addWidget(separator)
 
         lbl1 = QLabel("1회:")
         lbl1.setStyleSheet(label_style)
-        cost_layout.addWidget(lbl1)
+        row2.addWidget(lbl1)
         self.cost_per_test = QLabel("-")
         self.cost_per_test.setStyleSheet(bold_style)
-        cost_layout.addWidget(self.cost_per_test)
+        row2.addWidget(self.cost_per_test)
 
-        # 회차
         lbl2 = QLabel("회차:")
         lbl2.setStyleSheet(label_style)
-        cost_layout.addWidget(lbl2)
+        row2.addWidget(lbl2)
         self.total_rounds_cost = QLabel("-")
         self.total_rounds_cost.setStyleSheet(bold_style)
-        cost_layout.addWidget(self.total_rounds_cost)
+        row2.addWidget(self.total_rounds_cost)
 
-        # 보고서
         lbl3 = QLabel("보고서:")
         lbl3.setStyleSheet(label_style)
-        cost_layout.addWidget(lbl3)
+        row2.addWidget(lbl3)
         self.report_cost_input = QLineEdit("300,000")
         self.report_cost_input.setAlignment(Qt.AlignRight)
         self.report_cost_input.setStyleSheet(input_style)
         self.report_cost_input.setFixedWidth(55)
-        self.report_cost_input.setFixedHeight(18)
+        self.report_cost_input.setFixedHeight(16)
         self.report_cost_input.textChanged.connect(self.on_cost_input_changed)
-        cost_layout.addWidget(self.report_cost_input)
+        row2.addWidget(self.report_cost_input)
 
-        # 중간 보고서 (숨김)
         self.interim_cost_label = QLabel("중간:")
         self.interim_cost_label.setStyleSheet(label_style)
-        cost_layout.addWidget(self.interim_cost_label)
+        row2.addWidget(self.interim_cost_label)
         self.interim_report_cost_input = QLineEdit("200,000")
         self.interim_report_cost_input.setAlignment(Qt.AlignRight)
         self.interim_report_cost_input.setStyleSheet(input_style)
         self.interim_report_cost_input.setFixedWidth(55)
-        self.interim_report_cost_input.setFixedHeight(18)
+        self.interim_report_cost_input.setFixedHeight(16)
         self.interim_report_cost_input.textChanged.connect(self.on_cost_input_changed)
-        cost_layout.addWidget(self.interim_report_cost_input)
+        row2.addWidget(self.interim_report_cost_input)
         self.interim_cost_label.hide()
         self.interim_report_cost_input.hide()
 
-        # 계산식
         self.final_cost_formula = QLabel("-")
         self.final_cost_formula.setStyleSheet(formula_style)
-        cost_layout.addWidget(self.final_cost_formula)
+        row2.addWidget(self.final_cost_formula)
 
-        cost_layout.addStretch()
+        row2.addStretch()
+        left_layout.addLayout(row2)
+
+        cost_layout.addLayout(left_layout)
 
         # 우측: 공급가 + 세액 = 총계
         self.final_cost_with_vat = QLabel("-")
         self.final_cost_with_vat.setStyleSheet("font-size: 10px; font-weight: bold; color: white; background-color: #e67e22; padding: 2px 8px; border-radius: 2px;")
         self.final_cost_with_vat.setAlignment(Qt.AlignCenter)
+        self.final_cost_with_vat.setMinimumWidth(180)
         cost_layout.addWidget(self.final_cost_with_vat)
 
         parent_layout.addWidget(cost_frame)
