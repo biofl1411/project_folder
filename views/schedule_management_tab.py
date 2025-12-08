@@ -2469,11 +2469,11 @@ class ScheduleManagementTab(QWidget):
 
         # 1. 1회 기준 (합계) - 모든 검사항목 합계
         cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
-        self.cost_per_test.setText(f"{cost_per_test:,}원")
+        self.cost_per_test.setText(f"1회:{cost_per_test:,}원")
 
         # 2. 회차별 총계 (합계) - 초기 로드 시 모든 O가 체크되어 있으므로 1회기준 × 샘플링횟수
         total_rounds_cost = int(cost_per_test * sampling_count)
-        self.total_rounds_cost.setText(f"{total_rounds_cost:,}원")
+        self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
 
         # 3. 보고서 비용 설정 (견적 유형별)
         # 기본 보고서 비용: 실측=200,000원, 가속=300,000원
@@ -2516,31 +2516,68 @@ class ScheduleManagementTab(QWidget):
             self.suspend_interim_cost_label.hide()
             self.suspend_interim_cost_input.hide()
 
-        # 중단/연장 행 표시/숨김
-        schedule_status = schedule.get('status', '')
-        extend_rounds = schedule.get('extend_rounds', 0) or 0
-        if schedule_status == 'suspended':
-            self.row_suspend_widget.show()
-        else:
-            self.row_suspend_widget.hide()
-        if extend_rounds > 0:
-            self.row_extend_widget.show()
-        else:
-            self.row_extend_widget.hide()
-
-        # 4. 최종비용 (부가세별도) - 1차 견적 기준 계산식 표시
+        # ========== 1차 견적 계산 ==========
         first_total_rounds = cost_per_test * sampling_count
         first_cost_no_vat = int(first_total_rounds * zone_count + first_report + first_interim)
         if first_interim > 0:
-            formula_text = f"{first_total_rounds:,} × {zone_count} + {first_report:,} + {first_interim:,} = {first_cost_no_vat:,}원"
+            formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}+{first_interim:,}={first_cost_no_vat:,}원"
         else:
-            formula_text = f"{first_total_rounds:,} × {zone_count} + {first_report:,} = {first_cost_no_vat:,}원"
+            formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}={first_cost_no_vat:,}원"
         self.first_cost_formula.setText(formula_text)
 
-        # 5. 최종비용 (부가세 포함) - 1차 견적 기준
-        vat = int(first_cost_no_vat * 0.1)
-        final_cost_with_vat = first_cost_no_vat + vat
-        self.final_cost_with_vat.setText(f"{first_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
+        # 1차 부가세 포함 (통일된 형식)
+        first_vat = int(first_cost_no_vat * 0.1)
+        first_with_vat = first_cost_no_vat + first_vat
+        self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
+
+        # ========== 중단 견적 계산 ==========
+        schedule_status = schedule.get('status', '')
+        if schedule_status == 'suspended':
+            self.row_suspend_widget.show()
+            # 중단 견적 항목 (초기: 1차와 동일)
+            self.suspend_item_cost_detail.setText(" | ".join(detail_parts))
+            self.suspend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
+            self.suspend_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
+            # 중단 비용 계산 (초기: 1차와 동일)
+            suspend_cost_no_vat = int(first_total_rounds * zone_count + suspend_report + suspend_interim)
+            if suspend_interim > 0:
+                suspend_formula = f"{first_total_rounds:,}×{zone_count}+{suspend_report:,}+{suspend_interim:,}={suspend_cost_no_vat:,}원"
+            else:
+                suspend_formula = f"{first_total_rounds:,}×{zone_count}+{suspend_report:,}={suspend_cost_no_vat:,}원"
+            self.suspend_cost_formula.setText(suspend_formula)
+            suspend_vat = int(suspend_cost_no_vat * 0.1)
+            suspend_with_vat = suspend_cost_no_vat + suspend_vat
+            self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
+        else:
+            self.row_suspend_widget.hide()
+
+        # ========== 연장 견적 계산 ==========
+        extend_rounds = schedule.get('extend_rounds', 0) or 0
+        if extend_rounds > 0:
+            self.row_extend_widget.show()
+            # 연장 견적 항목
+            extend_detail_parts = []
+            for test_item in test_items:
+                unit_price = int(fees.get(test_item, 0))
+                extend_cost = unit_price * extend_rounds
+                extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_cost:,}원")
+            self.extend_item_cost_detail.setText(" | ".join(extend_detail_parts))
+            self.extend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
+            extend_total_rounds = cost_per_test * extend_rounds
+            self.extend_rounds_cost.setText(f"회차:{extend_total_rounds:,}원")
+            # 연장 비용 계산
+            extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
+            extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
+            self.extend_cost_formula.setText(extend_formula)
+            extend_vat = int(extend_cost_no_vat * 0.1)
+            extend_with_vat = extend_cost_no_vat + extend_vat
+            self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
+        else:
+            self.row_extend_widget.hide()
+
+        # 금액을 DB에 저장용
+        vat = first_vat
+        final_cost_with_vat = first_with_vat
 
         # 금액을 DB에 저장
         self._save_amounts_to_db(first_cost_no_vat, vat, final_cost_with_vat)
@@ -4429,11 +4466,11 @@ class ScheduleManagementTab(QWidget):
             first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}={first_cost_no_vat:,}원"
         self.first_cost_formula.setText(first_formula)
 
-        # 1차 부가세 포함
+        # 1차 부가세 포함 (통일된 형식)
         first_vat = int(first_cost_no_vat * 0.1)
         first_with_vat = first_cost_no_vat + first_vat
         if hasattr(self, 'first_cost_vat'):
-            self.first_cost_vat.setText(f"(VAT포함:{first_with_vat:,}원)")
+            self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
 
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
@@ -4471,11 +4508,11 @@ class ScheduleManagementTab(QWidget):
                 suspend_formula = f"{total_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
             self.suspend_cost_formula.setText(suspend_formula)
 
-            # 중단 부가세 포함
+            # 중단 부가세 포함 (통일된 형식)
             suspend_vat = int(suspend_cost_no_vat * 0.1)
             suspend_with_vat = suspend_cost_no_vat + suspend_vat
             if hasattr(self, 'suspend_cost_vat'):
-                self.suspend_cost_vat.setText(f"(VAT포함:{suspend_with_vat:,}원)")
+                self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
         else:
             self.row_suspend_widget.hide()
 
@@ -4519,11 +4556,11 @@ class ScheduleManagementTab(QWidget):
                 extend_formula = f"{extend_total_cost:,}×{zone_count}+{extend_report_cost:,}={extend_cost_no_vat:,}원"
             self.extend_cost_formula.setText(extend_formula)
 
-            # 연장 부가세 포함
+            # 연장 부가세 포함 (통일된 형식)
             extend_vat = int(extend_cost_no_vat * 0.1)
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
-                self.extend_cost_vat.setText(f"(VAT포함:{extend_with_vat:,}원)")
+                self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
         else:
             self.row_extend_widget.hide()
 
@@ -4609,11 +4646,11 @@ class ScheduleManagementTab(QWidget):
             first_formula = f"{first_total_rounds:,}×{zone_count}+{first_report_cost:,}={first_cost_no_vat:,}원"
         self.first_cost_formula.setText(first_formula)
 
-        # 1차 부가세 포함
+        # 1차 부가세 포함 (통일된 형식)
         first_vat = int(first_cost_no_vat * 0.1)
         first_with_vat = first_cost_no_vat + first_vat
         if hasattr(self, 'first_cost_vat'):
-            self.first_cost_vat.setText(f"(VAT포함:{first_with_vat:,}원)")
+            self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
 
         # 금액을 DB에 저장 (1차 견적 기준)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
@@ -4645,11 +4682,11 @@ class ScheduleManagementTab(QWidget):
                 suspend_formula = f"{suspend_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
             self.suspend_cost_formula.setText(suspend_formula)
 
-            # 중단 부가세 포함
+            # 중단 부가세 포함 (통일된 형식)
             suspend_vat = int(suspend_cost_no_vat * 0.1)
             suspend_with_vat = suspend_cost_no_vat + suspend_vat
             if hasattr(self, 'suspend_cost_vat'):
-                self.suspend_cost_vat.setText(f"(VAT포함:{suspend_with_vat:,}원)")
+                self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
 
         # ========== 연장 견적 계산 (연장 회차 있을 때만) ==========
         extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
@@ -4678,11 +4715,11 @@ class ScheduleManagementTab(QWidget):
                 extend_formula = f"{extend_rounds_cost:,}×{zone_count}+{extend_report_cost:,}={extend_cost_no_vat:,}원"
             self.extend_cost_formula.setText(extend_formula)
 
-            # 연장 부가세 포함
+            # 연장 부가세 포함 (통일된 형식)
             extend_vat = int(extend_cost_no_vat * 0.1)
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
-                self.extend_cost_vat.setText(f"(VAT포함:{extend_with_vat:,}원)")
+                self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
 
     def save_as_jpg(self):
         """스케줄 관리 화면을 JPG로 저장"""
