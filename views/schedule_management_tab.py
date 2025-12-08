@@ -2288,6 +2288,15 @@ class ScheduleManagementTab(QWidget):
         for col in range(1, col_count):
             header.setSectionResizeMode(col, QHeaderView.Stretch)
 
+        # 저장된 연장 회차가 있으면 테이블에 추가
+        extend_rounds = schedule.get('extend_rounds', 0) or 0
+        if extend_rounds > 0:
+            self._add_extension_rounds_to_table(extend_rounds)
+            # 저장된 연장 회차 O/X 상태 복원
+            self._restore_extension_rounds_state(schedule, sampling_count, extend_rounds, test_items)
+            # 연장 회차 O/X 상태가 복원되었으므로 비용 재계산
+            self.recalculate_costs()
+
         self.update_cost_summary(schedule, test_items, fees, sampling_count)
 
     def update_cost_summary(self, schedule, test_items, fees, sampling_count):
@@ -2493,6 +2502,13 @@ class ScheduleManagementTab(QWidget):
             schedule_data['extend_rounds'] = extend_rounds
         except (ValueError, AttributeError):
             schedule_data['extend_rounds'] = 0
+            extend_rounds = 0
+
+        # 연장 회차 비용 계산 (O/X 상태 반영)
+        if extend_rounds > 0:
+            schedule_data['extend_rounds_cost'] = self._calculate_extend_rounds_cost()
+        else:
+            schedule_data['extend_rounds_cost'] = 0
 
         # 연장 실험기간 정보 추가 (current_schedule에서 가져오기)
         schedule_data['extend_experiment_days'] = self.current_schedule.get('extend_experiment_days', 0) or 0
@@ -2748,12 +2764,14 @@ class ScheduleManagementTab(QWidget):
             traceback.print_exc()
 
     def _collect_experiment_schedule_data(self):
-        """실험 스케줄 테이블의 O/X 상태 수집"""
+        """실험 스케줄 테이블의 O/X 상태 수집 (연장 회차 포함)"""
         if not self.current_schedule:
             return None
 
         data = {}
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
         row_count = self.experiment_table.rowCount()
 
         # 검사항목 행 (행 3부터 마지막 가격 행 제외 - 중간보고서, 날짜, 제조후일수 행 다음)
@@ -2767,7 +2785,7 @@ class ScheduleManagementTab(QWidget):
                 continue
 
             row_data = []
-            for col in range(1, sampling_count + 1):
+            for col in range(1, total_rounds + 1):
                 cell = self.experiment_table.item(row, col)
                 if cell:
                     row_data.append(cell.text())
@@ -3379,6 +3397,49 @@ class ScheduleManagementTab(QWidget):
         # 스케줄 저장 시그널 발생
         self.schedule_saved.emit()
 
+    def _restore_extension_rounds_state(self, schedule, sampling_count, extend_rounds, test_items):
+        """저장된 연장 회차 O/X 상태 복원"""
+        import json
+        from PyQt5.QtGui import QColor, QBrush
+
+        # 저장된 실험 데이터 가져오기
+        experiment_data_json = schedule.get('experiment_schedule_data', '')
+        if not experiment_data_json:
+            return
+
+        try:
+            saved_data = json.loads(experiment_data_json)
+        except (json.JSONDecodeError, TypeError):
+            return
+
+        table = self.experiment_table
+        row_count = table.rowCount()
+
+        # 각 검사항목에 대해 연장 회차 상태 복원
+        for row in range(3, row_count - 1):
+            item_cell = table.item(row, 0)
+            if not item_cell:
+                continue
+
+            test_item = item_cell.text()
+            if test_item not in saved_data:
+                continue
+
+            saved_row_data = saved_data[test_item]
+
+            # 연장 회차 열에 대해서만 상태 복원
+            for i in range(extend_rounds):
+                col_idx = sampling_count + 1 + i
+                data_idx = sampling_count + i
+
+                if data_idx < len(saved_row_data):
+                    saved_value = saved_row_data[data_idx]
+                    cell = table.item(row, col_idx)
+                    if cell and saved_value:
+                        cell.setText(saved_value)
+                        if saved_value == 'X':
+                            cell.setForeground(QBrush(QColor('#e74c3c')))  # 빨간색
+
     def edit_last_experiment_date_with_calendar(self):
         """달력을 통해 마지막 실험일 수정"""
         # 수정 가능 여부 확인 (상태가 '대기'일 때만, 권한 확인)
@@ -3680,9 +3741,12 @@ class ScheduleManagementTab(QWidget):
 
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
 
-        # 검사항목 행 범위 (행 2부터 마지막-1 행까지)
-        test_item_start_row = 2
+        # 검사항목 행 범위 (행 3부터 마지막-1 행까지)
+        # 행 0: 중간보고서, 행 1: 날짜, 행 2: 제조후 일수, 행 3~: 검사항목
+        test_item_start_row = 3
         test_item_end_row = table.rowCount() - 2  # 마지막 행(1회 기준) 제외
 
         if test_item_end_row < test_item_start_row:
@@ -3690,8 +3754,8 @@ class ScheduleManagementTab(QWidget):
 
         completed_rounds = 0
 
-        # 각 회차(열) 확인
-        for col in range(1, sampling_count + 1):
+        # 각 회차(열) 확인 (연장 회차 포함)
+        for col in range(1, total_rounds + 1):
             has_incomplete = False
             has_any_test = False
 
@@ -3957,8 +4021,8 @@ class ScheduleManagementTab(QWidget):
         base_items = self.get_test_items_from_food_type(self.current_schedule)
         test_items = base_items + self.additional_test_items
 
-        # 검사항목 행 시작 (행 2부터)
-        test_item_start_row = 2
+        # 검사항목 행 시작 (행 3부터: 0=중간보고서, 1=날짜, 2=제조후일수, 3~=검사항목)
+        test_item_start_row = 3
 
         # 각 검사항목별 O 체크 수 및 비용 계산
         item_o_counts = {}  # {항목명: O 체크 수}
@@ -4046,6 +4110,44 @@ class ScheduleManagementTab(QWidget):
 
         # 금액을 DB에 저장
         self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+
+    def _calculate_extend_rounds_cost(self):
+        """연장 회차만의 비용 계산 (O/X 상태 반영)"""
+        if not self.current_schedule:
+            return 0
+
+        table = self.experiment_table
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+
+        if extend_rounds == 0:
+            return 0
+
+        # 수수료 정보 로드
+        fees = {}
+        try:
+            all_fees = Fee.get_all()
+            for fee in all_fees:
+                fees[fee['test_item']] = fee['price']
+        except Exception:
+            pass
+
+        # 식품유형에서 검사항목 가져오기 + 추가된 항목
+        base_items = self.get_test_items_from_food_type(self.current_schedule)
+        test_items = base_items + self.additional_test_items
+
+        # 검사항목 행 시작 (행 3부터)
+        test_item_start_row = 3
+
+        # 연장 회차 열만 계산 (sampling_count + 1 부터 sampling_count + extend_rounds 까지)
+        extend_cost = 0
+        for col_idx in range(sampling_count + 1, sampling_count + extend_rounds + 1):
+            for row_idx, test_item in enumerate(test_items):
+                item = table.item(test_item_start_row + row_idx, col_idx)
+                if item and item.text() == 'O':
+                    extend_cost += int(fees.get(test_item, 0))
+
+        return extend_cost
 
     def on_cost_input_changed(self):
         """보고서 비용 입력 변경 시 총비용 재계산"""

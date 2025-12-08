@@ -887,20 +887,25 @@ class EstimateTab(QWidget):
         return int(total)
 
     def _calculate_extend_price(self, schedule, zone_count):
-        """연장 견적 금액 계산 - 추가 실험 비용"""
+        """연장 견적 금액 계산 - 추가 실험 비용 (O/X 상태 반영)"""
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 연장 실험: 연장 회차 사용 (미설정 시 기본 3회차)
-        extend_rounds = schedule.get('extend_rounds', 0)
-        if extend_rounds is None or extend_rounds == 0:
-            extend_rounds = 3  # 기본값
+        # 스케줄 관리에서 계산된 연장 회차 비용이 있으면 사용 (O/X 상태 반영됨)
+        extend_rounds_cost = schedule.get('extend_rounds_cost', 0) or 0
+        if extend_rounds_cost > 0:
+            total += extend_rounds_cost * zone_count
+        else:
+            # 계산된 비용이 없으면 기존 방식으로 계산 (호환성 유지)
+            extend_rounds = schedule.get('extend_rounds', 0)
+            if extend_rounds is None or extend_rounds == 0:
+                extend_rounds = 3  # 기본값
 
-        # 검사항목 수수료 계산 (연장 회차)
-        test_items = schedule.get('test_items', '')
-        if test_items:
-            item_cost = Fee.calculate_total_fee(test_items)
-            total += item_cost * extend_rounds * zone_count
+            # 검사항목 수수료 계산 (연장 회차)
+            test_items = schedule.get('test_items', '')
+            if test_items:
+                item_cost = Fee.calculate_total_fee(test_items)
+                total += item_cost * extend_rounds * zone_count
 
         # 연장 보고서 비용 (50%)
         if test_method in ['real', 'custom_real']:
