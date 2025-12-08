@@ -1574,7 +1574,7 @@ class ScheduleManagementTab(QWidget):
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
-        cost_frame.setMinimumHeight(45)  # 최소 높이 (동적으로 확장)
+        cost_frame.setMinimumHeight(30)  # 최소 높이 (2/3로 축소)
         cost_layout = QHBoxLayout(cost_frame)
         cost_layout.setSpacing(2)
         cost_layout.setContentsMargins(5, 1, 5, 1)
@@ -4487,15 +4487,8 @@ class ScheduleManagementTab(QWidget):
         return extend_cost
 
     def on_cost_input_changed(self):
-        """보고서 비용 입력 변경 시 총비용 재계산"""
+        """보고서 비용 입력 변경 시 총비용 재계산 (1차/중단/연장 개별 처리)"""
         if not self.current_schedule:
-            return
-
-        # 현재 회차별 총계 가져오기
-        try:
-            total_rounds_text = self.total_rounds_cost.text().replace(',', '').replace('원', '')
-            total_rounds_cost = int(total_rounds_text)
-        except (ValueError, TypeError, AttributeError):
             return
 
         # 실험 방법에 따른 구간 수 결정
@@ -4505,35 +4498,87 @@ class ScheduleManagementTab(QWidget):
         else:
             zone_count = 3
 
-        # 보고서 비용 가져오기
+        sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+
+        # ========== 1차 견적 계산 ==========
+        # 1회 기준 비용
         try:
-            report_cost = int(self.report_cost_input.text().replace(',', '').replace('원', ''))
+            cost_per_test = int(self.cost_per_test.text().replace(',', '').replace('원', ''))
+        except (ValueError, TypeError, AttributeError):
+            cost_per_test = 0
+
+        first_total_rounds = cost_per_test * sampling_count
+
+        try:
+            first_report_cost = int(self.first_report_cost_input.text().replace(',', '').replace('원', ''))
         except (ValueError, TypeError):
-            report_cost = 0
+            first_report_cost = 0
 
-        # 중간 보고서 비용 가져오기 (표시 중인 경우에만)
-        interim_report_cost = 0
-        if self.interim_report_cost_input.isVisible():
+        first_interim_cost = 0
+        if self.first_interim_cost_input.isVisible():
             try:
-                interim_report_cost = int(self.interim_report_cost_input.text().replace(',', '').replace('원', ''))
+                first_interim_cost = int(self.first_interim_cost_input.text().replace(',', '').replace('원', ''))
             except (ValueError, TypeError):
-                interim_report_cost = 0
+                first_interim_cost = 0
 
-        # 최종비용 계산 및 표시
-        final_cost_no_vat = int(total_rounds_cost * zone_count + report_cost + interim_report_cost)
-        if interim_report_cost > 0:
-            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} + {interim_report_cost:,} = {final_cost_no_vat:,}원"
+        first_cost_no_vat = int(first_total_rounds * zone_count + first_report_cost + first_interim_cost)
+        if first_interim_cost > 0:
+            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} + {first_interim_cost:,} = {first_cost_no_vat:,}원"
         else:
-            formula_text = f"{total_rounds_cost:,} × {zone_count} + {report_cost:,} = {final_cost_no_vat:,}원"
-        self.final_cost_formula.setText(formula_text)
+            first_formula = f"{first_total_rounds:,} × {zone_count} + {first_report_cost:,} = {first_cost_no_vat:,}원"
+        self.first_cost_formula.setText(first_formula)
 
-        # 부가세 포함 금액
-        vat = int(final_cost_no_vat * 0.1)
-        final_cost_with_vat = final_cost_no_vat + vat
-        self.final_cost_with_vat.setText(f"{final_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
+        # 부가세 포함 금액 (1차 견적 기준)
+        vat = int(first_cost_no_vat * 0.1)
+        final_cost_with_vat = first_cost_no_vat + vat
+        self.final_cost_with_vat.setText(f"{first_cost_no_vat:,} + {vat:,} = {final_cost_with_vat:,}원")
 
-        # 금액을 DB에 저장
-        self._save_amounts_to_db(final_cost_no_vat, vat, final_cost_with_vat)
+        # 금액을 DB에 저장 (1차 견적 기준)
+        self._save_amounts_to_db(first_cost_no_vat, vat, final_cost_with_vat)
+
+        # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
+        schedule_status = self.current_schedule.get('status', '')
+        if schedule_status == 'suspended' and hasattr(self, 'suspend_cost_formula'):
+            try:
+                suspend_rounds_cost = int(self.suspend_rounds_cost.text().replace(',', '').replace('원', ''))
+            except (ValueError, TypeError, AttributeError):
+                suspend_rounds_cost = 0
+
+            try:
+                suspend_report_cost = int(self.suspend_report_cost_input.text().replace(',', '').replace('원', ''))
+            except (ValueError, TypeError):
+                suspend_report_cost = 0
+
+            suspend_interim_cost = 0
+            if self.suspend_interim_cost_input.isVisible():
+                try:
+                    suspend_interim_cost = int(self.suspend_interim_cost_input.text().replace(',', '').replace('원', ''))
+                except (ValueError, TypeError):
+                    suspend_interim_cost = 0
+
+            suspend_cost_no_vat = int(suspend_rounds_cost * zone_count + suspend_report_cost + suspend_interim_cost)
+            if suspend_interim_cost > 0:
+                suspend_formula = f"{suspend_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} + {suspend_interim_cost:,} = {suspend_cost_no_vat:,}원"
+            else:
+                suspend_formula = f"{suspend_rounds_cost:,} × {zone_count} + {suspend_report_cost:,} = {suspend_cost_no_vat:,}원"
+            self.suspend_cost_formula.setText(suspend_formula)
+
+        # ========== 연장 견적 계산 (연장 회차 있을 때만) ==========
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        if extend_rounds > 0 and hasattr(self, 'extend_cost_formula'):
+            try:
+                extend_rounds_cost = int(self.extend_rounds_cost.text().replace(',', '').replace('원', ''))
+            except (ValueError, TypeError, AttributeError):
+                extend_rounds_cost = 0
+
+            try:
+                extend_report_cost = int(self.extend_report_cost_input.text().replace(',', '').replace('원', ''))
+            except (ValueError, TypeError):
+                extend_report_cost = 0
+
+            extend_cost_no_vat = int(extend_rounds_cost * zone_count + extend_report_cost)
+            extend_formula = f"{extend_rounds_cost:,} × {zone_count} + {extend_report_cost:,} = {extend_cost_no_vat:,}원"
+            self.extend_cost_formula.setText(extend_formula)
 
     def save_as_jpg(self):
         """스케줄 관리 화면을 JPG로 저장"""
