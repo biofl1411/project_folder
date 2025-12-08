@@ -2748,12 +2748,14 @@ class ScheduleManagementTab(QWidget):
             traceback.print_exc()
 
     def _collect_experiment_schedule_data(self):
-        """실험 스케줄 테이블의 O/X 상태 수집"""
+        """실험 스케줄 테이블의 O/X 상태 수집 (연장 회차 포함)"""
         if not self.current_schedule:
             return None
 
         data = {}
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+        extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
+        total_rounds = sampling_count + extend_rounds
         row_count = self.experiment_table.rowCount()
 
         # 검사항목 행 (행 3부터 마지막 가격 행 제외 - 중간보고서, 날짜, 제조후일수 행 다음)
@@ -2767,7 +2769,7 @@ class ScheduleManagementTab(QWidget):
                 continue
 
             row_data = []
-            for col in range(1, sampling_count + 1):
+            for col in range(1, total_rounds + 1):
                 cell = self.experiment_table.item(row, col)
                 if cell:
                     row_data.append(cell.text())
@@ -3957,8 +3959,8 @@ class ScheduleManagementTab(QWidget):
         base_items = self.get_test_items_from_food_type(self.current_schedule)
         test_items = base_items + self.additional_test_items
 
-        # 검사항목 행 시작 (행 2부터)
-        test_item_start_row = 2
+        # 검사항목 행 시작 (행 3부터: 0=중간보고서, 1=날짜, 2=제조후일수, 3~=검사항목)
+        test_item_start_row = 3
 
         # 각 검사항목별 O 체크 수 및 비용 계산
         item_o_counts = {}  # {항목명: O 체크 수}
