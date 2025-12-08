@@ -79,16 +79,21 @@ class MainWindow(QMainWindow):
         settings_btn = QPushButton("⚙️ 설정")
         settings_btn.setStyleSheet("background-color: #ddd;")
         settings_btn.clicked.connect(self.show_settings)
-        
+
+        update_btn = QPushButton("🔄 업데이트")
+        update_btn.setStyleSheet("background-color: #27ae60; color: white;")
+        update_btn.clicked.connect(self.check_for_updates)
+
         logout_btn = QPushButton("로그아웃")
         logout_btn.setStyleSheet("background-color: #f44336; color: white;")
         logout_btn.clicked.connect(self.logout)
-        
+
         # 레이아웃에 위젯 추가
         title_layout.addWidget(logo_label)
         title_layout.addWidget(title_label)
         title_layout.addStretch()
         title_layout.addWidget(self.user_label)
+        title_layout.addWidget(update_btn)
         title_layout.addWidget(settings_btn)
         title_layout.addWidget(logout_btn)
         
@@ -782,7 +787,19 @@ class MainWindow(QMainWindow):
             print(f"설정 창 표시 중 오류: {str(e)}")
             traceback.print_exc()
             QMessageBox.critical(self, "오류", f"설정 창을 열 수 없습니다: {str(e)}")
-    
+
+    def check_for_updates(self):
+        """수동으로 업데이트 확인"""
+        try:
+            from updater import AutoUpdater
+            self._updater = AutoUpdater(self)
+            self._updater.check_for_updates(silent=False)  # 결과 항상 표시
+        except Exception as e:
+            import traceback
+            print(f"업데이트 확인 중 오류: {str(e)}")
+            traceback.print_exc()
+            QMessageBox.warning(self, "오류", f"업데이트를 확인할 수 없습니다: {str(e)}")
+
     def logout(self):
         """로그아웃 처리"""
         reply = QMessageBox.question(self, '로그아웃',

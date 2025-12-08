@@ -58,39 +58,9 @@ def setup_environment():
 def check_for_updates(window):
     """업데이트 확인 (비동기)"""
     try:
-        from utils.updater import Updater
-
-        updater = Updater()
-        has_update, message = updater.check_for_updates()
-
-        if has_update:
-            reply = QMessageBox.question(
-                window,
-                "업데이트 알림",
-                f"새 버전이 있습니다!\n\n"
-                f"현재 버전: {VERSION}\n"
-                f"최신 버전: {message}\n\n"
-                f"지금 다운로드하시겠습니까?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
-            )
-
-            if reply == QMessageBox.Yes:
-                # 다운로드 진행
-                success, result = updater.download_update()
-                if success:
-                    QMessageBox.information(
-                        window,
-                        "다운로드 완료",
-                        f"업데이트 파일이 다운로드되었습니다.\n\n{result}\n\n"
-                        f"프로그램을 종료하고 업데이트를 진행하세요."
-                    )
-                else:
-                    QMessageBox.warning(
-                        window,
-                        "다운로드 실패",
-                        f"업데이트 다운로드에 실패했습니다.\n\n{result}"
-                    )
+        from updater import check_for_updates_on_startup
+        # 참조를 유지하기 위해 window에 저장
+        window._updater = check_for_updates_on_startup(window)
     except Exception as e:
         # 업데이트 확인 실패는 조용히 무시
         print(f"업데이트 확인 오류: {e}")
