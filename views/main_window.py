@@ -664,6 +664,8 @@ class MainWindow(QMainWindow):
             self.communication_tab.set_current_user(user_data)
         if hasattr(self, 'user_management_tab') and self.user_management_tab:
             self.user_management_tab.set_current_user(user_data)
+        if hasattr(self, 'estimate_tab') and self.estimate_tab:
+            self.estimate_tab.set_current_user(user_data)
 
         # 권한 기반 탭 활성화/비활성화
         self.apply_tab_permissions(user_data)
