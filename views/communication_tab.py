@@ -99,10 +99,13 @@ class CommunicationTab(QWidget):
         left_layout.addWidget(new_chat_btn)
 
         # 대화 상대 목록
-        left_layout.addWidget(QLabel("대화 목록"))
+        chat_list_label = QLabel("대화 목록")
+        chat_list_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+        left_layout.addWidget(chat_list_label)
         self.chat_list = QListWidget()
         self.chat_list.setStyleSheet("""
-            QListWidget::item { padding: 10px; border-bottom: 1px solid #eee; }
+            QListWidget { font-size: 13px; }
+            QListWidget::item { padding: 12px; border-bottom: 1px solid #eee; }
             QListWidget::item:selected { background-color: #e1bee7; }
             QListWidget::item:hover { background-color: #f3e5f5; }
         """)
@@ -117,20 +120,42 @@ class CommunicationTab(QWidget):
         right_layout = QVBoxLayout(right_frame)
         right_layout.setContentsMargins(5, 5, 5, 5)
 
-        # 채팅 상대 이름
+        # 채팅 상대 헤더 (이름 + 삭제 버튼)
+        header_layout = QHBoxLayout()
         self.chat_partner_label = QLabel("대화 상대를 선택하세요")
-        self.chat_partner_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
-        right_layout.addWidget(self.chat_partner_label)
+        self.chat_partner_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 10px;")
+        header_layout.addWidget(self.chat_partner_label)
 
-        # 메시지 영역
+        header_layout.addStretch()
+
+        # 대화 삭제 버튼
+        self.delete_chat_btn = QPushButton("대화 삭제")
+        self.delete_chat_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #c0392b; }
+        """)
+        self.delete_chat_btn.clicked.connect(self.delete_conversation)
+        self.delete_chat_btn.hide()  # 대화 상대 선택 전에는 숨김
+        header_layout.addWidget(self.delete_chat_btn)
+
+        right_layout.addLayout(header_layout)
+
+        # 메시지 영역 (카카오톡 스타일 배경)
         self.message_area = QTextEdit()
         self.message_area.setReadOnly(True)
         self.message_area.setStyleSheet("""
             QTextEdit {
-                background-color: #fafafa;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                padding: 10px;
+                background-color: #B2C7D9;
+                border: 1px solid #9BB5C9;
+                border-radius: 8px;
+                padding: 15px;
+                font-size: 14px;
             }
         """)
         right_layout.addWidget(self.message_area)
@@ -142,9 +167,10 @@ class CommunicationTab(QWidget):
         self.message_input.setPlaceholderText("메시지를 입력하세요...")
         self.message_input.setStyleSheet("""
             QLineEdit {
-                padding: 10px;
+                padding: 12px;
                 border: 1px solid #9b59b6;
-                border-radius: 5px;
+                border-radius: 8px;
+                font-size: 14px;
             }
         """)
         self.message_input.returnPressed.connect(self.send_message)
@@ -153,13 +179,14 @@ class CommunicationTab(QWidget):
         send_btn = QPushButton("전송")
         send_btn.setStyleSheet("""
             QPushButton {
-                background-color: #9b59b6;
-                color: white;
-                padding: 10px 20px;
-                border-radius: 5px;
+                background-color: #FEE500;
+                color: #000;
+                padding: 12px 25px;
+                border-radius: 8px;
                 font-weight: bold;
+                font-size: 14px;
             }
-            QPushButton:hover { background-color: #8e44ad; }
+            QPushButton:hover { background-color: #E6CF00; }
         """)
         send_btn.clicked.connect(self.send_message)
         input_layout.addWidget(send_btn)
@@ -340,6 +367,9 @@ class CommunicationTab(QWidget):
         partner_name = item.text().split('\n')[0].split(' [')[0]
         self.chat_partner_label.setText(partner_name)
 
+        # 대화 삭제 버튼 표시
+        self.delete_chat_btn.show()
+
         # 대화 내용 로드
         self.load_conversation()
 
@@ -347,7 +377,7 @@ class CommunicationTab(QWidget):
         self.mark_conversation_read()
 
     def load_conversation(self):
-        """대화 내용 로드"""
+        """대화 내용 로드 (카카오톡 스타일)"""
         if not self.current_user or not self.current_chat_partner_id:
             return
 
@@ -368,26 +398,49 @@ class CommunicationTab(QWidget):
                 created_at = msg['created_at']
                 if created_at and not isinstance(created_at, str):
                     created_at = str(created_at)
-                time_str = created_at[:16] if created_at else ''
+                time_str = created_at[11:16] if created_at and len(created_at) > 16 else ''  # HH:MM 형식
+                date_str = created_at[:10] if created_at else ''  # YYYY-MM-DD 형식
 
                 if is_mine:
+                    # 내가 보낸 메시지 (오른쪽, 노란색 - 카카오톡 스타일)
                     html = f"""
-                        <div style="text-align: right; margin: 5px 0;">
-                            <span style="color: #666; font-size: 10px;">{time_str}</span><br>
-                            <span style="background-color: #9b59b6; color: white; padding: 8px 12px;
-                                         border-radius: 15px; display: inline-block; max-width: 70%;">
-                                {content}
-                            </span>
+                        <div style="text-align: right; margin: 8px 5px; clear: both;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="30%"></td>
+                                    <td width="70%" align="right">
+                                        <span style="color: #888; font-size: 11px;">{time_str}</span><br>
+                                        <span style="background-color: #FEE500; color: #000; padding: 10px 14px;
+                                                     border-radius: 12px; display: inline-block;
+                                                     font-size: 14px; line-height: 1.4; text-align: left;
+                                                     max-width: 280px; word-wrap: break-word;">
+                                            {content}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
                     """
                 else:
+                    # 상대방 메시지 (왼쪽, 흰색 - 카카오톡 스타일)
                     html = f"""
-                        <div style="text-align: left; margin: 5px 0;">
-                            <span style="color: #666; font-size: 10px;">{sender_name} - {time_str}</span><br>
-                            <span style="background-color: #e0e0e0; color: black; padding: 8px 12px;
-                                         border-radius: 15px; display: inline-block; max-width: 70%;">
-                                {content}
-                            </span>
+                        <div style="text-align: left; margin: 8px 5px; clear: both;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="70%" align="left">
+                                        <span style="color: #555; font-size: 12px; font-weight: bold;">{sender_name}</span>
+                                        <span style="color: #888; font-size: 11px; margin-left: 8px;">{time_str}</span><br>
+                                        <span style="background-color: #FFFFFF; color: #000; padding: 10px 14px;
+                                                     border-radius: 12px; display: inline-block;
+                                                     font-size: 14px; line-height: 1.4; text-align: left;
+                                                     max-width: 280px; word-wrap: break-word;
+                                                     border: 1px solid #ddd;">
+                                            {content}
+                                        </span>
+                                    </td>
+                                    <td width="30%"></td>
+                                </tr>
+                            </table>
                         </div>
                     """
 
@@ -453,7 +506,50 @@ class CommunicationTab(QWidget):
             if selected_user:
                 self.current_chat_partner_id = selected_user['id']
                 self.chat_partner_label.setText(f"{selected_user['name']} ({selected_user.get('department', '')})")
+                self.delete_chat_btn.show()
                 self.load_conversation()
+
+    def delete_conversation(self):
+        """현재 대화 상대와의 대화 전체 삭제"""
+        if not self.current_user or not self.current_chat_partner_id:
+            QMessageBox.warning(self, "알림", "삭제할 대화를 선택하세요.")
+            return
+
+        partner_name = self.chat_partner_label.text()
+
+        reply = QMessageBox.question(
+            self, "대화 삭제 확인",
+            f"'{partner_name}'님과의 대화 내용을 모두 삭제하시겠습니까?\n\n"
+            "삭제된 대화는 복구할 수 없습니다.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                from models.communications import Message
+
+                deleted_count = Message.delete_conversation(
+                    self.current_user['id'],
+                    self.current_chat_partner_id
+                )
+
+                if deleted_count > 0:
+                    QMessageBox.information(self, "삭제 완료", f"{deleted_count}개의 메시지가 삭제되었습니다.")
+
+                    # 대화 영역 초기화
+                    self.message_area.clear()
+                    self.current_chat_partner_id = None
+                    self.chat_partner_label.setText("대화 상대를 선택하세요")
+                    self.delete_chat_btn.hide()
+
+                    # 대화 목록 새로고침
+                    self.load_chat_partners()
+                else:
+                    QMessageBox.information(self, "알림", "삭제할 메시지가 없습니다.")
+
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"대화 삭제 실패: {e}")
 
     def load_email_logs(self):
         """이메일 발송 기록 로드 (본인 계정만 표시)"""

@@ -268,6 +268,61 @@ class Message:
             print(f"상대별 미읽음 수 조회 오류: {e}")
             return {}
 
+    @staticmethod
+    def delete_message(message_id, user_id):
+        """메시지 삭제 (본인이 보낸 메시지만)"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 읽음 상태도 함께 삭제
+            cursor.execute("DELETE FROM message_reads WHERE message_id = %s", (message_id,))
+
+            # 본인이 보낸 메시지만 삭제
+            cursor.execute("""
+                DELETE FROM messages WHERE id = %s AND sender_id = %s
+            """, (message_id, user_id))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            print(f"메시지 삭제 오류: {e}")
+            return False
+
+    @staticmethod
+    def delete_conversation(user_id, partner_id):
+        """두 사용자 간의 대화 전체 삭제"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 해당 대화의 메시지 ID들 조회
+            cursor.execute("""
+                SELECT id FROM messages
+                WHERE (sender_id = %s AND receiver_id = %s)
+                   OR (sender_id = %s AND receiver_id = %s)
+            """, (user_id, partner_id, partner_id, user_id))
+
+            message_ids = [row['id'] for row in cursor.fetchall()]
+
+            if message_ids:
+                # 읽음 상태 삭제
+                placeholders = ','.join(['%s'] * len(message_ids))
+                cursor.execute(f"DELETE FROM message_reads WHERE message_id IN ({placeholders})", message_ids)
+
+                # 메시지 삭제
+                cursor.execute(f"DELETE FROM messages WHERE id IN ({placeholders})", message_ids)
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return deleted_count
+        except Exception as e:
+            print(f"대화 삭제 오류: {e}")
+            return 0
+
 
 class EmailLog:
     """이메일 발송 로그"""
