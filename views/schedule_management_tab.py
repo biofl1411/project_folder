@@ -1964,11 +1964,21 @@ class ScheduleManagementTab(QWidget):
         # 연장실험 필드 활성화/비활성화
         self._update_extension_fields_visibility(extension_test)
 
-        # 연장기간 값 로드
+        # 연장기간 값 로드 (시그널 차단하여 로드 중 이벤트 발생 방지)
+        self.extend_days_input.blockSignals(True)
+        self.extend_months_input.blockSignals(True)
+        self.extend_years_input.blockSignals(True)
+        self.extend_rounds_input.blockSignals(True)
+
         self.extend_days_input.setText(str(schedule.get('extend_period_days', '') or ''))
         self.extend_months_input.setText(str(schedule.get('extend_period_months', '') or ''))
         self.extend_years_input.setText(str(schedule.get('extend_period_years', '') or ''))
         self.extend_rounds_input.setText(str(schedule.get('extend_rounds', '') or ''))
+
+        self.extend_days_input.blockSignals(False)
+        self.extend_months_input.blockSignals(False)
+        self.extend_years_input.blockSignals(False)
+        self.extend_rounds_input.blockSignals(False)
 
         # 중간보고서 (행 5 - 예/아니오)
         report_interim = schedule.get('report_interim', 0)
@@ -2544,7 +2554,7 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 중단 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         schedule_status = schedule.get('status', '')
-        if schedule_status == 'suspended':
+        if schedule_status == 'suspended' and hasattr(self, 'row_suspend_widget'):
             self.row_suspend_widget.show()
             saved_suspend_supply = schedule.get('suspend_supply_amount', 0) or 0
 
@@ -2600,11 +2610,12 @@ class ScheduleManagementTab(QWidget):
                         suspend_cost_no_vat, suspend_vat, suspend_with_vat
                     )
         else:
-            self.row_suspend_widget.hide()
+            if hasattr(self, 'row_suspend_widget'):
+                self.row_suspend_widget.hide()
 
         # ========== 연장 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         extend_rounds = schedule.get('extend_rounds', 0) or 0
-        if extend_rounds > 0:
+        if extend_rounds > 0 and hasattr(self, 'row_extend_widget'):
             self.row_extend_widget.show()
             saved_extend_supply = schedule.get('extend_supply_amount', 0) or 0
 
@@ -2653,7 +2664,8 @@ class ScheduleManagementTab(QWidget):
                         extend_cost_no_vat, extend_vat, extend_with_vat
                     )
         else:
-            self.row_extend_widget.hide()
+            if hasattr(self, 'row_extend_widget'):
+                self.row_extend_widget.hide()
 
         # 금액을 DB에 저장 (기존 호환성 유지)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
@@ -4634,7 +4646,7 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
-        if schedule_status == 'suspended':
+        if schedule_status == 'suspended' and hasattr(self, 'row_suspend_widget'):
             self.row_suspend_widget.show()
 
             # 중단 1회 비용 (O로 체크된 항목들의 평균)
@@ -4674,10 +4686,11 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'suspend_cost_vat'):
                 self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
         else:
-            self.row_suspend_widget.hide()
+            if hasattr(self, 'row_suspend_widget'):
+                self.row_suspend_widget.hide()
 
         # ========== 연장 견적 계산 (연장 계획 있을 때만) ==========
-        if extend_rounds > 0:
+        if extend_rounds > 0 and hasattr(self, 'row_extend_widget'):
             self.row_extend_widget.show()
 
             # 연장 회차 비용 (O로 체크된 것만)
@@ -4722,7 +4735,8 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
         else:
-            self.row_extend_widget.hide()
+            if hasattr(self, 'row_extend_widget'):
+                self.row_extend_widget.hide()
 
         # 금액을 DB에 저장 (1차 견적 기준)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
