@@ -3592,24 +3592,103 @@ class ScheduleManagementTab(QWidget):
             self.extend_rounds_input.setText(str(rounds_spin.value()))
 
     def on_extend_rounds_changed(self):
-        """연장 회차 변경 시 스케줄 테이블 업데이트"""
+        """연장 회차 변경 시 스케줄 테이블 및 비용 요약 업데이트"""
         if not self.current_schedule:
             return
 
         try:
             extend_rounds = int(self.extend_rounds_input.text() or 0)
 
-            if extend_rounds <= 0:
-                return
-
             # 현재 스케줄에 저장
             self.current_schedule['extend_rounds'] = extend_rounds
 
-            # 연장 회차 스케줄 생성 및 테이블 업데이트
-            self._add_extension_rounds_to_table(extend_rounds)
+            if extend_rounds > 0:
+                # 연장 회차 스케줄 생성 및 테이블 업데이트
+                self._add_extension_rounds_to_table(extend_rounds)
+
+                # 연장 견적 UI 표시 및 업데이트
+                self._update_extend_estimate_ui(extend_rounds)
+            else:
+                # 연장 회차가 0이면 연장 견적 UI 숨김
+                self.row_extend_widget.hide()
 
         except ValueError:
             pass
+
+    def _update_extend_estimate_ui(self, extend_rounds):
+        """연장 견적 UI 업데이트"""
+        if not self.current_schedule:
+            return
+
+        schedule = self.current_schedule
+        test_method = schedule.get('test_method', '') or ''
+
+        # 구간 수 결정
+        if test_method in ['real', 'custom_real']:
+            zone_count = 1
+        else:
+            zone_count = 3
+
+        # 기본 보고서 비용
+        if test_method in ['real', 'custom_real']:
+            default_report_cost = 200000
+        else:
+            default_report_cost = 300000
+
+        # 검사항목 및 수수료
+        food_type_id = schedule.get('food_type_id')
+        test_items = []
+        fees = {}
+        if food_type_id:
+            from models.product_types import ProductType
+            from models.fees import Fee
+            food_type = ProductType.get_by_id(food_type_id)
+            if food_type:
+                test_items_str = food_type.get('test_items', '') or ''
+                test_items = [item.strip() for item in test_items_str.split(',') if item.strip()]
+                for item in test_items:
+                    fee_data = Fee.get_by_name(item)
+                    if fee_data:
+                        fees[item] = fee_data.get('fee', 0)
+
+        # 연장 견적 UI 표시
+        self.row_extend_widget.show()
+
+        # 연장 견적 계산
+        extend_detail_parts = []
+        for test_item in test_items:
+            unit_price = int(fees.get(test_item, 0))
+            extend_cost = unit_price * extend_rounds
+            extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_cost:,}원")
+        extend_item_detail = " | ".join(extend_detail_parts)
+        self.extend_item_cost_detail.setText(extend_item_detail)
+
+        cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
+        self.extend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
+
+        extend_total_rounds = cost_per_test * extend_rounds
+        self.extend_rounds_cost.setText(f"회차:{extend_total_rounds:,}원")
+
+        extend_report = schedule.get('extend_report_cost', default_report_cost)
+        self.extend_report_cost_input.setText(f"{extend_report:,}")
+
+        extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
+        extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
+        self.extend_cost_formula.setText(extend_formula)
+
+        extend_vat = int(extend_cost_no_vat * 0.1)
+        extend_with_vat = extend_cost_no_vat + extend_vat
+        self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+
+        # 연장 견적 DB 저장
+        schedule_id = schedule.get('id')
+        if schedule_id:
+            from models.schedules import Schedule
+            Schedule.save_extend_estimate(
+                schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
+                extend_report, extend_formula,
+                extend_cost_no_vat, extend_vat, extend_with_vat
+            )
 
     def _add_extension_rounds_to_table(self, extend_rounds):
         """연장 회차를 스케줄 테이블에 추가"""
