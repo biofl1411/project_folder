@@ -2030,6 +2030,29 @@ class EstimateTab(QWidget):
             server.sendmail(smtp_email, all_recipients, msg.as_string())
             server.quit()
 
+            # 이메일 발송 로그 저장
+            try:
+                from models.communications import EmailLog
+                schedule_id = self.current_schedule.get('id')
+                client_name = self.current_schedule.get('client_name', '')
+                estimate_type = getattr(self, 'estimate_type', 'first')
+                sent_by = self.current_user.get('id') if hasattr(self, 'current_user') and self.current_user else None
+
+                EmailLog.save(
+                    schedule_id=schedule_id,
+                    estimate_type=estimate_type,
+                    sender_email=smtp_email,
+                    to_emails=', '.join(to_list),
+                    cc_emails=', '.join(cc_list) if cc_list else None,
+                    subject=self.email_subject_input.text(),
+                    body=body,
+                    attachment_name=os.path.basename(pdf_path),
+                    sent_by=sent_by,
+                    client_name=client_name
+                )
+            except Exception as log_err:
+                print(f"이메일 로그 저장 오류: {log_err}")
+
             QMessageBox.information(self, "발송 완료",
                 f"이메일이 성공적으로 발송되었습니다.\n\n"
                 f"수신자: {', '.join(to_list)}\n"
