@@ -145,11 +145,8 @@ class Message:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT DISTINCT
-                    CASE
-                        WHEN m.sender_id = %s THEN m.receiver_id
-                        ELSE m.sender_id
-                    END as partner_id,
+                SELECT
+                    u.id as partner_id,
                     u.name as partner_name,
                     u.department as partner_department,
                     MAX(m.created_at) as last_message_time,
@@ -162,8 +159,9 @@ class Message:
                     WHEN m.sender_id = %s THEN m.receiver_id
                     ELSE m.sender_id
                 END
-                WHERE m.sender_id = %s OR m.receiver_id = %s
-                GROUP BY partner_id
+                WHERE (m.sender_id = %s OR m.receiver_id = %s)
+                  AND u.id != %s
+                GROUP BY u.id, u.name, u.department
                 ORDER BY last_message_time DESC
             """, (user_id, user_id, user_id, user_id, user_id, user_id))
 
