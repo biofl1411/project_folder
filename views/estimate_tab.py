@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
     QScrollArea, QGridLayout, QGroupBox, QTextEdit, QMessageBox,
-    QLineEdit, QSizePolicy, QSplitter, QFormLayout
+    QLineEdit, QSizePolicy, QSplitter, QFormLayout, QComboBox,
+    QDialog, QRadioButton, QButtonGroup, QDialogButtonBox
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
@@ -18,6 +19,7 @@ class EstimateTab(QWidget):
         super().__init__(parent)
         self.current_schedule = None
         self.current_user = None
+        self.discount_rate = 0  # 할인율 (0, 5, 10, 15, 20, 25, 30)
         self.initUI()
 
     def set_current_user(self, user):
@@ -112,16 +114,67 @@ class EstimateTab(QWidget):
         button_layout.addWidget(self.suspend_estimate_btn)
         button_layout.addWidget(self.extend_estimate_btn)
 
+        # 할인 기능 영역 추가
+        button_layout.addSpacing(30)
+        discount_label = QLabel("할인율:")
+        discount_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        button_layout.addWidget(discount_label)
+
+        self.discount_combo = QComboBox()
+        self.discount_combo.addItems(["0%", "5%", "10%", "15%", "20%", "25%", "30%"])
+        self.discount_combo.setStyleSheet("""
+            QComboBox {
+                padding: 5px 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                min-width: 70px;
+                font-size: 12px;
+            }
+        """)
+        button_layout.addWidget(self.discount_combo)
+
+        self.apply_discount_btn = QPushButton("할인 적용")
+        self.apply_discount_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                padding: 6px 15px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f57c00;
+            }
+        """)
+        self.apply_discount_btn.clicked.connect(self.apply_discount)
+        button_layout.addWidget(self.apply_discount_btn)
+
         main_layout.addWidget(button_frame)
 
         # 스크롤 영역 - 수직 스크롤만
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setStyleSheet("QScrollArea { border: none; background-color: #e0e0e0; }")
 
-        # 견적서 컨테이너 - A4 비율에 맞게 너비 제한 (210:297)
+        # 가로 스플리터 (원본 | 할인 적용)
+        self.estimate_splitter = QSplitter(Qt.Horizontal)
+        self.estimate_splitter.setStyleSheet("QSplitter { background-color: #e0e0e0; }")
+
+        # 원본 견적서 컨테이너 - A4 비율에 맞게 너비 제한 (210:297)
+        self.original_frame = QFrame()
+        self.original_frame.setStyleSheet("QFrame { background-color: #e0e0e0; }")
+        original_frame_layout = QVBoxLayout(self.original_frame)
+        original_frame_layout.setContentsMargins(10, 5, 5, 10)
+
+        # 원본 라벨
+        self.original_label = QLabel("◀ 원본 견적서 ▶")
+        self.original_label.setAlignment(Qt.AlignCenter)
+        self.original_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; padding: 5px; background-color: #d0d0d0; border-radius: 4px;")
+        original_frame_layout.addWidget(self.original_label)
+
         self.estimate_container = QWidget()
         self.estimate_container.setStyleSheet("background-color: white;")
         self.estimate_container.setFixedWidth(700)  # A4 비율에 맞는 고정 너비
@@ -133,12 +186,45 @@ class EstimateTab(QWidget):
         # 견적서 내용 생성
         self.create_estimate_content()
 
-        # 스크롤 영역에 컨테이너 배치 (중앙 정렬)
+        original_frame_layout.addWidget(self.estimate_container, 0, Qt.AlignHCenter)
+        original_frame_layout.addStretch()
+
+        # 할인 적용 견적서 컨테이너
+        self.discounted_frame = QFrame()
+        self.discounted_frame.setStyleSheet("QFrame { background-color: #e0e0e0; }")
+        discounted_frame_layout = QVBoxLayout(self.discounted_frame)
+        discounted_frame_layout.setContentsMargins(5, 5, 10, 10)
+
+        # 할인 라벨
+        self.discounted_label = QLabel("◀ 할인 적용 견적서 (0%) ▶")
+        self.discounted_label.setAlignment(Qt.AlignCenter)
+        self.discounted_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #ff6600; padding: 5px; background-color: #ffe0b3; border-radius: 4px;")
+        discounted_frame_layout.addWidget(self.discounted_label)
+
+        self.discounted_container = QWidget()
+        self.discounted_container.setStyleSheet("background-color: white;")
+        self.discounted_container.setFixedWidth(700)  # A4 비율에 맞는 고정 너비
+
+        self.discounted_layout = QVBoxLayout(self.discounted_container)
+        self.discounted_layout.setContentsMargins(30, 25, 30, 25)  # 여백 축소
+        self.discounted_layout.setSpacing(10)
+
+        # 할인 견적서 내용 생성
+        self.create_discounted_estimate_content()
+
+        discounted_frame_layout.addWidget(self.discounted_container, 0, Qt.AlignHCenter)
+        discounted_frame_layout.addStretch()
+
+        # 스플리터에 추가
+        self.estimate_splitter.addWidget(self.original_frame)
+        self.estimate_splitter.addWidget(self.discounted_frame)
+        self.estimate_splitter.setSizes([720, 720])
+
+        # 스크롤 영역에 스플리터 배치
         scroll_content = QWidget()
         scroll_layout = QHBoxLayout(scroll_content)
-        scroll_layout.addStretch()
-        scroll_layout.addWidget(self.estimate_container)
-        scroll_layout.addStretch()
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.addWidget(self.estimate_splitter)
         scroll_area.setWidget(scroll_content)
 
         # 스플리터로 견적서와 이메일 패널 분리
@@ -475,13 +561,572 @@ class EstimateTab(QWidget):
 
         self.estimate_layout.addWidget(self.save_btn_widget)
 
-    def add_separator(self):
+    def add_separator(self, target_layout=None):
         """구분선 추가"""
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         separator.setStyleSheet("background-color: #ccc;")
         separator.setFixedHeight(1)
-        self.estimate_layout.addWidget(separator)
+        if target_layout:
+            target_layout.addWidget(separator)
+        else:
+            self.estimate_layout.addWidget(separator)
+
+    def create_discounted_estimate_content(self):
+        """할인 적용 견적서 내용 생성 (원본과 동일한 구조)"""
+        # 1. 헤더 (로고 + 견적서 타이틀)
+        header_layout = QHBoxLayout()
+
+        # 로고
+        self.disc_logo_label = QLabel("BFL")
+        self.disc_logo_label.setStyleSheet("""
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e90ff;
+            font-family: Arial;
+        """)
+        self.disc_logo_label.setFixedHeight(60)
+
+        # 견적서 타이틀
+        disc_title_label = QLabel("견 적 서")
+        disc_title_label.setStyleSheet("""
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e90ff;
+            border-bottom: 3px solid #1e90ff;
+            padding-bottom: 5px;
+        """)
+        disc_title_label.setAlignment(Qt.AlignCenter)
+
+        header_layout.addWidget(self.disc_logo_label)
+        header_layout.addStretch()
+        header_layout.addWidget(disc_title_label)
+        header_layout.addStretch()
+
+        self.discounted_layout.addLayout(header_layout)
+
+        # 회사명 + 주소 + 홈페이지
+        company_address_layout = QHBoxLayout()
+        company_address_layout.setSpacing(15)
+
+        self.disc_header_company_label = QLabel("(주)바이오푸드랩")
+        self.disc_header_company_label.setStyleSheet("font-size: 10px; color: #666;")
+
+        self.disc_header_address_label = QLabel("")
+        self.disc_header_address_label.setStyleSheet("font-size: 10px; color: #666;")
+
+        self.disc_website_label = QLabel("https://www.biofl.co.kr")
+        self.disc_website_label.setStyleSheet("font-size: 10px; color: #1e90ff;")
+
+        company_address_layout.addWidget(self.disc_header_company_label)
+        company_address_layout.addWidget(self.disc_header_address_label)
+        company_address_layout.addWidget(self.disc_website_label)
+        company_address_layout.addStretch()
+
+        self.discounted_layout.addLayout(company_address_layout)
+
+        # 구분선
+        self.add_separator(self.discounted_layout)
+
+        # 2. 견적 정보 테이블
+        info_frame = QFrame()
+        info_layout = QGridLayout(info_frame)
+        info_layout.setSpacing(8)
+        info_layout.setColumnStretch(1, 1)
+
+        input_style = """
+            QLineEdit {
+                border: 1px solid #ffcc80;
+                border-radius: 3px;
+                padding: 4px 8px;
+                background-color: #fff8e1;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #ff9800;
+                background-color: #ffffff;
+            }
+        """
+
+        # 견적번호
+        estimate_no_title = QLabel("견 적 번 호 :")
+        estimate_no_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.disc_estimate_no_input = QLineEdit("")
+        self.disc_estimate_no_input.setStyleSheet(input_style)
+
+        # 견적일자
+        estimate_date_title = QLabel("견 적 일 자 :")
+        estimate_date_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.disc_estimate_date_input = QLineEdit("")
+        self.disc_estimate_date_input.setStyleSheet(input_style)
+
+        # 수신
+        receiver_title = QLabel("수       신 :")
+        receiver_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.disc_receiver_input = QLineEdit("")
+        self.disc_receiver_input.setStyleSheet(input_style)
+
+        # 발신
+        sender_title = QLabel("발       신 :")
+        sender_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.disc_sender_input = QLineEdit("㈜바이오푸드랩")
+        self.disc_sender_input.setStyleSheet(input_style)
+
+        # 오른쪽 정보
+        right_info_widget = QWidget()
+        right_info_widget.setFixedSize(320, 140)
+
+        self.disc_right_company_info = QLabel("")
+        self.disc_right_company_info.setStyleSheet("font-size: 13px; padding-left: 40px;")
+        self.disc_right_company_info.setFixedSize(320, 140)
+        self.disc_right_company_info.setParent(right_info_widget)
+        self.disc_right_company_info.move(0, 0)
+        self.disc_right_company_info.setAttribute(Qt.WA_TranslucentBackground)
+
+        self.disc_stamp_label = QLabel("")
+        self.disc_stamp_label.setFixedSize(60, 60)
+        self.disc_stamp_label.setStyleSheet("border: none; background: transparent;")
+        self.disc_stamp_label.setParent(right_info_widget)
+        self.disc_stamp_label.move(140, 5)
+
+        info_layout.addWidget(estimate_no_title, 0, 0)
+        info_layout.addWidget(self.disc_estimate_no_input, 0, 1)
+        info_layout.addWidget(right_info_widget, 0, 2, 4, 1, Qt.AlignRight | Qt.AlignTop)
+
+        info_layout.addWidget(estimate_date_title, 1, 0)
+        info_layout.addWidget(self.disc_estimate_date_input, 1, 1)
+
+        info_layout.addWidget(receiver_title, 2, 0)
+        info_layout.addWidget(self.disc_receiver_input, 2, 1)
+
+        info_layout.addWidget(sender_title, 3, 0)
+        info_layout.addWidget(self.disc_sender_input, 3, 1)
+
+        self.discounted_layout.addWidget(info_frame)
+
+        # 구분선
+        self.add_separator(self.discounted_layout)
+
+        # 3. 견적 상세 정보
+        detail_frame = QFrame()
+        detail_layout = QGridLayout(detail_frame)
+        detail_layout.setSpacing(8)
+
+        self.disc_title_value = QLabel("소비기한설정시험의 건")
+        self.disc_total_text_label = QLabel("일금 이백사십일만천칠백 원정")
+        self.disc_total_amount_label = QLabel("( ₩2,471,700 )")
+        self.disc_total_amount_label.setStyleSheet("color: red; font-weight: bold;")
+        self.disc_validity_label = QLabel("견적 후 1개월")
+        self.disc_payment_label = QLabel("온라인입금 ( 기업은행: 024-088021-01-017 )")
+
+        # 할인 정보 라벨 추가
+        self.disc_discount_info_label = QLabel("")
+        self.disc_discount_info_label.setStyleSheet("color: #ff6600; font-weight: bold; font-size: 11px;")
+
+        detail_layout.addWidget(QLabel("1.   견 적 명 칭"), 0, 0)
+        detail_layout.addWidget(QLabel(":"), 0, 1)
+        detail_layout.addWidget(self.disc_title_value, 0, 2)
+
+        detail_layout.addWidget(QLabel("2.   합 계 금 액"), 1, 0)
+        detail_layout.addWidget(QLabel(":"), 1, 1)
+        amount_layout = QHBoxLayout()
+        amount_layout.addWidget(self.disc_total_text_label)
+        amount_layout.addWidget(self.disc_total_amount_label)
+        amount_layout.addStretch()
+        detail_layout.addLayout(amount_layout, 1, 2)
+
+        # 할인 정보 행 추가
+        detail_layout.addWidget(QLabel("     (할인 적용)"), 2, 0)
+        detail_layout.addWidget(QLabel(":"), 2, 1)
+        detail_layout.addWidget(self.disc_discount_info_label, 2, 2)
+
+        detail_layout.addWidget(QLabel("3.   견적유효기간"), 3, 0)
+        detail_layout.addWidget(QLabel(":"), 3, 1)
+        detail_layout.addWidget(self.disc_validity_label, 3, 2)
+
+        detail_layout.addWidget(QLabel("4.   결 제 조 건"), 4, 0)
+        detail_layout.addWidget(QLabel(":"), 4, 1)
+        detail_layout.addWidget(self.disc_payment_label, 4, 2)
+
+        self.discounted_layout.addWidget(detail_frame)
+
+        # 아래와 같이 견적합니다
+        note_label = QLabel("아래와 같이 견적합니다.")
+        note_label.setStyleSheet("font-size: 12px; margin: 10px 0;")
+        self.discounted_layout.addWidget(note_label)
+
+        # 구분선
+        self.add_separator(self.discounted_layout)
+
+        # 4. 품목 테이블
+        self.disc_items_table = QTableWidget()
+        self.disc_items_table.setColumnCount(5)
+        self.disc_items_table.setHorizontalHeaderLabels(["No.", "식품유형", "검사 항목", "계", "소 계"])
+        self.disc_items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.disc_items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.disc_items_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.disc_items_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
+        self.disc_items_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+        self.disc_items_table.setColumnWidth(0, 35)
+        self.disc_items_table.setColumnWidth(3, 80)
+        self.disc_items_table.setColumnWidth(4, 100)
+        self.disc_items_table.setMinimumHeight(200)
+        self.disc_items_table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid #ccc;
+                gridline-color: #ccc;
+            }
+            QTableWidget::item {
+                padding: 8px 5px;
+            }
+            QHeaderView::section {
+                background-color: #fff3e0;
+                border: 1px solid #ccc;
+                padding: 5px;
+                font-weight: bold;
+                text-align: center;
+            }
+        """)
+        self.disc_items_table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter)
+        self.disc_items_table.verticalHeader().setVisible(False)
+
+        self.discounted_layout.addWidget(self.disc_items_table)
+
+        # 5. Remark 섹션
+        remark_group = QGroupBox("※ Remark")
+        remark_layout = QVBoxLayout(remark_group)
+
+        self.disc_remark_text = QTextEdit()
+        self.disc_remark_text.setStyleSheet("""
+            QTextEdit {
+                font-size: 11px;
+                line-height: 1.4;
+                padding: 5px;
+                border: 1px solid #ffcc80;
+                border-radius: 3px;
+                background-color: #fff8e1;
+            }
+        """)
+        self.disc_remark_text.setMinimumHeight(300)
+        self.disc_remark_text.setReadOnly(True)
+        remark_layout.addWidget(self.disc_remark_text)
+
+        self.discounted_layout.addWidget(remark_group)
+
+        # 6. 합계 금액
+        total_frame = QFrame()
+        total_frame.setStyleSheet("border-top: 2px solid #ff9800;")
+        total_layout = QGridLayout(total_frame)
+
+        # 원래 금액 (취소선)
+        self.disc_original_subtotal_label = QLabel("")
+        self.disc_original_subtotal_label.setStyleSheet("color: #999; text-decoration: line-through;")
+        self.disc_original_vat_label = QLabel("")
+        self.disc_original_vat_label.setStyleSheet("color: #999; text-decoration: line-through;")
+
+        # 할인 적용 금액
+        self.disc_subtotal_label = QLabel("2,247,000 원")
+        self.disc_subtotal_label.setStyleSheet("color: #ff6600; font-weight: bold;")
+        self.disc_vat_label = QLabel("224,700 원")
+        self.disc_vat_label.setStyleSheet("color: #ff6600; font-weight: bold;")
+
+        total_layout.addWidget(QLabel("합계 금액"), 0, 0)
+        total_layout.addWidget(QLabel(":"), 0, 1)
+        subtotal_layout = QHBoxLayout()
+        subtotal_layout.addWidget(self.disc_original_subtotal_label)
+        subtotal_layout.addWidget(QLabel("→"))
+        subtotal_layout.addWidget(self.disc_subtotal_label)
+        subtotal_layout.addStretch()
+        total_layout.addLayout(subtotal_layout, 0, 2)
+
+        total_layout.addWidget(QLabel("V. A. T"), 1, 0)
+        total_layout.addWidget(QLabel(":"), 1, 1)
+        vat_layout = QHBoxLayout()
+        vat_layout.addWidget(self.disc_original_vat_label)
+        vat_layout.addWidget(QLabel("→"))
+        vat_layout.addWidget(self.disc_vat_label)
+        vat_layout.addStretch()
+        total_layout.addLayout(vat_layout, 1, 2)
+
+        self.discounted_layout.addWidget(total_frame)
+
+        # 7. 푸터
+        footer_layout = QHBoxLayout()
+        footer_left = QLabel("BFL-QI-002-F18")
+        footer_center = QLabel("㈜바이오푸드랩")
+        footer_right = QLabel("A4(210×297)")
+        footer_left.setStyleSheet("font-size: 10px; color: #666;")
+        footer_center.setStyleSheet("font-size: 10px; color: #666;")
+        footer_right.setStyleSheet("font-size: 10px; color: #666;")
+
+        footer_layout.addWidget(footer_left)
+        footer_layout.addStretch()
+        footer_layout.addWidget(footer_center)
+        footer_layout.addStretch()
+        footer_layout.addWidget(footer_right)
+
+        self.discounted_layout.addLayout(footer_layout)
+
+    def apply_discount(self):
+        """할인율 적용"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "먼저 스케줄을 선택해주세요.")
+            return
+
+        # 할인율 가져오기
+        discount_text = self.discount_combo.currentText()
+        self.discount_rate = int(discount_text.replace('%', ''))
+
+        # 할인 라벨 업데이트
+        self.discounted_label.setText(f"◀ 할인 적용 견적서 ({self.discount_rate}%) ▶")
+
+        # 할인 적용 견적서 업데이트
+        self.update_discounted_estimate()
+
+        if self.discount_rate > 0:
+            QMessageBox.information(self, "할인 적용", f"{self.discount_rate}% 할인이 적용되었습니다.")
+
+    def update_discounted_estimate(self):
+        """할인 적용 견적서 업데이트"""
+        if not self.current_schedule:
+            return
+
+        schedule = self.current_schedule
+        from datetime import datetime
+
+        # 기본 정보 복사
+        self.disc_estimate_no_input.setText(self.estimate_no_input.text())
+        self.disc_estimate_date_input.setText(self.estimate_date_input.text())
+        self.disc_receiver_input.setText(self.receiver_input.text())
+        self.disc_sender_input.setText(self.sender_input.text())
+        self.disc_title_value.setText(self.title_value.text())
+        self.disc_validity_label.setText(self.validity_label.text())
+        self.disc_payment_label.setText(self.payment_label.text())
+        self.disc_right_company_info.setText(self.right_company_info.text())
+        self.disc_remark_text.setPlainText(self.remark_text.toPlainText())
+
+        # 로고 복사
+        if self.logo_label.pixmap() and not self.logo_label.pixmap().isNull():
+            self.disc_logo_label.setPixmap(self.logo_label.pixmap())
+            self.disc_logo_label.setStyleSheet("")
+        else:
+            self.disc_logo_label.setText("BFL")
+            self.disc_logo_label.setStyleSheet("""
+                font-size: 36px;
+                font-weight: bold;
+                color: #1e90ff;
+                font-family: Arial;
+            """)
+
+        # 도장 복사
+        if self.stamp_label.pixmap() and not self.stamp_label.pixmap().isNull():
+            self.disc_stamp_label.setPixmap(self.stamp_label.pixmap())
+            self.disc_stamp_label.show()
+            self.disc_stamp_label.raise_()
+
+        # 원래 금액 계산
+        original_subtotal = self.calculate_total_price(schedule)
+        original_vat = int(original_subtotal * 0.1)
+        original_total = original_subtotal + original_vat
+
+        # 할인 적용 금액 계산
+        discount_multiplier = (100 - self.discount_rate) / 100
+        discounted_subtotal = int(original_subtotal * discount_multiplier)
+        discounted_vat = int(discounted_subtotal * 0.1)
+        discounted_total = discounted_subtotal + discounted_vat
+
+        # 할인 금액
+        discount_amount = original_total - discounted_total
+
+        # 금액을 한글로 변환
+        total_text = self.number_to_korean(discounted_total)
+
+        # 할인 정보 표시
+        if self.discount_rate > 0:
+            self.disc_discount_info_label.setText(
+                f"원가 ₩{original_total:,} - 할인 {self.discount_rate}% (₩{discount_amount:,})"
+            )
+            self.disc_original_subtotal_label.setText(f"{original_subtotal:,} 원")
+            self.disc_original_vat_label.setText(f"{original_vat:,} 원")
+        else:
+            self.disc_discount_info_label.setText("할인 없음")
+            self.disc_original_subtotal_label.setText("")
+            self.disc_original_vat_label.setText("")
+
+        # 할인 적용 금액 표시
+        self.disc_total_text_label.setText(f"일금 {total_text} 원정")
+        self.disc_total_amount_label.setText(f"( ₩{discounted_total:,} )")
+        self.disc_subtotal_label.setText(f"{discounted_subtotal:,} 원")
+        self.disc_vat_label.setText(f"{discounted_vat:,} 원")
+
+        # 품목 테이블 업데이트
+        self.update_discounted_items_table(schedule, discounted_subtotal)
+
+    def update_discounted_items_table(self, schedule, discounted_price):
+        """할인 적용 품목 테이블 업데이트"""
+        # 원본 테이블과 동일한 구조로 복사하고 금액만 변경
+        self.disc_items_table.setRowCount(1)
+
+        # 식품유형
+        food_type = schedule.get('food_type_name', '기타가공품')
+
+        # 검사 항목 정보 구성 (원본과 동일)
+        test_period_days = schedule.get('test_period_days', 0) or 0
+        test_period_months = schedule.get('test_period_months', 0) or 0
+        test_period_years = schedule.get('test_period_years', 0) or 0
+
+        period_parts = []
+        if test_period_years > 0:
+            period_parts.append(f"{test_period_years}년")
+        if test_period_months > 0:
+            period_parts.append(f"{test_period_months}개월")
+        if test_period_days > 0:
+            period_parts.append(f"{test_period_days}일")
+        period_str = " ".join(period_parts) if period_parts else "0개월"
+
+        storage_code = schedule.get('storage_condition', 'room_temp')
+        storage_map = {
+            'room_temp': '상온',
+            'warm': '실온',
+            'cool': '냉장',
+            'freeze': '냉동'
+        }
+        storage = storage_map.get(storage_code, storage_code)
+
+        test_method = schedule.get('test_method', 'real')
+        method_map = {
+            'real': '실측실험',
+            'acceleration': '가속실험',
+            'custom_real': '의뢰자요청(실측)',
+            'custom_accel': '의뢰자요청(가속)',
+            'custom_acceleration': '의뢰자요청(가속)'
+        }
+        method_str = method_map.get(test_method, '실측실험')
+
+        total_expiry_days = test_period_days + (test_period_months * 30) + (test_period_years * 365)
+
+        actual_experiment_days = schedule.get('actual_experiment_days')
+        if actual_experiment_days is not None and actual_experiment_days > 0:
+            experiment_days = actual_experiment_days
+        else:
+            if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+                experiment_days = total_expiry_days // 2 if total_expiry_days > 0 else 0
+            else:
+                experiment_days = int(total_expiry_days * 1.5)
+
+        exp_years = experiment_days // 365
+        exp_months = (experiment_days % 365) // 30
+        exp_days_remaining = experiment_days % 30
+
+        duration_parts = []
+        if exp_years > 0: duration_parts.append(f"{exp_years}년")
+        if exp_months > 0: duration_parts.append(f"{exp_months}개월")
+        if exp_days_remaining > 0: duration_parts.append(f"{exp_days_remaining}일")
+        test_duration = ' '.join(duration_parts) if duration_parts else f"{experiment_days}일"
+
+        real_temps = {'room_temp': '15', 'warm': '25', 'cool': '10', 'freeze': '-18'}
+        accel_temps = {
+            'room_temp': ['15', '25', '35'],
+            'warm': ['25', '35', '45'],
+            'cool': ['5', '10', '15'],
+            'freeze': ['-6', '-12', '-18']
+        }
+
+        custom_temps = schedule.get('custom_temperatures', '')
+        if custom_temps:
+            temps = [t.strip().replace('℃', '') for t in custom_temps.split(',')]
+        else:
+            if test_method in ['acceleration', 'custom_accel', 'custom_acceleration']:
+                temps = accel_temps.get(storage_code, ['25', '35', '45'])
+            else:
+                temps = [real_temps.get(storage_code, '15')]
+
+        sampling_count = schedule.get('sampling_count', 6) or 6
+
+        if experiment_days > 0 and sampling_count > 0:
+            experiment_interval = experiment_days // sampling_count
+        else:
+            experiment_interval = 15
+
+        test_items_str = schedule.get('test_items', '')
+        if test_items_str:
+            test_items_list = [item.strip() for item in test_items_str.split(',') if item.strip()]
+        else:
+            test_items_list = ['관능평가', '세균수', '대장균(정량)', 'pH']
+
+        if len(temps) == 1:
+            temp_str = f"{temps[0]}℃"
+        else:
+            temp_str = " / ".join([f"{t}℃" for t in temps])
+
+        # 견적 유형에 따라 표시
+        if self.estimate_type == "suspend":
+            completed_rounds = schedule.get('completed_rounds', 0)
+            if completed_rounds is None or completed_rounds == 0:
+                completed_rounds = max(1, sampling_count // 2)
+            food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temp_str}
+※ 중단 정산
+완료 회차: {completed_rounds}회 / 전체 {sampling_count}회
+실험 주기: {experiment_interval}일"""
+        elif self.estimate_type == "extend":
+            extend_rounds = schedule.get('extend_rounds', 0)
+            if extend_rounds is None or extend_rounds == 0:
+                extend_rounds = 3
+            food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temp_str}
+※ 연장 실험
+연장 회차: {extend_rounds}회
+실험 주기: {experiment_interval}일"""
+        else:
+            food_type_text = f"""{food_type}
+
+소비기한 : {storage} {period_str}
+시험기간 : {test_duration}
+실험방법 : {method_str}
+실험 온도: {temp_str}
+연장시험 : {'진행' if schedule.get('extension_test') else '미진행'}
+실험 횟수: {sampling_count}회
+실험 주기: {experiment_interval}일"""
+
+        test_items_text = '\n'.join([f"{i+1})  {item}" for i, item in enumerate(test_items_list)])
+
+        base_height = 140
+        item_height = 18
+        temp_lines = len(temps) - 1 if len(temps) > 1 else 0
+        row_height = base_height + max(len(test_items_list), temp_lines + 5) * item_height
+        self.disc_items_table.setRowHeight(0, row_height)
+
+        def create_top_aligned_cell(text, align=Qt.AlignCenter, word_wrap=False):
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(5, 8, 5, 5)
+            layout.setAlignment(Qt.AlignTop)
+
+            label = QLabel(text)
+            label.setAlignment(align)
+            label.setStyleSheet("background-color: transparent;")
+            if word_wrap:
+                label.setWordWrap(True)
+            layout.addWidget(label)
+            layout.addStretch()
+
+            container.setStyleSheet("background-color: white;")
+            return container
+
+        self.disc_items_table.setCellWidget(0, 0, create_top_aligned_cell("1"))
+        self.disc_items_table.setCellWidget(0, 1, create_top_aligned_cell(food_type_text, Qt.AlignTop | Qt.AlignLeft, True))
+        self.disc_items_table.setCellWidget(0, 2, create_top_aligned_cell(test_items_text, Qt.AlignTop | Qt.AlignLeft, True))
+        self.disc_items_table.setCellWidget(0, 3, create_top_aligned_cell(f"{discounted_price:,}", Qt.AlignTop | Qt.AlignRight))
+        self.disc_items_table.setCellWidget(0, 4, create_top_aligned_cell(f"{discounted_price:,} 원", Qt.AlignTop | Qt.AlignRight))
 
     def load_company_info(self):
         """설정에서 회사 정보 불러오기"""
@@ -708,6 +1353,9 @@ class EstimateTab(QWidget):
 
         # Remark 업데이트
         self.update_remark(schedule)
+
+        # 할인 견적서 업데이트
+        self.update_discounted_estimate()
 
     def update_items_table(self, schedule):
         """품목 테이블 업데이트"""
@@ -1553,6 +2201,63 @@ class EstimateTab(QWidget):
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
 
+    def show_estimate_version_dialog(self, action_name="저장"):
+        """견적서 버전 선택 다이얼로그 표시"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"견적서 선택 - {action_name}")
+        dialog.setFixedSize(350, 180)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #f5f5f5;
+            }
+            QLabel {
+                font-size: 13px;
+            }
+            QRadioButton {
+                font-size: 12px;
+                padding: 8px;
+            }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        # 안내 라벨
+        info_label = QLabel(f"어떤 견적서를 {action_name}하시겠습니까?")
+        info_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        layout.addWidget(info_label)
+
+        # 라디오 버튼 그룹
+        button_group = QButtonGroup(dialog)
+
+        # 원본 견적서 옵션
+        original_radio = QRadioButton("원본 견적서 (할인 전)")
+        original_radio.setStyleSheet("background-color: white; border: 1px solid #ddd; border-radius: 4px;")
+        original_radio.setChecked(True)
+        button_group.addButton(original_radio, 0)
+        layout.addWidget(original_radio)
+
+        # 할인 적용 견적서 옵션
+        discount_text = f"할인 적용 견적서 ({self.discount_rate}% 할인)" if self.discount_rate > 0 else "할인 적용 견적서 (할인 없음)"
+        discounted_radio = QRadioButton(discount_text)
+        discounted_radio.setStyleSheet("background-color: #fff8e1; border: 1px solid #ffcc80; border-radius: 4px;")
+        button_group.addButton(discounted_radio, 1)
+        layout.addWidget(discounted_radio)
+
+        # 버튼 박스
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.button(QDialogButtonBox.Ok).setText("확인")
+        button_box.button(QDialogButtonBox.Cancel).setText("취소")
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec_() == QDialog.Accepted:
+            # 0 = 원본, 1 = 할인 적용
+            return button_group.checkedId()
+        return None  # 취소
+
     def save_as_pdf(self):
         """PDF로 저장"""
         import os
@@ -1564,6 +2269,13 @@ class EstimateTab(QWidget):
         if not self.current_schedule:
             QMessageBox.warning(self, "알림", "저장할 견적서가 없습니다. 먼저 스케줄을 선택해주세요.")
             return
+
+        # 견적서 버전 선택
+        version = self.show_estimate_version_dialog("PDF 저장")
+        if version is None:
+            return  # 취소됨
+
+        use_discounted = (version == 1)
 
         # 설정에서 출력 경로 가져오기
         output_path = ""
@@ -1612,7 +2324,11 @@ class EstimateTab(QWidget):
                 name = name.replace(char, '_')
             return name
 
-        filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
+        # 할인 적용 시 파일명에 할인율 추가
+        if use_discounted and self.discount_rate > 0:
+            filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}_할인{self.discount_rate}%.pdf"
+        else:
+            filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
         filename = sanitize_filename(filename)
 
         # 저장 경로 결정
@@ -1653,15 +2369,23 @@ class EstimateTab(QWidget):
             # 저장 버튼 숨기기
             self.save_btn_widget.setVisible(False)
 
+            # 사용할 컨테이너 및 Remark 선택
+            if use_discounted:
+                widget = self.discounted_container
+                remark_widget = self.disc_remark_text
+            else:
+                widget = self.estimate_container
+                remark_widget = self.remark_text
+
             # Remark 텍스트 전체 표시를 위해 높이 조정
-            original_min_height = self.remark_text.minimumHeight()
-            original_max_height = self.remark_text.maximumHeight()
-            doc_height = self.remark_text.document().size().height() + 20
-            self.remark_text.setMinimumHeight(int(doc_height))
-            self.remark_text.setMaximumHeight(int(doc_height))
+            original_min_height = remark_widget.minimumHeight()
+            original_max_height = remark_widget.maximumHeight()
+            doc_height = remark_widget.document().size().height() + 20
+            remark_widget.setMinimumHeight(int(doc_height))
+            remark_widget.setMaximumHeight(int(doc_height))
 
             # 레이아웃 업데이트
-            self.estimate_container.adjustSize()
+            widget.adjustSize()
             from PyQt5.QtWidgets import QApplication
             QApplication.processEvents()
 
@@ -1689,7 +2413,6 @@ class EstimateTab(QWidget):
                 page_rect = printer.pageRect(QPrinter.DevicePixel)
 
                 # 위젯의 실제 내용 크기 계산
-                widget = self.estimate_container
                 widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
                 widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
 
@@ -1708,13 +2431,14 @@ class EstimateTab(QWidget):
                 widget.render(painter)
                 painter.end()
 
-                QMessageBox.information(self, "저장 완료", f"PDF가 저장되었습니다.\n\n{file_path}")
+                version_text = "할인 적용 견적서" if use_discounted else "원본 견적서"
+                QMessageBox.information(self, "저장 완료", f"{version_text}가 PDF로 저장되었습니다.\n\n{file_path}")
             else:
                 QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
 
             # Remark 텍스트 높이 복원
-            self.remark_text.setMinimumHeight(original_min_height)
-            self.remark_text.setMaximumHeight(original_max_height)
+            remark_widget.setMinimumHeight(original_min_height)
+            remark_widget.setMaximumHeight(original_max_height)
 
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
@@ -2000,6 +2724,13 @@ class EstimateTab(QWidget):
             QMessageBox.warning(self, "오류", "견적서를 먼저 선택해주세요.")
             return
 
+        # 견적서 버전 선택
+        version = self.show_estimate_version_dialog("이메일 발송")
+        if version is None:
+            return  # 취소됨
+
+        use_discounted = (version == 1)
+
         # SMTP 설정 가져오기
         try:
             from database import get_connection
@@ -2045,7 +2776,7 @@ class EstimateTab(QWidget):
             return
 
         # PDF 저장 (첨부용)
-        pdf_path = self._save_pdf_for_email(output_path)
+        pdf_path = self._save_pdf_for_email(output_path, use_discounted)
         if not pdf_path:
             return
 
@@ -2143,7 +2874,7 @@ class EstimateTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"오류가 발생했습니다:\n{str(e)}")
 
-    def _save_pdf_for_email(self, output_path):
+    def _save_pdf_for_email(self, output_path, use_discounted=False):
         """이메일 첨부용 PDF 저장"""
         import os
         from datetime import datetime
@@ -2173,7 +2904,11 @@ class EstimateTab(QWidget):
                 name = name.replace(char, '_')
             return name
 
-        filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
+        # 할인 적용 시 파일명에 할인율 추가
+        if use_discounted and self.discount_rate > 0:
+            filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}_할인{self.discount_rate}%.pdf"
+        else:
+            filename = f"{client_name}_{food_type}_{estimate_date}_{storage}_{method_str}.pdf"
         filename = sanitize_filename(filename)
 
         # 저장 경로 결정
@@ -2184,6 +2919,12 @@ class EstimateTab(QWidget):
             if not os.path.exists(default_path):
                 default_path = os.path.expanduser("~")
             file_path = os.path.join(default_path, filename)
+
+        # 사용할 컨테이너 선택
+        if use_discounted:
+            widget = self.discounted_container
+        else:
+            widget = self.estimate_container
 
         # PDF 생성
         try:
@@ -2207,7 +2948,6 @@ class EstimateTab(QWidget):
                 painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
                 page_rect = printer.pageRect(QPrinter.DevicePixel)
-                widget = self.estimate_container
                 widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
                 widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
 
