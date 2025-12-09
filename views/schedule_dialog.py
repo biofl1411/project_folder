@@ -584,7 +584,9 @@ class ScheduleCreateDialog(QDialog):
         test_method_layout.addWidget(self.test_method_acceleration)
         test_method_layout.addWidget(self.test_method_custom_real)
         test_method_layout.addWidget(self.test_method_custom_accel)
-        test_layout.addRow("실험방법(필수):", test_method_layout)
+        test_method_label = QLabel("실험방법<span style='color:red;'>*</span>:")
+        test_method_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        test_layout.addRow(test_method_label, test_method_layout)
         
         # 보관 조건 라디오 버튼
         storage_layout = QHBoxLayout()
@@ -607,7 +609,9 @@ class ScheduleCreateDialog(QDialog):
         storage_layout.addWidget(self.storage_warm)
         storage_layout.addWidget(self.storage_cool)
         storage_layout.addWidget(self.storage_freeze)
-        test_layout.addRow("보관조건(필수):", storage_layout)
+        storage_label = QLabel("보관조건<span style='color:red;'>*</span>:")
+        storage_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        test_layout.addRow(storage_label, storage_layout)
         
         # 보관 온도 (읽기 전용)
         self.storage_temp_label = QLabel(self.ROOM_TEMP_LABEL)
@@ -625,7 +629,9 @@ class ScheduleCreateDialog(QDialog):
         expected_date_layout.addWidget(self.expected_date)
         expected_date_layout.addWidget(self.expected_date_check)
         expected_date_layout.addStretch()
-        test_layout.addRow("의뢰 예상일(필수):", expected_date_layout)
+        expected_date_label = QLabel("의뢰 예상일<span style='color:red;'>*</span>:")
+        expected_date_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        test_layout.addRow(expected_date_label, expected_date_layout)
 
         # 실험 시작일
         start_date_layout = QHBoxLayout()
@@ -638,7 +644,9 @@ class ScheduleCreateDialog(QDialog):
         start_date_layout.addWidget(self.test_start_date)
         start_date_layout.addWidget(self.start_date_check)
         start_date_layout.addStretch()
-        test_layout.addRow("실험 시작일(필수):", start_date_layout)
+        start_date_label = QLabel("실험 시작일<span style='color:red;'>*</span>:")
+        start_date_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        test_layout.addRow(start_date_label, start_date_layout)
 
         # 견적일자
         estimate_date_layout = QHBoxLayout()
@@ -685,8 +693,10 @@ class ScheduleCreateDialog(QDialog):
         period_layout.addLayout(months_layout)
         period_layout.addLayout(years_layout)
         period_layout.addStretch()
-                
-        test_layout.addRow("소비기한:", period_layout)
+
+        expiry_label = QLabel("소비기한<span style='color:red;'>*</span>:")
+        expiry_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        test_layout.addRow(expiry_label, period_layout)
 
         # 실험기간 표시용 레이블 추가
         self.experiment_period_label = QLabel("0일 0개월 0년")
@@ -761,7 +771,9 @@ class ScheduleCreateDialog(QDialog):
 
         # 제품명
         self.product_name_input = QLineEdit()
-        product_layout.addRow("제품명:", self.product_name_input)
+        product_name_label = QLabel("제품명<span style='color:red;'>*</span>:")
+        product_name_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        product_layout.addRow(product_name_label, self.product_name_input)
 
         # 포장단위 (0~3000, g 또는 kg)
         packaging_layout = QHBoxLayout()
@@ -773,7 +785,9 @@ class ScheduleCreateDialog(QDialog):
         packaging_layout.addWidget(self.packaging_weight_spin)
         packaging_layout.addWidget(self.packaging_unit_combo)
         packaging_layout.addStretch()
-        product_layout.addRow("포장단위:", packaging_layout)
+        packaging_label = QLabel("포장단위<span style='color:red;'>*</span>:")
+        packaging_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        product_layout.addRow(packaging_label, packaging_layout)
 
         # 식품 유형 콤보박스와 선택 버튼
         food_type_layout = QHBoxLayout()
@@ -787,7 +801,9 @@ class ScheduleCreateDialog(QDialog):
         self.food_type_select_btn.setDefault(False)
         food_type_layout.addWidget(self.food_type_combo)
         food_type_layout.addWidget(self.food_type_select_btn)
-        product_layout.addRow("식품유형:", food_type_layout)
+        food_type_label = QLabel("식품유형<span style='color:red;'>*</span>:")
+        food_type_label.setStyleSheet("background-color: #FFFF99; padding: 2px;")
+        product_layout.addRow(food_type_label, food_type_layout)
 
         # 성상
         self.appearance_input = QLineEdit()
@@ -1536,13 +1552,35 @@ class ScheduleCreateDialog(QDialog):
         try:
             print("스케줄 저장 시작")  # 로그 기록
 
-            # 필수 입력 확인
-            if not self.selected_client_id:
-                QMessageBox.warning(self, "입력 오류", "업체를 선택해주세요.")
-                return
+            # 필수 입력 확인 - 누락된 항목 수집
+            missing_fields = []
 
+            # 업체 확인
+            if not self.selected_client_id:
+                missing_fields.append("업체")
+
+            # 제품명 확인
             if not self.product_name_input.text().strip():
-                QMessageBox.warning(self, "입력 오류", "제품명을 입력해주세요.")
+                missing_fields.append("제품명")
+
+            # 소비기한 확인 (일/월/년 모두 0이면 안됨)
+            if self.days_spin.value() == 0 and self.months_spin.value() == 0 and self.years_spin.value() == 0:
+                missing_fields.append("소비기한")
+
+            # 포장단위 확인 (0이면 안됨)
+            if self.packaging_weight_spin.value() == 0:
+                missing_fields.append("포장단위")
+
+            # 식품유형 확인
+            if not self.selected_food_type_id and not self.food_type_combo.currentText().strip():
+                missing_fields.append("식품유형")
+
+            # 누락된 필수 항목이 있으면 경고
+            if missing_fields:
+                QMessageBox.warning(
+                    self, "필수 항목 누락",
+                    f"다음 필수 항목을 입력해주세요:\n\n• " + "\n• ".join(missing_fields)
+                )
                 return
 
             # 샘플링 횟수 유효성 검사 (6~15 사이)
