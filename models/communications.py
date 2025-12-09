@@ -1,5 +1,5 @@
 # models/communications.py
-"""커뮤니케이션 모델 - 사용자 간 메시지 및 메일 공지"""
+"""커뮤니케이션 모델 - 사용자 간 메시지 및 이메일 로그"""
 
 from database import get_connection
 from datetime import datetime
@@ -10,7 +10,7 @@ class Message:
 
     @staticmethod
     def _ensure_tables():
-        """필요한 테이블 생성"""
+        """필요한 테이블 생성 (MySQL)"""
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -18,60 +18,57 @@ class Message:
             # 메시지 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender_id INTEGER NOT NULL,
-                    receiver_id INTEGER,
-                    message_type TEXT DEFAULT 'chat',
-                    subject TEXT,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    sender_id INT NOT NULL,
+                    receiver_id INT,
+                    message_type VARCHAR(50) DEFAULT 'chat',
+                    subject VARCHAR(255),
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (sender_id) REFERENCES users(id),
-                    FOREIGN KEY (receiver_id) REFERENCES users(id)
-                )
+                    INDEX idx_sender (sender_id),
+                    INDEX idx_receiver (receiver_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             # 메시지 읽음 상태 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS message_reads (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    message_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    message_id INT NOT NULL,
+                    user_id INT NOT NULL,
                     read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (message_id) REFERENCES messages(id),
-                    FOREIGN KEY (user_id) REFERENCES users(id),
-                    UNIQUE(message_id, user_id)
-                )
+                    UNIQUE KEY unique_read (message_id, user_id),
+                    INDEX idx_message (message_id),
+                    INDEX idx_user (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
-            # 메일 공지 테이블
+            # 이메일 발송 로그 테이블
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS mail_notices (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender_id INTEGER NOT NULL,
-                    subject TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (sender_id) REFERENCES users(id)
-                )
-            """)
-
-            # 메일 수신자 테이블
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS mail_recipients (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    mail_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    recipient_type TEXT DEFAULT 'to',
-                    read_at TIMESTAMP,
-                    FOREIGN KEY (mail_id) REFERENCES mail_notices(id),
-                    FOREIGN KEY (user_id) REFERENCES users(id)
-                )
+                CREATE TABLE IF NOT EXISTS email_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    schedule_id INT,
+                    estimate_type VARCHAR(50),
+                    sender_email VARCHAR(255),
+                    to_emails TEXT,
+                    cc_emails TEXT,
+                    subject VARCHAR(500),
+                    body TEXT,
+                    attachment_name VARCHAR(255),
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    sent_by INT,
+                    client_name VARCHAR(255),
+                    INDEX idx_schedule (schedule_id),
+                    INDEX idx_sent_at (sent_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
             conn.commit()
             conn.close()
         except Exception as e:
             print(f"테이블 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
     @staticmethod
     def send(sender_id, receiver_id, content, message_type='chat', subject=None):
@@ -257,178 +254,138 @@ class Message:
             return {}
 
 
-class MailNotice:
-    """메일 공지"""
+class EmailLog:
+    """이메일 발송 로그"""
 
     @staticmethod
-    def send(sender_id, subject, content, to_user_ids, cc_user_ids=None):
-        """메일 공지 전송"""
+    def save(schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+             subject, body, attachment_name, sent_by=None, client_name=None):
+        """이메일 발송 로그 저장"""
         try:
             Message._ensure_tables()
             conn = get_connection()
             cursor = conn.cursor()
 
-            # 메일 공지 생성
             cursor.execute("""
-                INSERT INTO mail_notices (sender_id, subject, content)
-                VALUES (%s, %s, %s)
-            """, (sender_id, subject, content))
+                INSERT INTO email_logs
+                (schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+                 subject, body, attachment_name, sent_by, client_name)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+                  subject, body, attachment_name, sent_by, client_name))
 
-            mail_id = cursor.lastrowid
-
-            # 수신자 추가
-            for user_id in to_user_ids:
-                cursor.execute("""
-                    INSERT INTO mail_recipients (mail_id, user_id, recipient_type)
-                    VALUES (%s, %s, 'to')
-                """, (mail_id, user_id))
-
-            # 참조자 추가
-            if cc_user_ids:
-                for user_id in cc_user_ids:
-                    cursor.execute("""
-                        INSERT INTO mail_recipients (mail_id, user_id, recipient_type)
-                        VALUES (%s, %s, 'cc')
-                    """, (mail_id, user_id))
-
+            log_id = cursor.lastrowid
             conn.commit()
             conn.close()
-            return mail_id
+            return log_id
         except Exception as e:
-            print(f"메일 공지 전송 오류: {e}")
+            print(f"이메일 로그 저장 오류: {e}")
             import traceback
             traceback.print_exc()
             return None
 
     @staticmethod
-    def get_received(user_id, limit=50):
-        """받은 메일 공지 목록"""
+    def get_all(limit=100):
+        """전체 이메일 로그 조회"""
         try:
             Message._ensure_tables()
             conn = get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT mn.*,
-                       u.name as sender_name,
-                       mr.recipient_type,
-                       mr.read_at
-                FROM mail_notices mn
-                JOIN mail_recipients mr ON mn.id = mr.mail_id
-                JOIN users u ON mn.sender_id = u.id
-                WHERE mr.user_id = %s
-                ORDER BY mn.created_at DESC
+                SELECT el.*, u.name as sent_by_name
+                FROM email_logs el
+                LEFT JOIN users u ON el.sent_by = u.id
+                ORDER BY el.sent_at DESC
                 LIMIT %s
-            """, (user_id, limit))
+            """, (limit,))
 
-            mails = cursor.fetchall()
+            logs = cursor.fetchall()
             conn.close()
-            return [dict(m) for m in mails]
+            return [dict(log) for log in logs]
         except Exception as e:
-            print(f"받은 메일 조회 오류: {e}")
+            print(f"이메일 로그 조회 오류: {e}")
             return []
 
     @staticmethod
-    def get_sent(user_id, limit=50):
-        """보낸 메일 공지 목록"""
+    def get_by_schedule(schedule_id):
+        """스케줄별 이메일 로그 조회"""
         try:
             Message._ensure_tables()
             conn = get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT mn.*,
-                       GROUP_CONCAT(CASE WHEN mr.recipient_type = 'to' THEN u.name END) as to_names,
-                       GROUP_CONCAT(CASE WHEN mr.recipient_type = 'cc' THEN u.name END) as cc_names
-                FROM mail_notices mn
-                LEFT JOIN mail_recipients mr ON mn.id = mr.mail_id
-                LEFT JOIN users u ON mr.user_id = u.id
-                WHERE mn.sender_id = %s
-                GROUP BY mn.id
-                ORDER BY mn.created_at DESC
-                LIMIT %s
-            """, (user_id, limit))
+                SELECT el.*, u.name as sent_by_name
+                FROM email_logs el
+                LEFT JOIN users u ON el.sent_by = u.id
+                WHERE el.schedule_id = %s
+                ORDER BY el.sent_at DESC
+            """, (schedule_id,))
 
-            mails = cursor.fetchall()
+            logs = cursor.fetchall()
             conn.close()
-            return [dict(m) for m in mails]
+            return [dict(log) for log in logs]
         except Exception as e:
-            print(f"보낸 메일 조회 오류: {e}")
+            print(f"스케줄별 이메일 로그 조회 오류: {e}")
             return []
 
     @staticmethod
-    def mark_as_read(mail_id, user_id):
-        """메일 읽음 처리"""
+    def get_by_id(log_id):
+        """이메일 로그 상세 조회"""
         try:
             conn = get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
-                UPDATE mail_recipients
-                SET read_at = CURRENT_TIMESTAMP
-                WHERE mail_id = %s AND user_id = %s
-            """, (mail_id, user_id))
+                SELECT el.*, u.name as sent_by_name
+                FROM email_logs el
+                LEFT JOIN users u ON el.sent_by = u.id
+                WHERE el.id = %s
+            """, (log_id,))
 
-            conn.commit()
+            log = cursor.fetchone()
             conn.close()
-            return True
+            return dict(log) if log else None
         except Exception as e:
-            print(f"메일 읽음 처리 오류: {e}")
-            return False
-
-    @staticmethod
-    def get_unread_count(user_id):
-        """읽지 않은 메일 수"""
-        try:
-            Message._ensure_tables()
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT COUNT(*) as count
-                FROM mail_recipients
-                WHERE user_id = %s AND read_at IS NULL
-            """, (user_id,))
-
-            result = cursor.fetchone()
-            conn.close()
-            return result['count'] if result else 0
-        except Exception as e:
-            print(f"미읽음 메일 수 조회 오류: {e}")
-            return 0
-
-    @staticmethod
-    def get_by_id(mail_id):
-        """메일 상세 조회"""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT mn.*, u.name as sender_name
-                FROM mail_notices mn
-                JOIN users u ON mn.sender_id = u.id
-                WHERE mn.id = %s
-            """, (mail_id,))
-
-            mail = cursor.fetchone()
-
-            if mail:
-                mail = dict(mail)
-
-                # 수신자 목록
-                cursor.execute("""
-                    SELECT u.id, u.name, mr.recipient_type, mr.read_at
-                    FROM mail_recipients mr
-                    JOIN users u ON mr.user_id = u.id
-                    WHERE mr.mail_id = %s
-                """, (mail_id,))
-
-                recipients = cursor.fetchall()
-                mail['recipients'] = [dict(r) for r in recipients]
-
-            conn.close()
-            return mail
-        except Exception as e:
-            print(f"메일 상세 조회 오류: {e}")
+            print(f"이메일 로그 상세 조회 오류: {e}")
             return None
+
+    @staticmethod
+    def search(keyword=None, start_date=None, end_date=None, limit=100):
+        """이메일 로그 검색"""
+        try:
+            Message._ensure_tables()
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                SELECT el.*, u.name as sent_by_name
+                FROM email_logs el
+                LEFT JOIN users u ON el.sent_by = u.id
+                WHERE 1=1
+            """
+            params = []
+
+            if keyword:
+                query += " AND (el.client_name LIKE %s OR el.to_emails LIKE %s OR el.subject LIKE %s)"
+                params.extend([f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'])
+
+            if start_date:
+                query += " AND DATE(el.sent_at) >= %s"
+                params.append(start_date)
+
+            if end_date:
+                query += " AND DATE(el.sent_at) <= %s"
+                params.append(end_date)
+
+            query += " ORDER BY el.sent_at DESC LIMIT %s"
+            params.append(limit)
+
+            cursor.execute(query, params)
+            logs = cursor.fetchall()
+            conn.close()
+            return [dict(log) for log in logs]
+        except Exception as e:
+            print(f"이메일 로그 검색 오류: {e}")
+            return []

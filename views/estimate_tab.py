@@ -989,13 +989,14 @@ class EstimateTab(QWidget):
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 스케줄 관리에서 계산된 비용 정보 사용 (O로 체크된 항목만 포함됨)
-        total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
-        if total_rounds_cost > 0:
+        # 스케줄 관리에서 계산된 중단 비용 정보 사용 (O로 체크된 항목만 포함됨)
+        # 중단 견적은 suspend_rounds_cost 사용 (total_rounds_cost는 1차 견적용)
+        suspend_rounds_cost = schedule.get('suspend_rounds_cost', 0) or 0
+        if suspend_rounds_cost > 0:
             # O로 체크된 항목의 비용 × 구간수
-            total += total_rounds_cost * zone_count
+            total += suspend_rounds_cost * zone_count
         else:
-            # total_rounds_cost가 없으면 기존 방식으로 계산 (호환성 유지)
+            # suspend_rounds_cost가 없으면 기존 방식으로 계산 (호환성 유지)
             test_items = schedule.get('test_items', '')
             if test_items:
                 item_cost = Fee.calculate_total_fee(test_items)
@@ -1293,7 +1294,15 @@ class EstimateTab(QWidget):
 * 본 견적서는 실험 중단에 따른 정산 견적서입니다.
 * 완료된 실험 회차까지의 비용만 청구됩니다.
 * 이미 입금이 완료된 경우 환불 또는 다른 검사 비용으로 사용이 가능합니다.
-* 추가 문의사항은 {user_name}, {user_phone}, {user_mobile} 연락 주시기 바랍니다."""
+* 추가 문의사항은 {user_name}, {user_phone}, {user_mobile} 연락 주시기 바랍니다.
+
+※ 입금 계좌 안내
+- 기업 은행 : 024-088021-01-017
+- 우리 은행 : 1005-702-799176
+- 농협 은행 : 301-0178-1722-11
+★ 입금시 '대표자명' 또는 '업체명'으로 입금 부탁드립니다.
+★ 업체명으로 입금 진행시, [농업회사법인 주식회]에서 잘리는 경우가 있습니다.
+   이와 같은 경우, 입금 확인이 늦어질 수 있으니 업체명을 식별할 수 있도록 표시 부탁드립니다."""
 
         elif self.estimate_type == "extend":
             # 연장 견적서 Remark
@@ -1321,7 +1330,15 @@ class EstimateTab(QWidget):
 
 * 연장실험은 기존 실험 데이터와 연계하여 진행됩니다.
 * 기존 보관 중인 검체를 사용하여 연장 실험을 진행합니다.
-* 연장실험 후 최종 보고서가 발행됩니다."""
+* 연장실험 후 최종 보고서가 발행됩니다.
+
+※ 입금 계좌 안내
+- 기업 은행 : 024-088021-01-017
+- 우리 은행 : 1005-702-799176
+- 농협 은행 : 301-0178-1722-11
+★ 입금시 '대표자명' 또는 '업체명'으로 입금 부탁드립니다.
+★ 업체명으로 입금 진행시, [농업회사법인 주식회]에서 잘리는 경우가 있습니다.
+   이와 같은 경우, 입금 확인이 늦어질 수 있으니 업체명을 식별할 수 있도록 표시 부탁드립니다."""
 
         else:
             # 1차 견적서 Remark (기존 내용)
@@ -1338,7 +1355,15 @@ class EstimateTab(QWidget):
 * 견적 금액은 검사비용 외 보관비 및 보고서작성 비용 포함입니다.
 * 지표 항목의 수정(추가)이나 삭제가 필요한 경우 사전 연락을 해주시고 문의사항은 연락 바랍니다.
 * 온도 구간별 1회 시험을 하며, 반복 실험이 필요한 경우 연락 바랍니다.
-* 소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다."""
+* 소비기한 설정 실험은 입금 후 진행되며, 검사 중 품질한계 도달로 실험 중단 시, 중단 전까지의 비용 청구됩니다.
+
+※ 입금 계좌 안내
+- 기업 은행 : 024-088021-01-017
+- 우리 은행 : 1005-702-799176
+- 농협 은행 : 301-0178-1722-11
+★ 입금시 '대표자명' 또는 '업체명'으로 입금 부탁드립니다.
+★ 업체명으로 입금 진행시, [농업회사법인 주식회]에서 잘리는 경우가 있습니다.
+   이와 같은 경우, 입금 확인이 늦어질 수 있으니 업체명을 식별할 수 있도록 표시 부탁드립니다."""
 
         self.remark_text.setPlainText(remark_text)
 
@@ -2005,6 +2030,29 @@ class EstimateTab(QWidget):
             server.login(smtp_email, smtp_password)
             server.sendmail(smtp_email, all_recipients, msg.as_string())
             server.quit()
+
+            # 이메일 발송 로그 저장
+            try:
+                from models.communications import EmailLog
+                schedule_id = self.current_schedule.get('id')
+                client_name = self.current_schedule.get('client_name', '')
+                estimate_type = getattr(self, 'estimate_type', 'first')
+                sent_by = self.current_user.get('id') if hasattr(self, 'current_user') and self.current_user else None
+
+                EmailLog.save(
+                    schedule_id=schedule_id,
+                    estimate_type=estimate_type,
+                    sender_email=smtp_email,
+                    to_emails=', '.join(to_list),
+                    cc_emails=', '.join(cc_list) if cc_list else None,
+                    subject=self.email_subject_input.text(),
+                    body=body,
+                    attachment_name=os.path.basename(pdf_path),
+                    sent_by=sent_by,
+                    client_name=client_name
+                )
+            except Exception as log_err:
+                print(f"이메일 로그 저장 오류: {log_err}")
 
             QMessageBox.information(self, "발송 완료",
                 f"이메일이 성공적으로 발송되었습니다.\n\n"

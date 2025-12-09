@@ -254,6 +254,20 @@ def init_database():
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
 
+    # 스케줄 첨부파일 테이블
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS schedule_attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        schedule_id INT NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INT DEFAULT 0,
+        file_type VARCHAR(50),
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ''')
+
     conn.commit()
 
     # 기본 설정 데이터 삽입
