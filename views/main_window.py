@@ -619,26 +619,35 @@ class MainWindow(QMainWindow):
 
     def create_status_bar(self):
         """하단 상태 바 생성"""
+        from version import VERSION
+
         status_frame = QFrame()
         status_frame.setFrameShape(QFrame.StyledPanel)
         status_frame.setStyleSheet("background-color: #f0f0f0; border-radius: 5px;")
         status_frame.setMaximumHeight(30)
-        
+
         status_layout = QHBoxLayout(status_frame)
         status_layout.setContentsMargins(10, 0, 10, 0)
-        
+
         # 좌측 상태 정보
         self.status_label = QLabel("준비 완료")
-        
+
+        # 중앙 개발자 정보
+        dev_info_label = QLabel("개발 및 문의 : hskim@biofl.co.kr (김희성 070-7410-1411)")
+        dev_info_label.setStyleSheet("color: #666; font-size: 11px;")
+        dev_info_label.setAlignment(Qt.AlignCenter)
+
         # 우측 버전 정보
-        version_label = QLabel("v1.0.0")
+        version_label = QLabel(f"v{VERSION}")
         version_label.setAlignment(Qt.AlignRight)
-        
+
         # 레이아웃에 위젯 추가
         status_layout.addWidget(self.status_label)
         status_layout.addStretch()
+        status_layout.addWidget(dev_info_label)
+        status_layout.addStretch()
         status_layout.addWidget(version_label)
-        
+
         # 메인 레이아웃에 추가
         self.main_layout.addWidget(status_frame)
     
