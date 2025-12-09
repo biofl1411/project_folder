@@ -1574,6 +1574,7 @@ class ScheduleManagementTab(QWidget):
         self.cost_frame = QFrame()
         cost_frame = self.cost_frame
         cost_frame.setStyleSheet("background-color: #fef9e7; border: 1px solid #f39c12; border-radius: 2px;")
+        cost_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)  # 내용에 맞게 높이 고정
         cost_layout = QVBoxLayout(cost_frame)
         cost_layout.setSpacing(0)  # 행간 간격 0px
         cost_layout.setContentsMargins(0, 0, 0, 0)  # 박스 내부 여백 0px
