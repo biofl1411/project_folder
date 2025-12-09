@@ -2509,8 +2509,14 @@ class ScheduleManagementTab(QWidget):
             self.item_cost_detail.setText(schedule.get('first_item_detail', '-'))
             self.cost_per_test.setText(f"1회:{schedule.get('first_cost_per_test', 0):,}원")
             self.total_rounds_cost.setText(f"회차:{schedule.get('first_rounds_cost', 0):,}원")
-            self.first_report_cost_input.setText(f"{schedule.get('first_report_cost', default_report_cost):,}")
-            self.first_interim_cost_input.setText(f"{schedule.get('first_interim_cost', 0):,}")
+            # 보고서 비용: 저장된 값이 0이면 기본값 사용
+            first_report_saved = schedule.get('first_report_cost', 0) or default_report_cost
+            self.first_report_cost_input.setText(f"{first_report_saved:,}")
+            # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+            first_interim_saved = schedule.get('first_interim_cost', 0)
+            if report_interim and first_interim_saved == 0:
+                first_interim_saved = default_interim_cost
+            self.first_interim_cost_input.setText(f"{first_interim_saved:,}")
             self.first_cost_formula.setText(schedule.get('first_formula_text', '-'))
             first_with_vat = schedule.get('first_total_amount', 0) or 0
             self.first_cost_vat.setText(f"{first_with_vat:,}원")
@@ -2532,8 +2538,10 @@ class ScheduleManagementTab(QWidget):
             total_rounds_cost = int(cost_per_test * sampling_count)
             self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
 
-            first_report = schedule.get('first_report_cost', default_report_cost)
-            first_interim = schedule.get('first_interim_cost', default_interim_cost)
+            # 보고서 비용: 저장된 값이 0이면 기본값 사용
+            first_report = schedule.get('first_report_cost', 0) or default_report_cost
+            # 중간 비용: 저장된 값이 0이면 기본값 사용
+            first_interim = schedule.get('first_interim_cost', 0) or default_interim_cost
             self.first_report_cost_input.setText(f"{first_report:,}")
             self.first_interim_cost_input.setText(f"{first_interim:,}")
 
@@ -2569,8 +2577,14 @@ class ScheduleManagementTab(QWidget):
                 self.suspend_item_cost_detail.setText(schedule.get('suspend_item_detail', '-'))
                 self.suspend_cost_per_test.setText(f"1회:{schedule.get('suspend_cost_per_test', 0):,}원")
                 self.suspend_rounds_cost.setText(f"회차:{schedule.get('suspend_rounds_cost', 0):,}원")
-                self.suspend_report_cost_input.setText(f"{schedule.get('suspend_report_cost', default_report_cost):,}")
-                self.suspend_interim_cost_input.setText(f"{schedule.get('suspend_interim_cost', 0):,}")
+                # 보고서 비용: 저장된 값이 0이면 기본값 사용
+                suspend_report_saved = schedule.get('suspend_report_cost', 0) or default_report_cost
+                self.suspend_report_cost_input.setText(f"{suspend_report_saved:,}")
+                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                suspend_interim_saved = schedule.get('suspend_interim_cost', 0)
+                if report_interim and suspend_interim_saved == 0:
+                    suspend_interim_saved = default_interim_cost
+                self.suspend_interim_cost_input.setText(f"{suspend_interim_saved:,}")
                 self.suspend_cost_formula.setText(schedule.get('suspend_formula_text', '-'))
                 suspend_with_vat = schedule.get('suspend_total_amount', 0) or 0
                 self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
@@ -2590,8 +2604,10 @@ class ScheduleManagementTab(QWidget):
                 total_rounds_cost = int(cost_per_test * sampling_count)
                 self.suspend_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
 
-                suspend_report = schedule.get('suspend_report_cost', default_report_cost)
-                suspend_interim = schedule.get('suspend_interim_cost', default_interim_cost)
+                # 보고서 비용: 저장된 값이 0이면 기본값 사용
+                suspend_report = schedule.get('suspend_report_cost', 0) or default_report_cost
+                # 중간 비용: 저장된 값이 0이면 기본값 사용
+                suspend_interim = schedule.get('suspend_interim_cost', 0) or default_interim_cost
                 self.suspend_report_cost_input.setText(f"{suspend_report:,}")
                 self.suspend_interim_cost_input.setText(f"{suspend_interim:,}")
 
@@ -2630,7 +2646,9 @@ class ScheduleManagementTab(QWidget):
                 self.extend_item_cost_detail.setText(schedule.get('extend_item_detail', '-'))
                 self.extend_cost_per_test.setText(f"1회:{schedule.get('extend_cost_per_test', 0):,}원")
                 self.extend_rounds_cost.setText(f"회차:{schedule.get('extend_rounds_cost', 0):,}원")
-                self.extend_report_cost_input.setText(f"{schedule.get('extend_report_cost', default_report_cost):,}")
+                # 보고서 비용: 저장된 값이 0이면 기본값 사용
+                extend_report_saved = schedule.get('extend_report_cost', 0) or default_report_cost
+                self.extend_report_cost_input.setText(f"{extend_report_saved:,}")
                 self.extend_cost_formula.setText(schedule.get('extend_formula_text', '-'))
                 extend_with_vat = schedule.get('extend_total_amount', 0) or 0
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
@@ -2650,7 +2668,8 @@ class ScheduleManagementTab(QWidget):
                 extend_total_rounds = cost_per_test * extend_rounds
                 self.extend_rounds_cost.setText(f"회차:{extend_total_rounds:,}원")
 
-                extend_report = schedule.get('extend_report_cost', default_report_cost)
+                # 보고서 비용: 저장된 값이 0이면 기본값 사용
+                extend_report = schedule.get('extend_report_cost', 0) or default_report_cost
                 self.extend_report_cost_input.setText(f"{extend_report:,}")
 
                 extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
@@ -4845,6 +4864,20 @@ class ScheduleManagementTab(QWidget):
         # 금액을 DB에 저장 (1차 견적 기준)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
 
+        # 1차 견적 전체 저장 (보고서/중간 비용 포함)
+        schedule_id = self.current_schedule.get('id')
+        if schedule_id:
+            try:
+                item_detail = self.item_cost_detail.text() if hasattr(self, 'item_cost_detail') else '-'
+                from models.schedules import Schedule
+                Schedule.save_first_estimate(
+                    schedule_id, item_detail, cost_per_test, first_total_rounds,
+                    first_report_cost, first_interim_cost, first_formula,
+                    first_cost_no_vat, first_vat, first_with_vat
+                )
+            except Exception as e:
+                print(f"1차 견적 저장 오류: {e}")
+
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
         if schedule_status == 'suspended' and hasattr(self, 'suspend_cost_formula'):
@@ -4878,6 +4911,20 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'suspend_cost_vat'):
                 self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
 
+            # 중단 견적 전체 저장 (보고서/중간 비용 포함)
+            if schedule_id:
+                try:
+                    suspend_item_detail = self.suspend_item_cost_detail.text() if hasattr(self, 'suspend_item_cost_detail') else '-'
+                    suspend_cost_per_test = int(self.suspend_cost_per_test.text().replace('1회:', '').replace(',', '').replace('원', '')) if hasattr(self, 'suspend_cost_per_test') else 0
+                    from models.schedules import Schedule
+                    Schedule.save_suspend_estimate(
+                        schedule_id, suspend_item_detail, suspend_cost_per_test, suspend_rounds_cost,
+                        suspend_report_cost, suspend_interim_cost, suspend_formula,
+                        suspend_cost_no_vat, suspend_vat, suspend_with_vat
+                    )
+                except Exception as e:
+                    print(f"중단 견적 저장 오류: {e}")
+
         # ========== 연장 견적 계산 (연장 회차 있을 때만) ==========
         extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
         if extend_rounds > 0 and hasattr(self, 'extend_cost_formula'):
@@ -4910,6 +4957,20 @@ class ScheduleManagementTab(QWidget):
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+
+            # 연장 견적 전체 저장 (보고서 비용 포함)
+            if schedule_id:
+                try:
+                    extend_item_detail = self.extend_item_cost_detail.text() if hasattr(self, 'extend_item_cost_detail') else '-'
+                    extend_cost_per_test = int(self.extend_cost_per_test.text().replace('1회:', '').replace(',', '').replace('원', '')) if hasattr(self, 'extend_cost_per_test') else 0
+                    from models.schedules import Schedule
+                    Schedule.save_extend_estimate(
+                        schedule_id, extend_item_detail, extend_cost_per_test, extend_rounds_cost,
+                        extend_report_cost, extend_formula,
+                        extend_cost_no_vat, extend_vat, extend_with_vat
+                    )
+                except Exception as e:
+                    print(f"연장 견적 저장 오류: {e}")
 
     def save_as_jpg(self):
         """스케줄 관리 화면을 JPG로 저장"""

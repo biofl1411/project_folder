@@ -1,0 +1,160 @@
+name: Auto Release on Main Push
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'version.py'  # version.py가 변경될 때만 실행
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check_version.outputs.should_release }}
+      version: ${{ steps.check_version.outputs.version }}
+      changelog: ${{ steps.generate_changelog.outputs.changelog }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 전체 히스토리 가져오기 (태그 확인용)
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Check version and existing tag
+      id: check_version
+      run: |
+        # version.py에서 버전 추출
+        VERSION=$(python -c "from version import VERSION; print(VERSION)")
+        echo "Current version: $VERSION"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+        # 해당 버전의 태그가 이미 있는지 확인
+        if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          echo "Tag v$VERSION already exists. Skipping release."
+          echo "should_release=false" >> $GITHUB_OUTPUT
+        else
+          echo "Tag v$VERSION does not exist. Creating release."
+          echo "should_release=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate changelog from commits
+      id: generate_changelog
+      if: steps.check_version.outputs.should_release == 'true'
+      run: |
+        # 최근 태그 찾기
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+        if [ -z "$LAST_TAG" ]; then
+          # 태그가 없으면 최근 20개 커밋 사용
+          echo "No previous tag found. Using recent commits."
+          COMMITS=$(git log --oneline -20 --pretty=format:"- %s" | grep -v "Merge" || echo "- Initial release")
+        else
+          # 이전 태그 이후의 커밋들
+          echo "Previous tag: $LAST_TAG"
+          COMMITS=$(git log $LAST_TAG..HEAD --oneline --pretty=format:"- %s" | grep -v "Merge" || echo "- Bug fixes and improvements")
+        fi
+
+        # 변경사항을 파일로 저장 (멀티라인 처리)
+        echo "$COMMITS" > changelog.txt
+
+        # GitHub Output으로 전달 (멀티라인)
+        {
+          echo 'changelog<<EOF'
+          cat changelog.txt
+          echo 'EOF'
+        } >> $GITHUB_OUTPUT
+
+        echo "Generated changelog:"
+        cat changelog.txt
+
+    - name: Create tag
+      if: steps.check_version.outputs.should_release == 'true'
+      run: |
+        VERSION=${{ steps.check_version.outputs.version }}
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "v$VERSION" -m "Release v$VERSION"
+        git push origin "v$VERSION"
+
+  build-and-release:
+    needs: check-and-release
+    if: needs.check-and-release.outputs.should_release == 'true'
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller PyQt5 reportlab openpyxl pandas pymysql requests packaging
+
+    - name: Build EXE
+      run: |
+        pyinstaller --name=FoodLabManager --windowed --onedir --add-data "config;config" main.py
+
+    - name: Copy additional files
+      run: |
+        mkdir -p dist/FoodLabManager/data
+        mkdir -p dist/FoodLabManager/output
+        if (Test-Path "config") { Copy-Item -Recurse "config/*" "dist/FoodLabManager/config/" -ErrorAction SilentlyContinue }
+        if (Test-Path "data/app.db") { Copy-Item "data/app.db" "dist/FoodLabManager/data/" }
+        if (Test-Path "cash_db.xlsx") { Copy-Item "cash_db.xlsx" "dist/FoodLabManager/" }
+      shell: pwsh
+
+    - name: Create ZIP archive
+      run: |
+        $VERSION = "${{ needs.check-and-release.outputs.version }}"
+        Compress-Archive -Path dist/FoodLabManager/* -DestinationPath "FoodLabManager-v$VERSION-Windows.zip"
+      shell: pwsh
+
+    - name: Create Release with Changelog
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ needs.check-and-release.outputs.version }}
+        name: FoodLabManager v${{ needs.check-and-release.outputs.version }}
+        body: |
+          ## FoodLabManager v${{ needs.check-and-release.outputs.version }}
+
+          ### 변경사항
+          ${{ needs.check-and-release.outputs.changelog }}
+
+          ---
+
+          ### 다운로드
+          - Windows: `FoodLabManager-v${{ needs.check-and-release.outputs.version }}-Windows.zip`
+
+          ### 설치 방법
+          1. ZIP 파일 다운로드
+          2. 원하는 폴더에 압축 해제
+          3. `FoodLabManager.exe` 실행
+
+          ### 업데이트 방법
+          - 프로그램 실행 시 자동으로 업데이트 확인
+          - 새 버전이 있으면 업데이트 다이얼로그 표시
+        files: |
+          FoodLabManager-v${{ needs.check-and-release.outputs.version }}-Windows.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: FoodLabManager-v${{ needs.check-and-release.outputs.version }}-Windows
+        path: dist/FoodLabManager/
+        retention-days: 30

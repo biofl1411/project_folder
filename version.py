@@ -6,7 +6,7 @@
 '''
 
 # 현재 버전 (Major.Minor.Patch)
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # GitHub 저장소 정보
 GITHUB_OWNER = "biofl1411"
