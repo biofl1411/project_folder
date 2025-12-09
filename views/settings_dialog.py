@@ -919,7 +919,7 @@ class SettingsDialog(QDialog):
 
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings")
+            cursor.execute("SELECT `key`, value FROM settings")
             settings = cursor.fetchall()
 
             settings_dict = {s['key']: s['value'] for s in settings}
