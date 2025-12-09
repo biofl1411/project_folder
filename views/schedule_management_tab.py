@@ -4913,45 +4913,57 @@ class ScheduleManagementTab(QWidget):
         if hasattr(self, 'first_cost_vat'):
             self.first_cost_vat.setText(f"{first_with_vat:,}원")
 
-        # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
+        # ========== 중단 견적 계산 (O/X 변경 시 항상 계산하여 저장) ==========
         schedule_status = self.current_schedule.get('status', '')
+        schedule_id = self.current_schedule.get('id')
+
+        # 중단 견적 비용 계산 (O로 체크된 항목만)
+        suspend_rounds_cost_value = total_rounds_cost  # O로 체크된 항목들의 회차 비용 합계
+
+        try:
+            suspend_report_cost = int(self.suspend_report_cost_input.text().replace(',', '').replace('원', ''))
+        except (ValueError, TypeError):
+            suspend_report_cost = first_report_cost
+
+        suspend_interim_cost = 0
+        if self.suspend_interim_cost_input.isVisible():
+            try:
+                suspend_interim_cost = int(self.suspend_interim_cost_input.text().replace(',', '').replace('원', ''))
+            except (ValueError, TypeError):
+                suspend_interim_cost = first_interim_cost
+
+        suspend_cost_no_vat = int(suspend_rounds_cost_value * zone_count + suspend_report_cost + suspend_interim_cost)
+        if suspend_interim_cost > 0:
+            suspend_formula = f"{suspend_rounds_cost_value:,}×{zone_count}+{suspend_report_cost:,}+{suspend_interim_cost:,}={suspend_cost_no_vat:,}원"
+        else:
+            suspend_formula = f"{suspend_rounds_cost_value:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
+
+        suspend_vat = int(suspend_cost_no_vat * 0.1)
+        suspend_with_vat = suspend_cost_no_vat + suspend_vat
+
+        # 중단 견적 DB에 저장 (상태와 관계없이 항상 저장 - 견적서 금액 일치 위해)
+        if schedule_id and hasattr(self, 'suspend_item_cost_detail'):
+            try:
+                suspend_item_detail = self.suspend_item_cost_detail.text() if self.suspend_item_cost_detail.text() != '-' else '-'
+                from models.schedules import Schedule
+                Schedule.save_suspend_estimate(
+                    schedule_id, suspend_item_detail, cost_per_test, suspend_rounds_cost_value,
+                    suspend_report_cost, suspend_interim_cost, suspend_formula,
+                    suspend_cost_no_vat, suspend_vat, suspend_with_vat
+                )
+            except Exception as e:
+                print(f"중단 견적 저장 오류 (recalculate_costs): {e}")
+
+        # UI 업데이트 (상태가 중단일 때만 표시)
         if schedule_status == 'suspended' and hasattr(self, 'row_suspend_widget'):
             self.row_suspend_widget.show()
 
-            # 중단 1회 비용 (O로 체크된 항목들의 평균)
-            suspend_o_count = sum(item_o_counts.values())
-            if suspend_o_count > 0:
-                suspend_per_test = total_rounds_cost // suspend_o_count if suspend_o_count > 0 else 0
-            else:
-                suspend_per_test = 0
             if hasattr(self, 'suspend_cost_per_test'):
                 self.suspend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
 
-            # 중단 견적은 O로 체크된 항목만 비용에 포함
-            self.suspend_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
-
-            try:
-                suspend_report_cost = int(self.suspend_report_cost_input.text().replace(',', '').replace('원', ''))
-            except (ValueError, TypeError):
-                suspend_report_cost = first_report_cost
-
-            suspend_interim_cost = 0
-            if self.suspend_interim_cost_input.isVisible():
-                try:
-                    suspend_interim_cost = int(self.suspend_interim_cost_input.text().replace(',', '').replace('원', ''))
-                except (ValueError, TypeError):
-                    suspend_interim_cost = first_interim_cost
-
-            suspend_cost_no_vat = int(total_rounds_cost * zone_count + suspend_report_cost + suspend_interim_cost)
-            if suspend_interim_cost > 0:
-                suspend_formula = f"{total_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}+{suspend_interim_cost:,}={suspend_cost_no_vat:,}원"
-            else:
-                suspend_formula = f"{total_rounds_cost:,}×{zone_count}+{suspend_report_cost:,}={suspend_cost_no_vat:,}원"
+            self.suspend_rounds_cost.setText(f"회차:{suspend_rounds_cost_value:,}원")
             self.suspend_cost_formula.setText(suspend_formula)
 
-            # 중단 부가세 포함 (통일된 형식)
-            suspend_vat = int(suspend_cost_no_vat * 0.1)
-            suspend_with_vat = suspend_cost_no_vat + suspend_vat
             if hasattr(self, 'suspend_cost_vat'):
                 self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
         else:

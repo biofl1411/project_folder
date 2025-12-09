@@ -989,13 +989,14 @@ class EstimateTab(QWidget):
         total = 0
         test_method = schedule.get('test_method', 'real')
 
-        # 스케줄 관리에서 계산된 비용 정보 사용 (O로 체크된 항목만 포함됨)
-        total_rounds_cost = schedule.get('total_rounds_cost', 0) or 0
-        if total_rounds_cost > 0:
+        # 스케줄 관리에서 계산된 중단 비용 정보 사용 (O로 체크된 항목만 포함됨)
+        # 중단 견적은 suspend_rounds_cost 사용 (total_rounds_cost는 1차 견적용)
+        suspend_rounds_cost = schedule.get('suspend_rounds_cost', 0) or 0
+        if suspend_rounds_cost > 0:
             # O로 체크된 항목의 비용 × 구간수
-            total += total_rounds_cost * zone_count
+            total += suspend_rounds_cost * zone_count
         else:
-            # total_rounds_cost가 없으면 기존 방식으로 계산 (호환성 유지)
+            # suspend_rounds_cost가 없으면 기존 방식으로 계산 (호환성 유지)
             test_items = schedule.get('test_items', '')
             if test_items:
                 item_cost = Fee.calculate_total_fee(test_items)
