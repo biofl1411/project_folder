@@ -3338,6 +3338,9 @@ class ScheduleManagementTab(QWidget):
                 }
             )
 
+            # 비용 요약 업데이트
+            self.recalculate_costs()
+
             QMessageBox.information(self, "저장 완료", "스케줄 변경사항이 저장되었습니다.")
             self.schedule_saved.emit()
 
@@ -3442,6 +3445,9 @@ class ScheduleManagementTab(QWidget):
                         'schedule_status_change',
                         details={'old_status': old_status, 'new_status': new_status}
                     )
+
+                    # 비용 요약 업데이트
+                    self.recalculate_costs()
 
                     # 스케줄 저장 시그널 발생 (스케줄 작성 탭 새로고침용)
                     self.schedule_saved.emit()
@@ -3565,6 +3571,9 @@ class ScheduleManagementTab(QWidget):
                 'schedule_edit',
                 details={'field': '연장실험', 'old_value': old_value, 'new_value': new_value}
             )
+
+            # 비용 요약 업데이트
+            self.recalculate_costs()
 
             # 스케줄 저장 시그널 발생
             self.schedule_saved.emit()
