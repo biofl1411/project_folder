@@ -8,6 +8,9 @@ on:
     paths:
       - 'version.py'  # version.py가 변경될 때만 실행
 
+permissions:
+  contents: write  # 태그 생성 및 릴리스 권한
+
 jobs:
   check-and-release:
     runs-on: ubuntu-latest
