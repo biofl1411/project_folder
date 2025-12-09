@@ -1591,7 +1591,7 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 1행: 1차 견적 ==========
         self.row_first_widget = QWidget()
-        self.row_first_widget.setFixedHeight(35)  # 고정 35px
+        self.row_first_widget.setFixedHeight(25)  # 고정 25px
         row_first = QHBoxLayout(self.row_first_widget)
         row_first.setSpacing(4)
         row_first.setContentsMargins(0, 0, 0, 0)
@@ -1660,7 +1660,7 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 2행: 중단 견적 ==========
         self.row_suspend_widget = QWidget()
-        self.row_suspend_widget.setFixedHeight(35)  # 고정 35px
+        self.row_suspend_widget.setFixedHeight(25)  # 고정 25px
         row_suspend = QHBoxLayout(self.row_suspend_widget)
         row_suspend.setSpacing(4)
         row_suspend.setContentsMargins(0, 0, 0, 0)
@@ -1727,7 +1727,7 @@ class ScheduleManagementTab(QWidget):
 
         # ========== 3행: 연장 견적 ==========
         self.row_extend_widget = QWidget()
-        self.row_extend_widget.setFixedHeight(35)  # 고정 35px
+        self.row_extend_widget.setFixedHeight(25)  # 고정 25px
         row_extend = QHBoxLayout(self.row_extend_widget)
         row_extend.setSpacing(4)
         row_extend.setContentsMargins(0, 0, 0, 0)
