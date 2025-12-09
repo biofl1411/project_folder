@@ -3512,7 +3512,10 @@ class ScheduleManagementTab(QWidget):
                 from models.schedules import Schedule
                 schedule_id = self.current_schedule.get('id')
                 if schedule_id:
-                    Schedule.update(schedule_id, report_interim=1 if is_requested else 0)
+                    # 현재 스케줄 데이터를 복사하고 report_interim 값 업데이트
+                    update_data = dict(self.current_schedule)
+                    update_data['report_interim'] = 1 if is_requested else 0
+                    Schedule.update(schedule_id, update_data)
             except Exception as e:
                 print(f"중간보고서 저장 오류: {e}")
 
@@ -3581,7 +3584,10 @@ class ScheduleManagementTab(QWidget):
                 from models.schedules import Schedule
                 schedule_id = self.current_schedule.get('id')
                 if schedule_id:
-                    Schedule.update(schedule_id, extension_test=1 if is_extension else 0)
+                    # 현재 스케줄 데이터를 복사하고 extension_test 값 업데이트
+                    update_data = dict(self.current_schedule)
+                    update_data['extension_test'] = 1 if is_extension else 0
+                    Schedule.update(schedule_id, update_data)
             except Exception as e:
                 print(f"연장실험 저장 오류: {e}")
 
