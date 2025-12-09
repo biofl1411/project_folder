@@ -3610,7 +3610,8 @@ class ScheduleManagementTab(QWidget):
                 self._update_extend_estimate_ui(extend_rounds)
             else:
                 # 연장 회차가 0이면 연장 견적 UI 숨김
-                self.row_extend_widget.hide()
+                if hasattr(self, 'row_extend_widget'):
+                    self.row_extend_widget.hide()
 
         except ValueError:
             pass
@@ -3618,6 +3619,10 @@ class ScheduleManagementTab(QWidget):
     def _update_extend_estimate_ui(self, extend_rounds):
         """연장 견적 UI 업데이트"""
         if not self.current_schedule:
+            return
+
+        # 비용 요약 UI 위젯이 생성되지 않은 경우 종료
+        if not hasattr(self, 'row_extend_widget'):
             return
 
         schedule = self.current_schedule
