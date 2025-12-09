@@ -1041,7 +1041,7 @@ class EstimateTab(QWidget):
     def _calculate_extend_price(self, schedule, zone_count):
         """연장 견적 금액 계산 - DB에 저장된 값 우선 사용
 
-        연장 견적 전용 보고서 비용 사용 (extend_report_cost)
+        연장 견적 전용 보고서/중간보고서 비용 사용 (extend_report_cost, extend_interim_cost)
         """
         # DB에 저장된 연장 견적 값이 있으면 사용 (최우선)
         saved_extend_supply = schedule.get('extend_supply_amount', 0) or 0
@@ -1081,6 +1081,10 @@ class EstimateTab(QWidget):
             else:
                 report_cost = 200000
         total += report_cost
+
+        # 연장 견적 전용 중간보고서 비용 (extend_interim_cost 우선 사용)
+        interim_report_cost = schedule.get('extend_interim_cost', 0) or 0
+        total += interim_report_cost
 
         return int(total)
 

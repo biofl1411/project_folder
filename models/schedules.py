@@ -58,6 +58,7 @@ class Schedule:
                 'extend_cost_per_test': 'INTEGER DEFAULT 0',
                 'extend_rounds_cost': 'INTEGER DEFAULT 0',
                 'extend_report_cost': 'INTEGER DEFAULT 0',
+                'extend_interim_cost': 'INTEGER DEFAULT 0',
                 'extend_formula_text': 'TEXT',
                 'extend_supply_amount': 'INTEGER DEFAULT 0',
                 'extend_tax_amount': 'INTEGER DEFAULT 0',
@@ -484,7 +485,7 @@ class Schedule:
 
     @staticmethod
     def save_extend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
-                            report_cost, formula_text, supply_amount,
+                            report_cost, interim_cost, formula_text, supply_amount,
                             tax_amount, total_amount):
         """연장 견적 저장 (연장 설정 시 저장)"""
         try:
@@ -494,10 +495,10 @@ class Schedule:
             cursor.execute("""
                 UPDATE schedules
                 SET extend_item_detail = %s, extend_cost_per_test = %s, extend_rounds_cost = %s,
-                    extend_report_cost = %s, extend_formula_text = %s,
+                    extend_report_cost = %s, extend_interim_cost = %s, extend_formula_text = %s,
                     extend_supply_amount = %s, extend_tax_amount = %s, extend_total_amount = %s
                 WHERE id = %s
-            """, (item_detail, cost_per_test, rounds_cost, report_cost,
+            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
                   formula_text, supply_amount, tax_amount, total_amount, schedule_id))
             success = cursor.rowcount > 0
             conn.commit()

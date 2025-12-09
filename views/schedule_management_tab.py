@@ -2748,11 +2748,15 @@ class ScheduleManagementTab(QWidget):
             self.first_interim_cost_input.show()
             self.suspend_interim_cost_label.show()
             self.suspend_interim_cost_input.show()
+            self.extend_interim_cost_label.show()
+            self.extend_interim_cost_input.show()
         else:
             self.first_interim_cost_label.hide()
             self.first_interim_cost_input.hide()
             self.suspend_interim_cost_label.hide()
             self.suspend_interim_cost_input.hide()
+            self.extend_interim_cost_label.hide()
+            self.extend_interim_cost_input.hide()
 
         # ========== 1차 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         saved_first_supply = schedule.get('first_supply_amount', 0) or 0
@@ -2902,6 +2906,11 @@ class ScheduleManagementTab(QWidget):
                 # 보고서 비용: 저장된 값이 0이면 기본값 사용
                 extend_report_saved = schedule.get('extend_report_cost', 0) or default_report_cost
                 self.extend_report_cost_input.setText(f"{extend_report_saved:,}")
+                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                extend_interim_saved = schedule.get('extend_interim_cost', 0)
+                if report_interim and extend_interim_saved == 0:
+                    extend_interim_saved = default_interim_cost
+                self.extend_interim_cost_input.setText(f"{extend_interim_saved:,}")
                 self.extend_cost_formula.setText(schedule.get('extend_formula_text', '-'))
                 extend_with_vat = schedule.get('extend_total_amount', 0) or 0
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
@@ -2923,10 +2932,16 @@ class ScheduleManagementTab(QWidget):
 
                 # 보고서 비용: 저장된 값이 0이면 기본값 사용
                 extend_report = schedule.get('extend_report_cost', 0) or default_report_cost
+                # 중간 비용: 저장된 값이 0이면 기본값 사용
+                extend_interim = schedule.get('extend_interim_cost', 0) or default_interim_cost
                 self.extend_report_cost_input.setText(f"{extend_report:,}")
+                self.extend_interim_cost_input.setText(f"{extend_interim:,}")
 
-                extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
-                extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
+                extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report + extend_interim)
+                if extend_interim > 0:
+                    extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}+{extend_interim:,}={extend_cost_no_vat:,}원"
+                else:
+                    extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
                 self.extend_cost_formula.setText(extend_formula)
 
                 extend_vat = int(extend_cost_no_vat * 0.1)
@@ -2938,7 +2953,7 @@ class ScheduleManagementTab(QWidget):
                     from models.schedules import Schedule
                     Schedule.save_extend_estimate(
                         schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
-                        extend_report, extend_formula,
+                        extend_report, extend_interim, extend_formula,
                         extend_cost_no_vat, extend_vat, extend_with_vat
                     )
         else:
