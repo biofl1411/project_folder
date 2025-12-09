@@ -32,7 +32,36 @@ class Schedule:
                 'extend_period_months': 'INTEGER DEFAULT 0',
                 'extend_period_years': 'INTEGER DEFAULT 0',
                 'extend_experiment_days': 'INTEGER DEFAULT 0',
-                'extend_rounds': 'INTEGER DEFAULT 0'
+                'extend_rounds': 'INTEGER DEFAULT 0',
+                # 1차 견적 필드 (최초 생성 시 고정)
+                'first_item_detail': 'TEXT',
+                'first_cost_per_test': 'INTEGER DEFAULT 0',
+                'first_rounds_cost': 'INTEGER DEFAULT 0',
+                'first_report_cost': 'INTEGER DEFAULT 0',
+                'first_interim_cost': 'INTEGER DEFAULT 0',
+                'first_formula_text': 'TEXT',
+                'first_supply_amount': 'INTEGER DEFAULT 0',
+                'first_tax_amount': 'INTEGER DEFAULT 0',
+                'first_total_amount': 'INTEGER DEFAULT 0',
+                # 중단 견적 필드 (중단 시점 저장)
+                'suspend_item_detail': 'TEXT',
+                'suspend_cost_per_test': 'INTEGER DEFAULT 0',
+                'suspend_rounds_cost': 'INTEGER DEFAULT 0',
+                'suspend_report_cost': 'INTEGER DEFAULT 0',
+                'suspend_interim_cost': 'INTEGER DEFAULT 0',
+                'suspend_formula_text': 'TEXT',
+                'suspend_supply_amount': 'INTEGER DEFAULT 0',
+                'suspend_tax_amount': 'INTEGER DEFAULT 0',
+                'suspend_total_amount': 'INTEGER DEFAULT 0',
+                # 연장 견적 필드 (연장 설정 시 저장)
+                'extend_item_detail': 'TEXT',
+                'extend_cost_per_test': 'INTEGER DEFAULT 0',
+                'extend_rounds_cost': 'INTEGER DEFAULT 0',
+                'extend_report_cost': 'INTEGER DEFAULT 0',
+                'extend_formula_text': 'TEXT',
+                'extend_supply_amount': 'INTEGER DEFAULT 0',
+                'extend_tax_amount': 'INTEGER DEFAULT 0',
+                'extend_total_amount': 'INTEGER DEFAULT 0'
             }
 
             for col_name, col_type in new_columns.items():
@@ -389,4 +418,91 @@ class Schedule:
             return success
         except Exception as e:
             print(f"스케줄 금액 업데이트 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def save_first_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
+                           report_cost, interim_cost, formula_text, supply_amount,
+                           tax_amount, total_amount):
+        """1차 견적 저장 (최초 생성 시만 저장, 이후 고정)"""
+        try:
+            Schedule._ensure_columns()
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # 이미 1차 견적이 저장되어 있는지 확인
+            cursor.execute("""
+                SELECT first_supply_amount FROM schedules WHERE id = %s
+            """, (schedule_id,))
+            result = cursor.fetchone()
+
+            # 이미 저장된 값이 있으면 저장하지 않음 (고정)
+            if result and result.get('first_supply_amount', 0) > 0:
+                conn.close()
+                return False
+
+            cursor.execute("""
+                UPDATE schedules
+                SET first_item_detail = %s, first_cost_per_test = %s, first_rounds_cost = %s,
+                    first_report_cost = %s, first_interim_cost = %s, first_formula_text = %s,
+                    first_supply_amount = %s, first_tax_amount = %s, first_total_amount = %s
+                WHERE id = %s
+            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"1차 견적 저장 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def save_suspend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
+                             report_cost, interim_cost, formula_text, supply_amount,
+                             tax_amount, total_amount):
+        """중단 견적 저장 (중단 시점에 저장)"""
+        try:
+            Schedule._ensure_columns()
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules
+                SET suspend_item_detail = %s, suspend_cost_per_test = %s, suspend_rounds_cost = %s,
+                    suspend_report_cost = %s, suspend_interim_cost = %s, suspend_formula_text = %s,
+                    suspend_supply_amount = %s, suspend_tax_amount = %s, suspend_total_amount = %s
+                WHERE id = %s
+            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"중단 견적 저장 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def save_extend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
+                            report_cost, formula_text, supply_amount,
+                            tax_amount, total_amount):
+        """연장 견적 저장 (연장 설정 시 저장)"""
+        try:
+            Schedule._ensure_columns()
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules
+                SET extend_item_detail = %s, extend_cost_per_test = %s, extend_rounds_cost = %s,
+                    extend_report_cost = %s, extend_formula_text = %s,
+                    extend_supply_amount = %s, extend_tax_amount = %s, extend_total_amount = %s
+                WHERE id = %s
+            """, (item_detail, cost_per_test, rounds_cost, report_cost,
+                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"연장 견적 저장 중 오류: {str(e)}")
             return False

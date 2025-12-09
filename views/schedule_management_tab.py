@@ -2453,6 +2453,7 @@ class ScheduleManagementTab(QWidget):
     def update_cost_summary(self, schedule, test_items, fees, sampling_count):
         """비용 요약 업데이트"""
         test_method = schedule.get('test_method', '') or ''
+        schedule_id = schedule.get('id')
 
         # 실험 방법에 따른 구간 수 결정 (실측=1구간, 가속=3구간)
         if test_method in ['real', 'custom_real']:
@@ -2460,23 +2461,6 @@ class ScheduleManagementTab(QWidget):
         else:
             zone_count = 3
 
-        # 항목별 비용 내역 (초기: 모두 O 체크 상태이므로 sampling_count회)
-        detail_parts = []
-        for test_item in test_items:
-            unit_price = int(fees.get(test_item, 0))
-            total_cost = unit_price * sampling_count
-            detail_parts.append(f"{test_item}({sampling_count}회)={total_cost:,}원")
-        self.item_cost_detail.setText(" | ".join(detail_parts))
-
-        # 1. 1회 기준 (합계) - 모든 검사항목 합계
-        cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
-        self.cost_per_test.setText(f"1회:{cost_per_test:,}원")
-
-        # 2. 회차별 총계 (합계) - 초기 로드 시 모든 O가 체크되어 있으므로 1회기준 × 샘플링횟수
-        total_rounds_cost = int(cost_per_test * sampling_count)
-        self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
-
-        # 3. 보고서 비용 설정 (견적 유형별)
         # 기본 보고서 비용: 실측=200,000원, 가속=300,000원
         if test_method in ['real', 'custom_real']:
             default_report_cost = 200000
@@ -2488,22 +2472,6 @@ class ScheduleManagementTab(QWidget):
         # 중간보고서 여부 확인
         report_interim = schedule.get('report_interim', False)
         default_interim_cost = 200000 if report_interim else 0
-
-        # 1차 견적 비용 (저장된 값이 있으면 사용, 없으면 기본값)
-        first_report = schedule.get('first_report_cost', default_report_cost)
-        first_interim = schedule.get('first_interim_cost', default_interim_cost)
-        self.first_report_cost_input.setText(f"{first_report:,}")
-        self.first_interim_cost_input.setText(f"{first_interim:,}")
-
-        # 중단 견적 비용 (저장된 값이 있으면 사용, 없으면 1차 값)
-        suspend_report = schedule.get('suspend_report_cost', first_report)
-        suspend_interim = schedule.get('suspend_interim_cost', first_interim)
-        self.suspend_report_cost_input.setText(f"{suspend_report:,}")
-        self.suspend_interim_cost_input.setText(f"{suspend_interim:,}")
-
-        # 연장 견적 비용 (저장된 값이 있으면 사용, 없으면 1차 값)
-        extend_report = schedule.get('extend_report_cost', first_report)
-        self.extend_report_cost_input.setText(f"{extend_report:,}")
 
         # 중간 보고서 필드 표시/숨김
         if report_interim:
@@ -2517,71 +2485,178 @@ class ScheduleManagementTab(QWidget):
             self.suspend_interim_cost_label.hide()
             self.suspend_interim_cost_input.hide()
 
-        # ========== 1차 견적 계산 ==========
-        first_total_rounds = cost_per_test * sampling_count
-        first_cost_no_vat = int(first_total_rounds * zone_count + first_report + first_interim)
-        if first_interim > 0:
-            formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}+{first_interim:,}={first_cost_no_vat:,}원"
+        # ========== 1차 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
+        saved_first_supply = schedule.get('first_supply_amount', 0) or 0
+
+        if saved_first_supply > 0:
+            # 저장된 1차 견적 값 사용 (고정)
+            self.item_cost_detail.setText(schedule.get('first_item_detail', '-'))
+            self.cost_per_test.setText(f"1회:{schedule.get('first_cost_per_test', 0):,}원")
+            self.total_rounds_cost.setText(f"회차:{schedule.get('first_rounds_cost', 0):,}원")
+            self.first_report_cost_input.setText(f"{schedule.get('first_report_cost', default_report_cost):,}")
+            self.first_interim_cost_input.setText(f"{schedule.get('first_interim_cost', 0):,}")
+            self.first_cost_formula.setText(schedule.get('first_formula_text', '-'))
+            first_with_vat = schedule.get('first_total_amount', 0) or 0
+            self.first_cost_vat.setText(f"{first_with_vat:,}원")
+            first_cost_no_vat = schedule.get('first_supply_amount', 0)
+            first_vat = schedule.get('first_tax_amount', 0)
         else:
-            formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}={first_cost_no_vat:,}원"
-        self.first_cost_formula.setText(formula_text)
+            # 새로 계산하고 저장
+            detail_parts = []
+            for test_item in test_items:
+                unit_price = int(fees.get(test_item, 0))
+                total_cost = unit_price * sampling_count
+                detail_parts.append(f"{test_item}({sampling_count}회)={total_cost:,}원")
+            item_detail_text = " | ".join(detail_parts)
+            self.item_cost_detail.setText(item_detail_text)
 
-        # 1차 부가세 포함 (통일된 형식)
-        first_vat = int(first_cost_no_vat * 0.1)
-        first_with_vat = first_cost_no_vat + first_vat
-        self.first_cost_vat.setText(f"{first_with_vat:,}원")
+            cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
+            self.cost_per_test.setText(f"1회:{cost_per_test:,}원")
 
-        # ========== 중단 견적 계산 ==========
+            total_rounds_cost = int(cost_per_test * sampling_count)
+            self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
+
+            first_report = schedule.get('first_report_cost', default_report_cost)
+            first_interim = schedule.get('first_interim_cost', default_interim_cost)
+            self.first_report_cost_input.setText(f"{first_report:,}")
+            self.first_interim_cost_input.setText(f"{first_interim:,}")
+
+            first_total_rounds = cost_per_test * sampling_count
+            first_cost_no_vat = int(first_total_rounds * zone_count + first_report + first_interim)
+            if first_interim > 0:
+                formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}+{first_interim:,}={first_cost_no_vat:,}원"
+            else:
+                formula_text = f"{first_total_rounds:,}×{zone_count}+{first_report:,}={first_cost_no_vat:,}원"
+            self.first_cost_formula.setText(formula_text)
+
+            first_vat = int(first_cost_no_vat * 0.1)
+            first_with_vat = first_cost_no_vat + first_vat
+            self.first_cost_vat.setText(f"{first_with_vat:,}원")
+
+            # 1차 견적 DB 저장
+            if schedule_id:
+                from models.schedules import Schedule
+                Schedule.save_first_estimate(
+                    schedule_id, item_detail_text, cost_per_test, total_rounds_cost,
+                    first_report, first_interim, formula_text,
+                    first_cost_no_vat, first_vat, first_with_vat
+                )
+
+        # ========== 중단 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         schedule_status = schedule.get('status', '')
         if schedule_status == 'suspended':
             self.row_suspend_widget.show()
-            # 중단 견적 항목 (초기: 1차와 동일)
-            self.suspend_item_cost_detail.setText(" | ".join(detail_parts))
-            self.suspend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
-            self.suspend_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
-            # 중단 비용 계산 (초기: 1차와 동일)
-            suspend_cost_no_vat = int(first_total_rounds * zone_count + suspend_report + suspend_interim)
-            if suspend_interim > 0:
-                suspend_formula = f"{first_total_rounds:,}×{zone_count}+{suspend_report:,}+{suspend_interim:,}={suspend_cost_no_vat:,}원"
+            saved_suspend_supply = schedule.get('suspend_supply_amount', 0) or 0
+
+            if saved_suspend_supply > 0:
+                # 저장된 중단 견적 값 사용
+                self.suspend_item_cost_detail.setText(schedule.get('suspend_item_detail', '-'))
+                self.suspend_cost_per_test.setText(f"1회:{schedule.get('suspend_cost_per_test', 0):,}원")
+                self.suspend_rounds_cost.setText(f"회차:{schedule.get('suspend_rounds_cost', 0):,}원")
+                self.suspend_report_cost_input.setText(f"{schedule.get('suspend_report_cost', default_report_cost):,}")
+                self.suspend_interim_cost_input.setText(f"{schedule.get('suspend_interim_cost', 0):,}")
+                self.suspend_cost_formula.setText(schedule.get('suspend_formula_text', '-'))
+                suspend_with_vat = schedule.get('suspend_total_amount', 0) or 0
+                self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
             else:
-                suspend_formula = f"{first_total_rounds:,}×{zone_count}+{suspend_report:,}={suspend_cost_no_vat:,}원"
-            self.suspend_cost_formula.setText(suspend_formula)
-            suspend_vat = int(suspend_cost_no_vat * 0.1)
-            suspend_with_vat = suspend_cost_no_vat + suspend_vat
-            self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
+                # 새로 계산하고 저장 (현재 스케줄 값 기반)
+                detail_parts = []
+                for test_item in test_items:
+                    unit_price = int(fees.get(test_item, 0))
+                    total_cost = unit_price * sampling_count
+                    detail_parts.append(f"{test_item}({sampling_count}회)={total_cost:,}원")
+                suspend_item_detail = " | ".join(detail_parts)
+                self.suspend_item_cost_detail.setText(suspend_item_detail)
+
+                cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
+                self.suspend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
+
+                total_rounds_cost = int(cost_per_test * sampling_count)
+                self.suspend_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
+
+                suspend_report = schedule.get('suspend_report_cost', default_report_cost)
+                suspend_interim = schedule.get('suspend_interim_cost', default_interim_cost)
+                self.suspend_report_cost_input.setText(f"{suspend_report:,}")
+                self.suspend_interim_cost_input.setText(f"{suspend_interim:,}")
+
+                suspend_total_rounds = cost_per_test * sampling_count
+                suspend_cost_no_vat = int(suspend_total_rounds * zone_count + suspend_report + suspend_interim)
+                if suspend_interim > 0:
+                    suspend_formula = f"{suspend_total_rounds:,}×{zone_count}+{suspend_report:,}+{suspend_interim:,}={suspend_cost_no_vat:,}원"
+                else:
+                    suspend_formula = f"{suspend_total_rounds:,}×{zone_count}+{suspend_report:,}={suspend_cost_no_vat:,}원"
+                self.suspend_cost_formula.setText(suspend_formula)
+
+                suspend_vat = int(suspend_cost_no_vat * 0.1)
+                suspend_with_vat = suspend_cost_no_vat + suspend_vat
+                self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
+
+                # 중단 견적 DB 저장
+                if schedule_id:
+                    from models.schedules import Schedule
+                    Schedule.save_suspend_estimate(
+                        schedule_id, suspend_item_detail, cost_per_test, total_rounds_cost,
+                        suspend_report, suspend_interim, suspend_formula,
+                        suspend_cost_no_vat, suspend_vat, suspend_with_vat
+                    )
         else:
             self.row_suspend_widget.hide()
 
-        # ========== 연장 견적 계산 ==========
+        # ========== 연장 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         extend_rounds = schedule.get('extend_rounds', 0) or 0
         if extend_rounds > 0:
             self.row_extend_widget.show()
-            # 연장 견적 항목
-            extend_detail_parts = []
-            for test_item in test_items:
-                unit_price = int(fees.get(test_item, 0))
-                extend_cost = unit_price * extend_rounds
-                extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_cost:,}원")
-            self.extend_item_cost_detail.setText(" | ".join(extend_detail_parts))
-            self.extend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
-            extend_total_rounds = cost_per_test * extend_rounds
-            self.extend_rounds_cost.setText(f"회차:{extend_total_rounds:,}원")
-            # 연장 비용 계산
-            extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
-            extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
-            self.extend_cost_formula.setText(extend_formula)
-            extend_vat = int(extend_cost_no_vat * 0.1)
-            extend_with_vat = extend_cost_no_vat + extend_vat
-            self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+            saved_extend_supply = schedule.get('extend_supply_amount', 0) or 0
+
+            if saved_extend_supply > 0:
+                # 저장된 연장 견적 값 사용
+                self.extend_item_cost_detail.setText(schedule.get('extend_item_detail', '-'))
+                self.extend_cost_per_test.setText(f"1회:{schedule.get('extend_cost_per_test', 0):,}원")
+                self.extend_rounds_cost.setText(f"회차:{schedule.get('extend_rounds_cost', 0):,}원")
+                self.extend_report_cost_input.setText(f"{schedule.get('extend_report_cost', default_report_cost):,}")
+                self.extend_cost_formula.setText(schedule.get('extend_formula_text', '-'))
+                extend_with_vat = schedule.get('extend_total_amount', 0) or 0
+                self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+            else:
+                # 새로 계산하고 저장
+                extend_detail_parts = []
+                for test_item in test_items:
+                    unit_price = int(fees.get(test_item, 0))
+                    extend_cost = unit_price * extend_rounds
+                    extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_cost:,}원")
+                extend_item_detail = " | ".join(extend_detail_parts)
+                self.extend_item_cost_detail.setText(extend_item_detail)
+
+                cost_per_test = int(sum(fees.get(item, 0) for item in test_items))
+                self.extend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
+
+                extend_total_rounds = cost_per_test * extend_rounds
+                self.extend_rounds_cost.setText(f"회차:{extend_total_rounds:,}원")
+
+                extend_report = schedule.get('extend_report_cost', default_report_cost)
+                self.extend_report_cost_input.setText(f"{extend_report:,}")
+
+                extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
+                extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
+                self.extend_cost_formula.setText(extend_formula)
+
+                extend_vat = int(extend_cost_no_vat * 0.1)
+                extend_with_vat = extend_cost_no_vat + extend_vat
+                self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+
+                # 연장 견적 DB 저장
+                if schedule_id:
+                    from models.schedules import Schedule
+                    Schedule.save_extend_estimate(
+                        schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
+                        extend_report, extend_formula,
+                        extend_cost_no_vat, extend_vat, extend_with_vat
+                    )
         else:
             self.row_extend_widget.hide()
 
-        # 금액을 DB에 저장용
-        vat = first_vat
-        final_cost_with_vat = first_with_vat
-
-        # 금액을 DB에 저장
-        self._save_amounts_to_db(first_cost_no_vat, vat, final_cost_with_vat)
+        # 금액을 DB에 저장 (기존 호환성 유지)
+        self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
 
         # 테이블 높이를 내용에 맞게 조절
         self._adjust_table_height()
