@@ -1505,6 +1505,18 @@ class EstimateTab(QWidget):
             # 저장 버튼 숨기기
             self.save_btn_widget.setVisible(False)
 
+            # Remark 텍스트 전체 표시를 위해 높이 조정
+            original_min_height = self.remark_text.minimumHeight()
+            original_max_height = self.remark_text.maximumHeight()
+            doc_height = self.remark_text.document().size().height() + 20
+            self.remark_text.setMinimumHeight(int(doc_height))
+            self.remark_text.setMaximumHeight(int(doc_height))
+
+            # 레이아웃 업데이트
+            self.estimate_container.adjustSize()
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+
             painter = QPainter()
             if painter.begin(printer):
                 # 페이지 크기
@@ -1529,6 +1541,10 @@ class EstimateTab(QWidget):
                 painter.scale(scale, scale)
                 widget.render(painter)
                 painter.end()
+
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(original_min_height)
+            self.remark_text.setMaximumHeight(original_max_height)
 
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
@@ -1633,6 +1649,18 @@ class EstimateTab(QWidget):
             # 저장 버튼 숨기기
             self.save_btn_widget.setVisible(False)
 
+            # Remark 텍스트 전체 표시를 위해 높이 조정
+            original_min_height = self.remark_text.minimumHeight()
+            original_max_height = self.remark_text.maximumHeight()
+            doc_height = self.remark_text.document().size().height() + 20
+            self.remark_text.setMinimumHeight(int(doc_height))
+            self.remark_text.setMaximumHeight(int(doc_height))
+
+            # 레이아웃 업데이트
+            self.estimate_container.adjustSize()
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
@@ -1680,10 +1708,17 @@ class EstimateTab(QWidget):
             else:
                 QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
 
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(original_min_height)
+            self.remark_text.setMaximumHeight(original_max_height)
+
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
 
         except Exception as e:
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(300)
+            self.remark_text.setMaximumHeight(16777215)
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
             QMessageBox.critical(self, "오류", f"PDF 저장 중 오류가 발생했습니다:\n{str(e)}")

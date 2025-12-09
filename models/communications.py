@@ -300,20 +300,30 @@ class EmailLog:
             return None
 
     @staticmethod
-    def get_all(limit=100):
-        """전체 이메일 로그 조회"""
+    def get_all(limit=100, sent_by=None):
+        """전체 이메일 로그 조회 (sent_by로 필터링 가능)"""
         try:
             Message._ensure_tables()
             conn = get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("""
-                SELECT el.*, u.name as sent_by_name
-                FROM email_logs el
-                LEFT JOIN users u ON el.sent_by = u.id
-                ORDER BY el.sent_at DESC
-                LIMIT %s
-            """, (limit,))
+            if sent_by:
+                cursor.execute("""
+                    SELECT el.*, u.name as sent_by_name
+                    FROM email_logs el
+                    LEFT JOIN users u ON el.sent_by = u.id
+                    WHERE el.sent_by = %s
+                    ORDER BY el.sent_at DESC
+                    LIMIT %s
+                """, (sent_by, limit))
+            else:
+                cursor.execute("""
+                    SELECT el.*, u.name as sent_by_name
+                    FROM email_logs el
+                    LEFT JOIN users u ON el.sent_by = u.id
+                    ORDER BY el.sent_at DESC
+                    LIMIT %s
+                """, (limit,))
 
             logs = cursor.fetchall()
             conn.close()
@@ -367,8 +377,8 @@ class EmailLog:
             return None
 
     @staticmethod
-    def search(keyword=None, start_date=None, end_date=None, limit=100):
-        """이메일 로그 검색"""
+    def search(keyword=None, start_date=None, end_date=None, limit=100, sent_by=None):
+        """이메일 로그 검색 (sent_by로 필터링 가능)"""
         try:
             Message._ensure_tables()
             conn = get_connection()
@@ -381,6 +391,10 @@ class EmailLog:
                 WHERE 1=1
             """
             params = []
+
+            if sent_by:
+                query += " AND el.sent_by = %s"
+                params.append(sent_by)
 
             if keyword:
                 query += " AND (el.client_name LIKE %s OR el.to_emails LIKE %s OR el.subject LIKE %s)"
@@ -404,6 +418,31 @@ class EmailLog:
         except Exception as e:
             print(f"이메일 로그 검색 오류: {e}")
             return []
+
+    @staticmethod
+    def delete(log_id, user_id=None):
+        """이메일 로그 삭제 (본인 기록만 삭제 가능)"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            if user_id:
+                # 본인 기록만 삭제 가능
+                cursor.execute("""
+                    DELETE FROM email_logs WHERE id = %s AND sent_by = %s
+                """, (log_id, user_id))
+            else:
+                cursor.execute("""
+                    DELETE FROM email_logs WHERE id = %s
+                """, (log_id,))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            print(f"이메일 로그 삭제 오류: {e}")
+            return False
 
     @staticmethod
     def update_status(log_id, status=None, received=None, received_at=None):

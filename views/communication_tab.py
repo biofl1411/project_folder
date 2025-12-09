@@ -253,6 +253,26 @@ class CommunicationTab(QWidget):
         """)
         layout.addWidget(self.email_log_table)
 
+        # 삭제 버튼
+        delete_btn_layout = QHBoxLayout()
+        delete_btn_layout.addStretch()
+        self.delete_email_log_btn = QPushButton("선택 항목 삭제")
+        self.delete_email_log_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                padding: 6px 15px;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+        """)
+        self.delete_email_log_btn.clicked.connect(self.delete_email_log)
+        delete_btn_layout.addWidget(self.delete_email_log_btn)
+        layout.addLayout(delete_btn_layout)
+
     def load_users(self):
         """사용자 목록 로드"""
         try:
@@ -436,18 +456,20 @@ class CommunicationTab(QWidget):
                 self.load_conversation()
 
     def load_email_logs(self):
-        """이메일 발송 기록 로드"""
+        """이메일 발송 기록 로드 (본인 계정만 표시)"""
         try:
             from models.communications import EmailLog
 
-            logs = EmailLog.get_all(limit=100)
+            # 본인 계정만 표시
+            sent_by = self.current_user.get('id') if self.current_user else None
+            logs = EmailLog.get_all(limit=100, sent_by=sent_by)
             self._populate_email_log_table(logs)
 
         except Exception as e:
             print(f"이메일 로그 로드 오류: {e}")
 
     def search_email_logs(self):
-        """이메일 발송 기록 검색"""
+        """이메일 발송 기록 검색 (본인 계정만 표시)"""
         try:
             from models.communications import EmailLog
 
@@ -455,16 +477,55 @@ class CommunicationTab(QWidget):
             start_date = self.email_start_date.date().toString("yyyy-MM-dd")
             end_date = self.email_end_date.date().toString("yyyy-MM-dd")
 
+            # 본인 계정만 표시
+            sent_by = self.current_user.get('id') if self.current_user else None
             logs = EmailLog.search(
                 keyword=keyword if keyword else None,
                 start_date=start_date,
                 end_date=end_date,
-                limit=100
+                limit=100,
+                sent_by=sent_by
             )
             self._populate_email_log_table(logs)
 
         except Exception as e:
             print(f"이메일 로그 검색 오류: {e}")
+
+    def delete_email_log(self):
+        """선택한 이메일 로그 삭제"""
+        selected_rows = self.email_log_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "알림", "삭제할 항목을 선택하세요.")
+            return
+
+        reply = QMessageBox.question(
+            self, "삭제 확인",
+            f"선택한 {len(selected_rows)}개의 이메일 발송 기록을 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                from models.communications import EmailLog
+
+                user_id = self.current_user.get('id') if self.current_user else None
+                deleted_count = 0
+
+                for index in selected_rows:
+                    row = index.row()
+                    log_id = self.email_log_table.item(row, 0).data(Qt.UserRole)
+                    if EmailLog.delete(log_id, user_id):
+                        deleted_count += 1
+
+                if deleted_count > 0:
+                    QMessageBox.information(self, "삭제 완료", f"{deleted_count}개의 기록이 삭제되었습니다.")
+                    self.load_email_logs()
+                else:
+                    QMessageBox.warning(self, "삭제 실패", "삭제할 수 없는 기록입니다.")
+
+            except Exception as e:
+                QMessageBox.critical(self, "오류", f"삭제 중 오류가 발생했습니다:\n{str(e)}")
 
     def _populate_email_log_table(self, logs):
         """이메일 로그 테이블 채우기"""
