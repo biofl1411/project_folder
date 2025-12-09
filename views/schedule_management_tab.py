@@ -5915,7 +5915,7 @@ class ScheduleMailDialog(QDialog):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings")
+            cursor.execute("SELECT `key`, value FROM settings")
             settings = cursor.fetchall()
             conn.close()
             settings_dict = {s['key']: s['value'] for s in settings}
@@ -6163,7 +6163,7 @@ class ScheduleMailDialog(QDialog):
                 from database import get_connection
                 conn = get_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT key, value FROM settings")
+                cursor.execute("SELECT `key`, value FROM settings")
                 settings = cursor.fetchall()
                 conn.close()
 
