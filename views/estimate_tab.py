@@ -928,11 +928,17 @@ class EstimateTab(QWidget):
             return self._calculate_first_price(schedule, zone_count, sampling_count)
 
     def _calculate_first_price(self, schedule, zone_count, sampling_count):
-        """1차 견적 금액 계산 - 상태 변경과 무관하게 원래 전체 비용 계산
+        """1차 견적 금액 계산 - DB에 저장된 값 우선 사용
 
         O/X 상태 변경과 관계없이 모든 검사항목이 O인 것으로 가정한 원래 비용 계산
         1차 견적 전용 보고서/중간보고서 비용 사용 (first_report_cost, first_interim_cost)
         """
+        # DB에 저장된 1차 견적 값이 있으면 사용 (최우선)
+        saved_first_supply = schedule.get('first_supply_amount', 0) or 0
+        if saved_first_supply > 0:
+            return saved_first_supply
+
+        # 저장된 값이 없으면 계산
         total = 0
         test_method = schedule.get('test_method', 'real')
 
@@ -964,11 +970,17 @@ class EstimateTab(QWidget):
         return int(total)
 
     def _calculate_suspend_price(self, schedule, completed_rounds, zone_count):
-        """중단 견적 금액 계산 - O로 체크된 항목만 비용 계산
+        """중단 견적 금액 계산 - DB에 저장된 값 우선 사용
 
         상태가 '중단'이고 체크 설정이 O인 경우만 비용에 포함
         중단 견적 전용 보고서/중간보고서 비용 사용 (suspend_report_cost, suspend_interim_cost)
         """
+        # DB에 저장된 중단 견적 값이 있으면 사용 (최우선)
+        saved_suspend_supply = schedule.get('suspend_supply_amount', 0) or 0
+        if saved_suspend_supply > 0:
+            return saved_suspend_supply
+
+        # 저장된 값이 없으면 계산
         total = 0
         test_method = schedule.get('test_method', 'real')
 
@@ -1000,10 +1012,16 @@ class EstimateTab(QWidget):
         return int(total)
 
     def _calculate_extend_price(self, schedule, zone_count):
-        """연장 견적 금액 계산 - 추가 실험 비용 (O/X 상태 반영)
+        """연장 견적 금액 계산 - DB에 저장된 값 우선 사용
 
         연장 견적 전용 보고서 비용 사용 (extend_report_cost)
         """
+        # DB에 저장된 연장 견적 값이 있으면 사용 (최우선)
+        saved_extend_supply = schedule.get('extend_supply_amount', 0) or 0
+        if saved_extend_supply > 0:
+            return saved_extend_supply
+
+        # 저장된 값이 없으면 계산
         total = 0
         test_method = schedule.get('test_method', 'real')
 
