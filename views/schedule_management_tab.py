@@ -4617,12 +4617,20 @@ class ScheduleManagementTab(QWidget):
         self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
 
         # ========== 1차 견적 계산 ==========
+        # 기본 보고서 비용: 실측=200,000원, 가속=300,000원
+        if test_method in ['real', 'custom_real']:
+            default_report_cost = 200000
+        elif test_method in ['acceleration', 'custom_acceleration']:
+            default_report_cost = 300000
+        else:
+            default_report_cost = 200000
+
         # 1차 견적은 O/X 상태와 무관하게 원래 전체 비용 (모든 항목 O로 가정)
         first_total_rounds = cost_per_test * sampling_count
         try:
             first_report_cost = int(self.first_report_cost_input.text().replace(',', '').replace('원', ''))
         except (ValueError, TypeError):
-            first_report_cost = 200000
+            first_report_cost = default_report_cost
 
         first_interim_cost = 0
         if self.first_interim_cost_input.isVisible():
