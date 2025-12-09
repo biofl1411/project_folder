@@ -23,6 +23,7 @@ from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
 from models.activity_log import ActivityLog
+from models.schedule_attachments import ScheduleAttachment
 from utils.logger import log_message, log_error, log_exception, safe_get
 from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
 
@@ -1178,12 +1179,6 @@ class ScheduleManagementTab(QWidget):
         self.estimate_btn.clicked.connect(self.show_estimate)
         layout.addWidget(self.estimate_btn)
 
-        # 표시 설정 버튼
-        self.settings_btn = QPushButton("표시 설정")
-        self.settings_btn.setStyleSheet("background-color: #9b59b6; color: white; padding: 8px 15px; font-weight: bold;")
-        self.settings_btn.clicked.connect(self.open_display_settings)
-        layout.addWidget(self.settings_btn)
-
         # 스케줄 선택 버튼
         self.select_btn = QPushButton("스케줄 선택")
         self.select_btn.setStyleSheet("background-color: #3498db; color: white; padding: 8px 20px; font-weight: bold;")
@@ -1567,6 +1562,9 @@ class ScheduleManagementTab(QWidget):
         # 비용 요약
         self.create_cost_summary(layout)
 
+        # 첨부파일 패널
+        self.create_attachment_panel(layout)
+
         parent_layout.addWidget(group)
 
     def create_cost_summary(self, parent_layout):
@@ -1817,6 +1815,240 @@ class ScheduleManagementTab(QWidget):
         label.setFixedHeight(25)
         return label
 
+    def create_attachment_panel(self, parent_layout):
+        """첨부파일 패널"""
+        self.attachment_frame = QFrame()
+        attach_frame = self.attachment_frame
+        attach_frame.setStyleSheet("background-color: #eaf2f8; border: 1px solid #3498db; border-radius: 2px;")
+        attach_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        attach_layout = QHBoxLayout(attach_frame)
+        attach_layout.setSpacing(8)
+        attach_layout.setContentsMargins(8, 4, 8, 4)
+
+        # 첨부파일 라벨
+        attach_label = QLabel("첨부파일")
+        attach_label.setStyleSheet("font-size: 11px; font-weight: bold; color: #2980b9; border: none;")
+        attach_label.setFixedWidth(55)
+        attach_layout.addWidget(attach_label)
+
+        # 첨부파일 목록 (테이블)
+        self.attachment_table = QTableWidget()
+        self.attachment_table.setColumnCount(4)
+        self.attachment_table.setHorizontalHeaderLabels(["파일명", "크기", "업로드일", "삭제"])
+        self.attachment_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.attachment_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.attachment_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.attachment_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
+        self.attachment_table.setColumnWidth(1, 80)
+        self.attachment_table.setColumnWidth(2, 100)
+        self.attachment_table.setColumnWidth(3, 50)
+        self.attachment_table.setMaximumHeight(100)
+        self.attachment_table.setMinimumHeight(60)
+        self.attachment_table.setStyleSheet("""
+            QTableWidget { background-color: white; border: 1px solid #bdc3c7; font-size: 10px; }
+            QHeaderView::section { background-color: #ecf0f1; font-size: 10px; padding: 2px; }
+        """)
+        self.attachment_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.attachment_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.attachment_table.cellDoubleClicked.connect(self.download_attachment)
+        attach_layout.addWidget(self.attachment_table, 1)
+
+        # 버튼 영역
+        btn_widget = QWidget()
+        btn_widget.setStyleSheet("border: none;")
+        btn_layout = QVBoxLayout(btn_widget)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+
+        self.add_attachment_btn = QPushButton("파일 추가")
+        self.add_attachment_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60; color: white; padding: 4px 8px;
+                font-size: 10px; font-weight: bold; border-radius: 2px;
+            }
+            QPushButton:hover { background-color: #2ecc71; }
+        """)
+        self.add_attachment_btn.setFixedWidth(70)
+        self.add_attachment_btn.clicked.connect(self.add_schedule_attachment)
+        btn_layout.addWidget(self.add_attachment_btn)
+
+        self.download_attachment_btn = QPushButton("다운로드")
+        self.download_attachment_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db; color: white; padding: 4px 8px;
+                font-size: 10px; font-weight: bold; border-radius: 2px;
+            }
+            QPushButton:hover { background-color: #5dade2; }
+        """)
+        self.download_attachment_btn.setFixedWidth(70)
+        self.download_attachment_btn.clicked.connect(self.download_selected_attachment)
+        btn_layout.addWidget(self.download_attachment_btn)
+
+        btn_layout.addStretch()
+        attach_layout.addWidget(btn_widget)
+
+        parent_layout.addWidget(attach_frame)
+
+    def refresh_attachment_list(self):
+        """첨부파일 목록 새로고침"""
+        self.attachment_table.setRowCount(0)
+
+        if not self.current_schedule:
+            return
+
+        schedule_id = self.current_schedule.get('id')
+        if not schedule_id:
+            return
+
+        attachments = ScheduleAttachment.get_by_schedule(schedule_id)
+
+        for attach in attachments:
+            row = self.attachment_table.rowCount()
+            self.attachment_table.insertRow(row)
+
+            # 파일명 (클릭 가능)
+            name_item = QTableWidgetItem(attach['file_name'])
+            name_item.setData(Qt.UserRole, attach['id'])  # ID 저장
+            name_item.setForeground(QBrush(QColor("#2980b9")))
+            self.attachment_table.setItem(row, 0, name_item)
+
+            # 파일 크기
+            size_text = ScheduleAttachment.format_file_size(attach['file_size'])
+            size_item = QTableWidgetItem(size_text)
+            size_item.setTextAlignment(Qt.AlignCenter)
+            self.attachment_table.setItem(row, 1, size_item)
+
+            # 업로드 날짜
+            if attach['uploaded_at']:
+                upload_date = attach['uploaded_at'].strftime('%Y-%m-%d') if hasattr(attach['uploaded_at'], 'strftime') else str(attach['uploaded_at'])[:10]
+            else:
+                upload_date = '-'
+            date_item = QTableWidgetItem(upload_date)
+            date_item.setTextAlignment(Qt.AlignCenter)
+            self.attachment_table.setItem(row, 2, date_item)
+
+            # 삭제 버튼
+            delete_btn = QPushButton("X")
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c; color: white;
+                    font-weight: bold; border-radius: 2px; padding: 2px;
+                }
+                QPushButton:hover { background-color: #c0392b; }
+            """)
+            delete_btn.setFixedSize(30, 20)
+            delete_btn.clicked.connect(lambda checked, aid=attach['id']: self.delete_schedule_attachment(aid))
+            self.attachment_table.setCellWidget(row, 3, delete_btn)
+
+    def add_schedule_attachment(self):
+        """첨부파일 추가"""
+        if not self.current_schedule:
+            QMessageBox.warning(self, "알림", "먼저 스케줄을 선택하세요.")
+            return
+
+        schedule_id = self.current_schedule.get('id')
+        if not schedule_id:
+            QMessageBox.warning(self, "알림", "스케줄 ID가 없습니다.")
+            return
+
+        # 파일 선택 다이얼로그
+        file_filter = "지원 파일 (*.pdf *.png *.jpg *.jpeg *.xlsx *.xls *.doc *.docx *.hwp *.hwpx);;모든 파일 (*.*)"
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "첨부파일 선택", "", file_filter
+        )
+
+        if not file_path:
+            return
+
+        # 파일 업로드
+        success, message, attachment_id = ScheduleAttachment.add(schedule_id, file_path)
+
+        if success:
+            self.refresh_attachment_list()
+            # 활동 로그 기록
+            file_name = os.path.basename(file_path)
+            self.log_activity('upload_attachment', file_name, f"첨부파일 업로드: {file_name}")
+        else:
+            QMessageBox.warning(self, "업로드 실패", message)
+
+    def delete_schedule_attachment(self, attachment_id):
+        """첨부파일 삭제"""
+        reply = QMessageBox.question(
+            self, "첨부파일 삭제",
+            "선택한 첨부파일을 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        # 파일 정보 조회 (로그용)
+        attach_info = ScheduleAttachment.get_by_id(attachment_id)
+
+        success, message = ScheduleAttachment.delete(attachment_id)
+
+        if success:
+            self.refresh_attachment_list()
+            # 활동 로그 기록
+            if attach_info:
+                self.log_activity('delete_attachment', attach_info['file_name'], f"첨부파일 삭제: {attach_info['file_name']}")
+        else:
+            QMessageBox.warning(self, "삭제 실패", message)
+
+    def download_attachment(self, row, column):
+        """첨부파일 더블클릭 시 다운로드"""
+        if column != 0:  # 파일명 열만 반응
+            return
+        self._download_attachment_at_row(row)
+
+    def download_selected_attachment(self):
+        """선택된 첨부파일 다운로드"""
+        selected_rows = self.attachment_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.information(self, "알림", "다운로드할 첨부파일을 선택하세요.")
+            return
+
+        for index in selected_rows:
+            self._download_attachment_at_row(index.row())
+
+    def _download_attachment_at_row(self, row):
+        """특정 행의 첨부파일 다운로드"""
+        name_item = self.attachment_table.item(row, 0)
+        if not name_item:
+            return
+
+        attachment_id = name_item.data(Qt.UserRole)
+        if not attachment_id:
+            return
+
+        # 파일 경로 조회
+        file_path = ScheduleAttachment.get_file_path(attachment_id)
+        if not file_path:
+            QMessageBox.warning(self, "오류", "파일을 찾을 수 없습니다.")
+            return
+
+        # 저장 위치 선택
+        attach_info = ScheduleAttachment.get_by_id(attachment_id)
+        default_name = attach_info['file_name'] if attach_info else os.path.basename(file_path)
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self, "첨부파일 저장", default_name, "모든 파일 (*.*)"
+        )
+
+        if not save_path:
+            return
+
+        try:
+            import shutil
+            shutil.copy2(file_path, save_path)
+            QMessageBox.information(self, "다운로드 완료", f"파일이 저장되었습니다:\n{save_path}")
+
+            # 활동 로그 기록
+            self.log_activity('download_attachment', default_name, f"첨부파일 다운로드: {default_name}")
+        except Exception as e:
+            QMessageBox.warning(self, "다운로드 실패", f"파일 저장 중 오류가 발생했습니다:\n{str(e)}")
+
     def open_schedule_selector(self):
         """스케줄 선택 팝업 열기"""
         dialog = ScheduleSelectDialog(self)
@@ -1835,6 +2067,8 @@ class ScheduleManagementTab(QWidget):
             self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
             self.update_info_panel(schedule)
             self.update_experiment_schedule(schedule)
+            # 첨부파일 목록 새로고침
+            self.refresh_attachment_list()
 
     def _load_saved_test_items(self, schedule):
         """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""

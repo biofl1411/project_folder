@@ -562,13 +562,15 @@ class SettingsDialog(QDialog):
                 self.stamp_path_input.setText(file_path)
 
             dest_path = os.path.join(config_dir, dest_name)
+            # 상대 경로로 저장 (다른 환경에서도 사용 가능하도록)
+            relative_path = os.path.join("config", dest_name)
 
             try:
                 shutil.copy2(file_path, dest_path)
                 if image_type == 'logo':
-                    self.logo_path_input.setText(dest_path)
+                    self.logo_path_input.setText(relative_path)
                 else:
-                    self.stamp_path_input.setText(dest_path)
+                    self.stamp_path_input.setText(relative_path)
                 QMessageBox.information(self, "완료", f"이미지가 저장되었습니다.\n{dest_path}")
             except Exception as e:
                 QMessageBox.critical(self, "오류", f"이미지 저장 실패: {str(e)}")
