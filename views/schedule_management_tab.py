@@ -4037,7 +4037,7 @@ class ScheduleManagementTab(QWidget):
             from models.schedules import Schedule
             Schedule.save_extend_estimate(
                 schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
-                extend_report, extend_formula,
+                extend_report, extend_interim, extend_formula,
                 extend_cost_no_vat, extend_vat, extend_with_vat
             )
 
@@ -5198,6 +5198,19 @@ class ScheduleManagementTab(QWidget):
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+
+            # 연장 견적 DB에 저장 (견적서 금액 일치 위해)
+            if schedule_id and hasattr(self, 'extend_item_cost_detail'):
+                try:
+                    extend_item_detail = self.extend_item_cost_detail.text() if self.extend_item_cost_detail.text() != '-' else '-'
+                    from models.schedules import Schedule
+                    Schedule.save_extend_estimate(
+                        schedule_id, extend_item_detail, cost_per_test, extend_total_cost,
+                        extend_report_cost, extend_interim_cost, extend_formula,
+                        extend_cost_no_vat, extend_vat, extend_with_vat
+                    )
+                except Exception as e:
+                    print(f"연장 견적 저장 오류 (recalculate_costs): {e}")
         else:
             if hasattr(self, 'row_extend_widget'):
                 self.row_extend_widget.hide()
@@ -5387,7 +5400,7 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
 
-            # 연장 견적 전체 저장 (보고서 비용 포함)
+            # 연장 견적 전체 저장 (보고서/중간 비용 포함)
             if schedule_id:
                 try:
                     extend_item_detail = self.extend_item_cost_detail.text() if hasattr(self, 'extend_item_cost_detail') else '-'
@@ -5395,7 +5408,7 @@ class ScheduleManagementTab(QWidget):
                     from models.schedules import Schedule
                     Schedule.save_extend_estimate(
                         schedule_id, extend_item_detail, extend_cost_per_test, extend_rounds_cost,
-                        extend_report_cost, extend_formula,
+                        extend_report_cost, extend_interim_cost, extend_formula,
                         extend_cost_no_vat, extend_vat, extend_with_vat
                     )
                 except Exception as e:
