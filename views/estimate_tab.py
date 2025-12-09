@@ -514,22 +514,31 @@ class EstimateTab(QWidget):
                 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
             # 로고 이미지 로드
-            logo_path = settings_dict.get('logo_path', '')
+            logo_path_setting = settings_dict.get('logo_path', '')
+            logo_path = logo_path_setting
+            print(f"[로고 로드] DB에서 가져온 경로: '{logo_path_setting}'")
+            print(f"[로고 로드] base_path: '{base_path}'")
+
             if logo_path:
                 # 상대 경로인 경우 절대 경로로 변환
                 if not os.path.isabs(logo_path):
                     logo_path = os.path.join(base_path, logo_path)
                 logo_path = os.path.normpath(logo_path)
+                print(f"[로고 로드] 최종 경로: '{logo_path}'")
+                print(f"[로고 로드] 파일 존재 여부: {os.path.exists(logo_path)}")
 
             if logo_path and os.path.exists(logo_path):
                 pixmap = QPixmap(logo_path)
+                print(f"[로고 로드] QPixmap isNull: {pixmap.isNull()}")
                 if not pixmap.isNull():
                     # 로고 크기 조정 (높이 60px 기준으로 비율 유지)
                     scaled_pixmap = pixmap.scaledToHeight(60, Qt.SmoothTransformation)
                     self.logo_label.setPixmap(scaled_pixmap)
                     self.logo_label.setStyleSheet("")  # 기존 텍스트 스타일 제거
+                    print("[로고 로드] 로고 이미지 적용 완료")
             else:
                 # 기본 텍스트 로고
+                print(f"[로고 로드] 기본 텍스트 로고 사용 (경로 없음 또는 파일 없음)")
                 self.logo_label.setText("BFL")
                 self.logo_label.setStyleSheet("""
                     font-size: 36px;
@@ -539,22 +548,30 @@ class EstimateTab(QWidget):
                 """)
 
             # 직인 이미지 로드
-            stamp_path = settings_dict.get('stamp_path', '')
+            stamp_path_setting = settings_dict.get('stamp_path', '')
+            stamp_path = stamp_path_setting
+            print(f"[도장 로드] DB에서 가져온 경로: '{stamp_path_setting}'")
+
             if stamp_path:
                 # 상대 경로인 경우 절대 경로로 변환
                 if not os.path.isabs(stamp_path):
                     stamp_path = os.path.join(base_path, stamp_path)
                 stamp_path = os.path.normpath(stamp_path)
+                print(f"[도장 로드] 최종 경로: '{stamp_path}'")
+                print(f"[도장 로드] 파일 존재 여부: {os.path.exists(stamp_path)}")
 
             if stamp_path and os.path.exists(stamp_path):
                 stamp_pixmap = QPixmap(stamp_path)
+                print(f"[도장 로드] QPixmap isNull: {stamp_pixmap.isNull()}")
                 if not stamp_pixmap.isNull():
                     # 직인 크기 조정 (60x60px)
                     scaled_stamp = stamp_pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                     self.stamp_label.setPixmap(scaled_stamp)
                     self.stamp_label.show()
                     self.stamp_label.raise_()  # 다른 위젯 앞으로 이동
+                    print("[도장 로드] 도장 이미지 적용 완료")
             else:
+                print(f"[도장 로드] 도장 표시 안함 (경로 없음 또는 파일 없음)")
                 self.stamp_label.clear()
 
             # 오른쪽 회사 정보 구성 (제목열 맞춤)

@@ -547,32 +547,43 @@ class SettingsDialog(QDialog):
             else:
                 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+            print(f"[이미지 업로드] 선택한 파일: {file_path}")
+            print(f"[이미지 업로드] base_path: {base_path}")
+
             # config 폴더에 복사 (절대 경로 사용)
             config_dir = os.path.join(base_path, "config")
+            print(f"[이미지 업로드] config_dir: {config_dir}")
+
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir)
+                print(f"[이미지 업로드] config 폴더 생성됨")
 
             # 파일 이름 결정
-            ext = os.path.splitext(file_path)[1]
+            ext = os.path.splitext(file_path)[1].lower()
             if image_type == 'logo':
                 dest_name = f"company_logo{ext}"
-                self.logo_path_input.setText(file_path)
             else:
                 dest_name = f"company_stamp{ext}"
-                self.stamp_path_input.setText(file_path)
 
             dest_path = os.path.join(config_dir, dest_name)
-            # 상대 경로로 저장 (다른 환경에서도 사용 가능하도록)
-            relative_path = os.path.join("config", dest_name)
+            # 상대 경로로 저장 (다른 환경에서도 사용 가능하도록) - 항상 / 사용
+            relative_path = f"config/{dest_name}"
+
+            print(f"[이미지 업로드] 대상 경로: {dest_path}")
+            print(f"[이미지 업로드] 상대 경로: {relative_path}")
 
             try:
                 shutil.copy2(file_path, dest_path)
+                print(f"[이미지 업로드] 파일 복사 성공")
+                print(f"[이미지 업로드] 파일 존재 확인: {os.path.exists(dest_path)}")
+
                 if image_type == 'logo':
                     self.logo_path_input.setText(relative_path)
                 else:
                     self.stamp_path_input.setText(relative_path)
                 QMessageBox.information(self, "완료", f"이미지가 저장되었습니다.\n{dest_path}")
             except Exception as e:
+                print(f"[이미지 업로드] 오류: {str(e)}")
                 QMessageBox.critical(self, "오류", f"이미지 저장 실패: {str(e)}")
 
     def clear_image(self, image_type):
