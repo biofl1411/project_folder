@@ -264,21 +264,20 @@ class EstimateTab(QWidget):
         right_info_widget = QWidget()
         right_info_widget.setFixedSize(320, 140)
 
-        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정) - 먼저 생성하여 글 뒤로
-        self.stamp_label = QLabel("")
-        self.stamp_label.setFixedSize(60, 60)
-        self.stamp_label.setStyleSheet("border: none; background: transparent;")
-        self.stamp_label.setParent(right_info_widget)
-        self.stamp_label.move(140, 5)  # 대표자 이름 옆에 위치
-        self.stamp_label.lower()  # 글 뒤로 이동
-
-        # 회사 정보 라벨 (글씨 2포인트 크게: 11px → 13px, 왼쪽 여백 추가)
+        # 회사 정보 라벨 (글씨 2포인트 크게: 11px → 13px, 왼쪽 여백 추가) - 먼저 생성
         self.right_company_info = QLabel("")
         self.right_company_info.setStyleSheet("font-size: 13px; padding-left: 40px;")
         self.right_company_info.setFixedSize(320, 140)
         self.right_company_info.setParent(right_info_widget)
         self.right_company_info.move(0, 0)
         self.right_company_info.setAttribute(Qt.WA_TranslucentBackground)  # 배경 투명
+
+        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정) - 나중에 생성하여 글자 앞으로
+        self.stamp_label = QLabel("")
+        self.stamp_label.setFixedSize(60, 60)
+        self.stamp_label.setStyleSheet("border: none; background: transparent;")
+        self.stamp_label.setParent(right_info_widget)
+        self.stamp_label.move(140, 5)  # 대표자 이름 옆에 위치
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
@@ -1506,6 +1505,18 @@ class EstimateTab(QWidget):
             # 저장 버튼 숨기기
             self.save_btn_widget.setVisible(False)
 
+            # Remark 텍스트 전체 표시를 위해 높이 조정
+            original_min_height = self.remark_text.minimumHeight()
+            original_max_height = self.remark_text.maximumHeight()
+            doc_height = self.remark_text.document().size().height() + 20
+            self.remark_text.setMinimumHeight(int(doc_height))
+            self.remark_text.setMaximumHeight(int(doc_height))
+
+            # 레이아웃 업데이트
+            self.estimate_container.adjustSize()
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+
             painter = QPainter()
             if painter.begin(printer):
                 # 페이지 크기
@@ -1530,6 +1541,10 @@ class EstimateTab(QWidget):
                 painter.scale(scale, scale)
                 widget.render(painter)
                 painter.end()
+
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(original_min_height)
+            self.remark_text.setMaximumHeight(original_max_height)
 
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
@@ -1634,6 +1649,18 @@ class EstimateTab(QWidget):
             # 저장 버튼 숨기기
             self.save_btn_widget.setVisible(False)
 
+            # Remark 텍스트 전체 표시를 위해 높이 조정
+            original_min_height = self.remark_text.minimumHeight()
+            original_max_height = self.remark_text.maximumHeight()
+            doc_height = self.remark_text.document().size().height() + 20
+            self.remark_text.setMinimumHeight(int(doc_height))
+            self.remark_text.setMaximumHeight(int(doc_height))
+
+            # 레이아웃 업데이트
+            self.estimate_container.adjustSize()
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
@@ -1681,10 +1708,17 @@ class EstimateTab(QWidget):
             else:
                 QMessageBox.critical(self, "오류", "PDF 생성에 실패했습니다.")
 
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(original_min_height)
+            self.remark_text.setMaximumHeight(original_max_height)
+
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
 
         except Exception as e:
+            # Remark 텍스트 높이 복원
+            self.remark_text.setMinimumHeight(300)
+            self.remark_text.setMaximumHeight(16777215)
             # 저장 버튼 다시 표시
             self.save_btn_widget.setVisible(True)
             QMessageBox.critical(self, "오류", f"PDF 저장 중 오류가 발생했습니다:\n{str(e)}")
@@ -1967,23 +2001,39 @@ class EstimateTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
+
+            # 공용 설정 로드
             cursor.execute("SELECT `key`, value FROM settings")
             settings = cursor.fetchall()
-            conn.close()
-
             settings_dict = {s['key']: s['value'] for s in settings}
 
-            smtp_server = settings_dict.get('smtp_server', '')
-            smtp_port = int(settings_dict.get('smtp_port', '587'))
-            smtp_security = settings_dict.get('smtp_security', 'TLS')
-            smtp_email = settings_dict.get('smtp_email', '')
-            smtp_password = settings_dict.get('smtp_password', '')
-            sender_name = settings_dict.get('smtp_sender_name', '(주)바이오푸드랩')
+            # SMTP 서버 설정 (고정값)
+            smtp_server = 'spam.biofl.co.kr'
+            smtp_port = 25
+            smtp_security = 'TLS'
             output_path = settings_dict.get('output_path', '')
 
-            if not smtp_server or not smtp_email or not smtp_password:
+            # 사용자별 이메일 계정 설정 로드
+            smtp_email = ''
+            smtp_password = ''
+            sender_name = '(주)바이오푸드랩'
+
+            if self.current_user:
+                cursor.execute("""
+                    SELECT `key`, value FROM user_settings WHERE user_id = %s
+                """, (self.current_user['id'],))
+                user_settings = cursor.fetchall()
+                user_settings_dict = {s['key']: s['value'] for s in user_settings}
+
+                smtp_email = user_settings_dict.get('smtp_email', '') or ''
+                smtp_password = user_settings_dict.get('smtp_password', '') or ''
+                sender_name = user_settings_dict.get('smtp_sender_name', '') or '(주)바이오푸드랩'
+
+            conn.close()
+
+            if not smtp_email or not smtp_password:
                 QMessageBox.warning(self, "설정 오류",
-                    "이메일 설정이 완료되지 않았습니다.\n설정 > 이메일 탭에서 SMTP 설정을 완료해주세요.")
+                    "이메일 계정 설정이 완료되지 않았습니다.\n설정 > 이메일 탭에서 발신 이메일과 비밀번호를 설정해주세요.")
                 return
 
         except Exception as e:

@@ -58,10 +58,27 @@ class Message:
                     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     sent_by INT,
                     client_name VARCHAR(255),
+                    status VARCHAR(50) DEFAULT '정상',
+                    received VARCHAR(10) DEFAULT '아니오',
+                    received_at TIMESTAMP NULL,
                     INDEX idx_schedule (schedule_id),
                     INDEX idx_sent_at (sent_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+
+            # 기존 테이블에 새 컬럼 추가 (없는 경우)
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN status VARCHAR(50) DEFAULT '정상'")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN received VARCHAR(10) DEFAULT '아니오'")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN received_at TIMESTAMP NULL")
+            except:
+                pass
 
             conn.commit()
             conn.close()
@@ -128,11 +145,8 @@ class Message:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT DISTINCT
-                    CASE
-                        WHEN m.sender_id = %s THEN m.receiver_id
-                        ELSE m.sender_id
-                    END as partner_id,
+                SELECT
+                    u.id as partner_id,
                     u.name as partner_name,
                     u.department as partner_department,
                     MAX(m.created_at) as last_message_time,
@@ -145,8 +159,9 @@ class Message:
                     WHEN m.sender_id = %s THEN m.receiver_id
                     ELSE m.sender_id
                 END
-                WHERE m.sender_id = %s OR m.receiver_id = %s
-                GROUP BY partner_id
+                WHERE (m.sender_id = %s OR m.receiver_id = %s)
+                  AND u.id != %s
+                GROUP BY u.id, u.name, u.department
                 ORDER BY last_message_time DESC
             """, (user_id, user_id, user_id, user_id, user_id, user_id))
 
@@ -285,20 +300,30 @@ class EmailLog:
             return None
 
     @staticmethod
-    def get_all(limit=100):
-        """전체 이메일 로그 조회"""
+    def get_all(limit=100, sent_by=None):
+        """전체 이메일 로그 조회 (sent_by로 필터링 가능)"""
         try:
             Message._ensure_tables()
             conn = get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("""
-                SELECT el.*, u.name as sent_by_name
-                FROM email_logs el
-                LEFT JOIN users u ON el.sent_by = u.id
-                ORDER BY el.sent_at DESC
-                LIMIT %s
-            """, (limit,))
+            if sent_by:
+                cursor.execute("""
+                    SELECT el.*, u.name as sent_by_name
+                    FROM email_logs el
+                    LEFT JOIN users u ON el.sent_by = u.id
+                    WHERE el.sent_by = %s
+                    ORDER BY el.sent_at DESC
+                    LIMIT %s
+                """, (sent_by, limit))
+            else:
+                cursor.execute("""
+                    SELECT el.*, u.name as sent_by_name
+                    FROM email_logs el
+                    LEFT JOIN users u ON el.sent_by = u.id
+                    ORDER BY el.sent_at DESC
+                    LIMIT %s
+                """, (limit,))
 
             logs = cursor.fetchall()
             conn.close()
@@ -352,8 +377,8 @@ class EmailLog:
             return None
 
     @staticmethod
-    def search(keyword=None, start_date=None, end_date=None, limit=100):
-        """이메일 로그 검색"""
+    def search(keyword=None, start_date=None, end_date=None, limit=100, sent_by=None):
+        """이메일 로그 검색 (sent_by로 필터링 가능)"""
         try:
             Message._ensure_tables()
             conn = get_connection()
@@ -366,6 +391,10 @@ class EmailLog:
                 WHERE 1=1
             """
             params = []
+
+            if sent_by:
+                query += " AND el.sent_by = %s"
+                params.append(sent_by)
 
             if keyword:
                 query += " AND (el.client_name LIKE %s OR el.to_emails LIKE %s OR el.subject LIKE %s)"
@@ -389,3 +418,64 @@ class EmailLog:
         except Exception as e:
             print(f"이메일 로그 검색 오류: {e}")
             return []
+
+    @staticmethod
+    def delete(log_id, user_id=None):
+        """이메일 로그 삭제 (본인 기록만 삭제 가능)"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            if user_id:
+                # 본인 기록만 삭제 가능
+                cursor.execute("""
+                    DELETE FROM email_logs WHERE id = %s AND sent_by = %s
+                """, (log_id, user_id))
+            else:
+                cursor.execute("""
+                    DELETE FROM email_logs WHERE id = %s
+                """, (log_id,))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            print(f"이메일 로그 삭제 오류: {e}")
+            return False
+
+    @staticmethod
+    def update_status(log_id, status=None, received=None, received_at=None):
+        """이메일 로그 상태 업데이트"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            updates = []
+            params = []
+
+            if status is not None:
+                updates.append("status = %s")
+                params.append(status)
+
+            if received is not None:
+                updates.append("received = %s")
+                params.append(received)
+
+            if received_at is not None:
+                updates.append("received_at = %s")
+                params.append(received_at)
+
+            if not updates:
+                return False
+
+            params.append(log_id)
+            query = f"UPDATE email_logs SET {', '.join(updates)} WHERE id = %s"
+
+            cursor.execute(query, params)
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"이메일 로그 상태 업데이트 오류: {e}")
+            return False
