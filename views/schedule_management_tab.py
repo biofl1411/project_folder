@@ -3880,12 +3880,19 @@ class ScheduleManagementTab(QWidget):
                 # 연장 견적 UI 표시 및 업데이트
                 self._update_extend_estimate_ui(extend_rounds)
             else:
-                # 연장 회차가 0이면 연장 견적 UI 숨김
+                # 연장 회차가 0이면 연장 견적 UI 숨김 및 테이블 복원
                 if hasattr(self, 'row_extend_widget'):
                     self.row_extend_widget.hide()
 
+                # 연장 회차 열 제거 (테이블 복원)
+                self._remove_extension_rounds_from_table()
+
         except ValueError:
             pass
+        except Exception as e:
+            print(f"연장 회차 변경 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _update_extend_estimate_ui(self, extend_rounds):
         """연장 견적 UI 업데이트"""
@@ -3896,6 +3903,15 @@ class ScheduleManagementTab(QWidget):
         if not hasattr(self, 'row_extend_widget'):
             return
 
+        try:
+            self._update_extend_estimate_ui_impl(extend_rounds)
+        except Exception as e:
+            print(f"연장 견적 UI 업데이트 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _update_extend_estimate_ui_impl(self, extend_rounds):
+        """연장 견적 UI 업데이트 (실제 구현)"""
         schedule = self.current_schedule
         test_method = schedule.get('test_method', '') or ''
 
@@ -3976,15 +3992,90 @@ class ScheduleManagementTab(QWidget):
                 extend_cost_no_vat, extend_vat, extend_with_vat
             )
 
+    def _remove_extension_rounds_from_table(self):
+        """연장 회차 열을 테이블에서 제거하고 원래 상태로 복원"""
+        if not hasattr(self, 'experiment_table') or not self.current_schedule:
+            return
+
+        try:
+            table = self.experiment_table
+            sampling_count = self.current_schedule.get('sampling_count', 6) or 6
+            base_col_count = sampling_count + 2  # 구분(1) + 기본회차(sampling_count) + 가격(1)
+            current_col_count = table.columnCount()
+            row_count = table.rowCount()
+
+            # 연장 회차 열이 있는 경우에만 제거
+            if current_col_count > base_col_count:
+                # 가격 열 데이터 저장
+                old_price_col = current_col_count - 1
+                price_col_data = []
+                for row in range(row_count):
+                    item = table.takeItem(row, old_price_col)
+                    price_col_data.append(item)
+
+                # interim_report_combos에서 연장 회차 콤보박스 제거
+                if hasattr(self, 'interim_report_combos'):
+                    for col_idx in list(self.interim_report_combos.keys()):
+                        if col_idx > sampling_count:
+                            del self.interim_report_combos[col_idx]
+
+                # sample_dates에서 연장 회차 날짜 제거
+                if hasattr(self, 'sample_dates'):
+                    for col_idx in list(self.sample_dates.keys()):
+                        if col_idx > sampling_count:
+                            del self.sample_dates[col_idx]
+
+                # 테이블 열 수 축소
+                table.setColumnCount(base_col_count)
+
+                # 헤더 업데이트
+                headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count)] + ['가격']
+                table.setHorizontalHeaderLabels(headers)
+
+                # 가격 열 복원
+                for row in range(row_count):
+                    if price_col_data[row]:
+                        table.setItem(row, base_col_count - 1, price_col_data[row])
+
+                # 열 너비 재설정
+                header = table.horizontalHeader()
+                header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+                for col in range(1, base_col_count):
+                    header.setSectionResizeMode(col, QHeaderView.Stretch)
+
+            # 연장 스케줄 데이터 초기화
+            self.current_schedule['extension_schedules'] = []
+            self.current_schedule['_prev_extend_rounds'] = 0
+
+        except Exception as e:
+            print(f"연장 회차 제거 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _add_extension_rounds_to_table(self, extend_rounds):
         """연장 회차를 스케줄 테이블에 추가"""
         if not hasattr(self, 'experiment_table') or not self.current_schedule:
             return
 
+        try:
+            self._add_extension_rounds_to_table_impl(extend_rounds)
+        except Exception as e:
+            print(f"연장 회차 테이블 추가 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _add_extension_rounds_to_table_impl(self, extend_rounds):
+        """연장 회차를 스케줄 테이블에 추가 (실제 구현)"""
         from datetime import datetime, timedelta
         from PyQt5.QtWidgets import QTableWidgetItem, QComboBox
         from PyQt5.QtGui import QColor
         from PyQt5.QtCore import Qt
+
+        # sample_dates와 interim_report_combos 초기화 확인
+        if not hasattr(self, 'sample_dates'):
+            self.sample_dates = {}
+        if not hasattr(self, 'interim_report_combos'):
+            self.interim_report_combos = {}
 
         # 기존 샘플링 횟수와 간격 가져오기
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
@@ -3992,7 +4083,7 @@ class ScheduleManagementTab(QWidget):
 
         # 마지막 실험일 가져오기
         last_date_str = self.current_schedule.get('last_experiment_date', '')
-        if not last_date_str:
+        if not last_date_str and hasattr(self, 'last_experiment_date_value'):
             last_date_str = self.last_experiment_date_value.text()
 
         if not last_date_str or last_date_str == '-':
@@ -4038,13 +4129,51 @@ class ScheduleManagementTab(QWidget):
         current_col_count = table.columnCount()
         row_count = table.rowCount()
 
-        # 기존 열 수: 구분(1) + 기존회차(sampling_count) + 가격(1) = sampling_count + 2
+        # 기본 열 수: 구분(1) + 기존회차(sampling_count) + 가격(1) = sampling_count + 2
+        base_col_count = sampling_count + 2
+
+        # 기존 연장 회차가 있는지 확인 (이전에 추가된 연장 회차 열 제거 필요)
+        old_extend_rounds = self.current_schedule.get('_prev_extend_rounds', 0) or 0
+
+        # 현재 테이블 열 수와 기본 열 수 비교하여 연장 회차 열 존재 여부 확인
+        if current_col_count > base_col_count:
+            # 기존 연장 회차 열이 있으면 먼저 가격 열 데이터 저장
+            old_price_col = current_col_count - 1
+            price_col_data = []
+            for row in range(row_count):
+                item = table.takeItem(row, old_price_col)
+                price_col_data.append(item)
+
+            # 기존 연장 회차 열의 콤보박스 제거 (interim_report_combos에서)
+            for col_idx in list(self.interim_report_combos.keys()):
+                if col_idx > sampling_count:
+                    del self.interim_report_combos[col_idx]
+
+            # 기존 연장 회차의 sample_dates 제거
+            for col_idx in list(self.sample_dates.keys()):
+                if col_idx > sampling_count:
+                    del self.sample_dates[col_idx]
+
+            # 테이블을 기본 열 수로 축소
+            table.setColumnCount(base_col_count)
+
+            # 가격 열 복원
+            for row in range(row_count):
+                if price_col_data[row]:
+                    table.setItem(row, base_col_count - 1, price_col_data[row])
+
+        # 이제 기본 테이블 상태에서 시작
+        current_col_count = table.columnCount()  # 다시 열 수 확인
+
         # 가격 열 위치: 마지막 열
         price_col = current_col_count - 1
 
-        # 새 열 수: 기존 + 연장 회차
+        # 새 열 수: 기본 + 연장 회차
         new_col_count = sampling_count + 2 + extend_rounds
         table.setColumnCount(new_col_count)
+
+        # 이전 연장 회차 수 저장 (다음 호출 시 참조)
+        self.current_schedule['_prev_extend_rounds'] = extend_rounds
 
         # 헤더 업데이트
         headers = ['구 분'] + [f'{i+1}회' for i in range(sampling_count + extend_rounds)] + ['가격']
@@ -4802,6 +4931,10 @@ class ScheduleManagementTab(QWidget):
         if not self.current_schedule:
             return
 
+        # 필수 속성 체크
+        if not hasattr(self, 'experiment_table'):
+            return
+
         table = self.experiment_table
         sampling_count = self.current_schedule.get('sampling_count', 6) or 6
         extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
@@ -4819,7 +4952,8 @@ class ScheduleManagementTab(QWidget):
 
         # 식품유형에서 검사항목 가져오기 + 추가된 항목
         base_items = self.get_test_items_from_food_type(self.current_schedule)
-        test_items = base_items + self.additional_test_items
+        additional_items = self.additional_test_items if hasattr(self, 'additional_test_items') else []
+        test_items = base_items + additional_items
 
         # 검사항목 행 시작 (행 3부터: 0=중간보고서, 1=날짜, 2=제조후일수, 3~=검사항목)
         test_item_start_row = 3
