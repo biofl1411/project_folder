@@ -1966,23 +1966,39 @@ class EstimateTab(QWidget):
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
+
+            # 공용 설정 로드
             cursor.execute("SELECT `key`, value FROM settings")
             settings = cursor.fetchall()
-            conn.close()
-
             settings_dict = {s['key']: s['value'] for s in settings}
 
-            smtp_server = settings_dict.get('smtp_server', '')
-            smtp_port = int(settings_dict.get('smtp_port', '587'))
-            smtp_security = settings_dict.get('smtp_security', 'TLS')
-            smtp_email = settings_dict.get('smtp_email', '')
-            smtp_password = settings_dict.get('smtp_password', '')
-            sender_name = settings_dict.get('smtp_sender_name', '(주)바이오푸드랩')
+            # SMTP 서버 설정 (고정값)
+            smtp_server = 'spam.biofl.co.kr'
+            smtp_port = 25
+            smtp_security = 'TLS'
             output_path = settings_dict.get('output_path', '')
 
-            if not smtp_server or not smtp_email or not smtp_password:
+            # 사용자별 이메일 계정 설정 로드
+            smtp_email = ''
+            smtp_password = ''
+            sender_name = '(주)바이오푸드랩'
+
+            if self.current_user:
+                cursor.execute("""
+                    SELECT `key`, value FROM user_settings WHERE user_id = %s
+                """, (self.current_user['id'],))
+                user_settings = cursor.fetchall()
+                user_settings_dict = {s['key']: s['value'] for s in user_settings}
+
+                smtp_email = user_settings_dict.get('smtp_email', '') or ''
+                smtp_password = user_settings_dict.get('smtp_password', '') or ''
+                sender_name = user_settings_dict.get('smtp_sender_name', '') or '(주)바이오푸드랩'
+
+            conn.close()
+
+            if not smtp_email or not smtp_password:
                 QMessageBox.warning(self, "설정 오류",
-                    "이메일 설정이 완료되지 않았습니다.\n설정 > 이메일 탭에서 SMTP 설정을 완료해주세요.")
+                    "이메일 계정 설정이 완료되지 않았습니다.\n설정 > 이메일 탭에서 발신 이메일과 비밀번호를 설정해주세요.")
                 return
 
         except Exception as e:

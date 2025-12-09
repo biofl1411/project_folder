@@ -203,7 +203,7 @@ def init_database():
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
 
-    # 설정 테이블
+    # 설정 테이블 (공용 설정)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -211,6 +211,19 @@ def init_database():
         value TEXT NOT NULL,
         description TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ''')
+
+    # 사용자별 설정 테이블 (계정별 설정)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        `key` VARCHAR(100) NOT NULL,
+        value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_key (user_id, `key`),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
 
