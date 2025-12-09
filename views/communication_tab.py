@@ -228,8 +228,8 @@ class CommunicationTab(QWidget):
         layout.addWidget(search_frame)
 
         # 이메일 로그 테이블
-        self.email_log_table = QTableWidget(0, 6)
-        self.email_log_table.setHorizontalHeaderLabels(["발송일시", "업체명", "견적유형", "수신자", "제목", "발송자"])
+        self.email_log_table = QTableWidget(0, 9)
+        self.email_log_table.setHorizontalHeaderLabels(["발송일시", "업체명", "견적유형", "수신자", "제목", "발송자", "상태", "수신여부", "수신일시"])
         self.email_log_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.email_log_table.setColumnWidth(0, 140)
         self.email_log_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -238,6 +238,12 @@ class CommunicationTab(QWidget):
         self.email_log_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.email_log_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.email_log_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.email_log_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.email_log_table.setColumnWidth(6, 60)
+        self.email_log_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
+        self.email_log_table.setColumnWidth(7, 70)
+        self.email_log_table.horizontalHeader().setSectionResizeMode(8, QHeaderView.Fixed)
+        self.email_log_table.setColumnWidth(8, 140)
         self.email_log_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.email_log_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.email_log_table.doubleClicked.connect(self.view_email_log_detail)
@@ -500,6 +506,27 @@ class CommunicationTab(QWidget):
             sent_by_name = log.get('sent_by_name', '') or ''
             self.email_log_table.setItem(row, 5, QTableWidgetItem(sent_by_name))
 
+            # 상태 (정상/반송)
+            status = log.get('status', '정상') or '정상'
+            status_item = QTableWidgetItem(status)
+            if status == '반송':
+                status_item.setForeground(Qt.red)
+            self.email_log_table.setItem(row, 6, status_item)
+
+            # 수신여부 (예/아니오)
+            received = log.get('received', '아니오') or '아니오'
+            received_item = QTableWidgetItem(received)
+            if received == '예':
+                received_item.setForeground(Qt.darkGreen)
+            self.email_log_table.setItem(row, 7, received_item)
+
+            # 수신일시
+            received_at = log.get('received_at', '')
+            if received_at and not isinstance(received_at, str):
+                received_at = str(received_at)
+            received_at_str = received_at[:16] if received_at else ''
+            self.email_log_table.setItem(row, 8, QTableWidgetItem(received_at_str))
+
     def view_email_log_detail(self, index):
         """이메일 로그 상세 보기"""
         row = index.row()
@@ -609,8 +636,9 @@ class ViewEmailLogDialog(QDialog):
     def __init__(self, parent, log):
         super().__init__(parent)
         self.setWindowTitle("이메일 발송 기록 상세")
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(600, 550)
         self.log = log
+        self.parent_widget = parent
         self.initUI()
 
     def initUI(self):
@@ -663,6 +691,48 @@ class ViewEmailLogDialog(QDialog):
 
         layout.addWidget(info_frame)
 
+        # 상태 정보 영역 (편집 가능)
+        status_frame = QFrame()
+        status_frame.setFrameShape(QFrame.StyledPanel)
+        status_frame.setStyleSheet("background-color: #e8f4e8; padding: 10px;")
+        status_layout = QFormLayout(status_frame)
+
+        # 상태 (정상/반송)
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["정상", "반송"])
+        current_status = self.log.get('status', '정상') or '정상'
+        self.status_combo.setCurrentText(current_status)
+        status_layout.addRow("상태:", self.status_combo)
+
+        # 수신여부 (예/아니오)
+        self.received_combo = QComboBox()
+        self.received_combo.addItems(["아니오", "예"])
+        current_received = self.log.get('received', '아니오') or '아니오'
+        self.received_combo.setCurrentText(current_received)
+        self.received_combo.currentTextChanged.connect(self.on_received_changed)
+        status_layout.addRow("수신여부:", self.received_combo)
+
+        # 수신일시
+        received_at_layout = QHBoxLayout()
+        self.received_at_label = QLabel()
+        received_at = self.log.get('received_at', '')
+        if received_at and not isinstance(received_at, str):
+            received_at = str(received_at)
+        self.received_at_label.setText(received_at[:19] if received_at else '-')
+        received_at_layout.addWidget(self.received_at_label)
+
+        self.set_now_btn = QPushButton("현재시간")
+        self.set_now_btn.setFixedWidth(80)
+        self.set_now_btn.clicked.connect(self.set_received_now)
+        received_at_layout.addWidget(self.set_now_btn)
+        received_at_layout.addStretch()
+
+        received_at_widget = QWidget()
+        received_at_widget.setLayout(received_at_layout)
+        status_layout.addRow("수신일시:", received_at_widget)
+
+        layout.addWidget(status_frame)
+
         # 본문
         layout.addWidget(QLabel("본문:"))
         body_area = QTextEdit()
@@ -670,7 +740,54 @@ class ViewEmailLogDialog(QDialog):
         body_area.setPlainText(self.log.get('body', '') or '')
         layout.addWidget(body_area)
 
-        # 닫기 버튼
+        # 버튼 영역
+        btn_layout = QHBoxLayout()
+
+        save_btn = QPushButton("저장")
+        save_btn.clicked.connect(self.save_status)
+        btn_layout.addWidget(save_btn)
+
         close_btn = QPushButton("닫기")
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+
+    def on_received_changed(self, text):
+        """수신여부 변경시 수신일시 자동 설정"""
+        if text == "예" and self.received_at_label.text() == '-':
+            self.set_received_now()
+
+    def set_received_now(self):
+        """수신일시를 현재 시간으로 설정"""
+        from datetime import datetime
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.received_at_label.setText(now)
+
+    def save_status(self):
+        """상태 저장"""
+        try:
+            from models.communications import EmailLog
+
+            status = self.status_combo.currentText()
+            received = self.received_combo.currentText()
+            received_at_text = self.received_at_label.text()
+            received_at = received_at_text if received_at_text != '-' else None
+
+            success = EmailLog.update_status(
+                self.log['id'],
+                status=status,
+                received=received,
+                received_at=received_at
+            )
+
+            if success:
+                QMessageBox.information(self, "성공", "상태가 저장되었습니다.")
+                # 부모 테이블 새로고침
+                if hasattr(self.parent_widget, 'load_email_logs'):
+                    self.parent_widget.load_email_logs()
+            else:
+                QMessageBox.warning(self, "오류", "상태 저장에 실패했습니다.")
+
+        except Exception as e:
+            QMessageBox.warning(self, "오류", f"저장 오류: {str(e)}")

@@ -58,10 +58,27 @@ class Message:
                     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     sent_by INT,
                     client_name VARCHAR(255),
+                    status VARCHAR(50) DEFAULT '정상',
+                    received VARCHAR(10) DEFAULT '아니오',
+                    received_at TIMESTAMP NULL,
                     INDEX idx_schedule (schedule_id),
                     INDEX idx_sent_at (sent_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+
+            # 기존 테이블에 새 컬럼 추가 (없는 경우)
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN status VARCHAR(50) DEFAULT '정상'")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN received VARCHAR(10) DEFAULT '아니오'")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE email_logs ADD COLUMN received_at TIMESTAMP NULL")
+            except:
+                pass
 
             conn.commit()
             conn.close()
@@ -389,3 +406,39 @@ class EmailLog:
         except Exception as e:
             print(f"이메일 로그 검색 오류: {e}")
             return []
+
+    @staticmethod
+    def update_status(log_id, status=None, received=None, received_at=None):
+        """이메일 로그 상태 업데이트"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            updates = []
+            params = []
+
+            if status is not None:
+                updates.append("status = %s")
+                params.append(status)
+
+            if received is not None:
+                updates.append("received = %s")
+                params.append(received)
+
+            if received_at is not None:
+                updates.append("received_at = %s")
+                params.append(received_at)
+
+            if not updates:
+                return False
+
+            params.append(log_id)
+            query = f"UPDATE email_logs SET {', '.join(updates)} WHERE id = %s"
+
+            cursor.execute(query, params)
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"이메일 로그 상태 업데이트 오류: {e}")
+            return False

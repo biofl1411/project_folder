@@ -264,21 +264,20 @@ class EstimateTab(QWidget):
         right_info_widget = QWidget()
         right_info_widget.setFixedSize(320, 140)
 
-        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정) - 먼저 생성하여 글 뒤로
-        self.stamp_label = QLabel("")
-        self.stamp_label.setFixedSize(60, 60)
-        self.stamp_label.setStyleSheet("border: none; background: transparent;")
-        self.stamp_label.setParent(right_info_widget)
-        self.stamp_label.move(140, 5)  # 대표자 이름 옆에 위치
-        self.stamp_label.lower()  # 글 뒤로 이동
-
-        # 회사 정보 라벨 (글씨 2포인트 크게: 11px → 13px, 왼쪽 여백 추가)
+        # 회사 정보 라벨 (글씨 2포인트 크게: 11px → 13px, 왼쪽 여백 추가) - 먼저 생성
         self.right_company_info = QLabel("")
         self.right_company_info.setStyleSheet("font-size: 13px; padding-left: 40px;")
         self.right_company_info.setFixedSize(320, 140)
         self.right_company_info.setParent(right_info_widget)
         self.right_company_info.move(0, 0)
         self.right_company_info.setAttribute(Qt.WA_TranslucentBackground)  # 배경 투명
+
+        # 직인 이미지 (대표자 이름에 겹치도록 위치 지정) - 나중에 생성하여 글자 앞으로
+        self.stamp_label = QLabel("")
+        self.stamp_label.setFixedSize(60, 60)
+        self.stamp_label.setStyleSheet("border: none; background: transparent;")
+        self.stamp_label.setParent(right_info_widget)
+        self.stamp_label.move(140, 5)  # 대표자 이름 옆에 위치
 
         # 그리드 레이아웃에 배치
         info_layout.addWidget(estimate_no_title, 0, 0)
