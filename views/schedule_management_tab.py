@@ -2471,16 +2471,22 @@ class ScheduleManagementTab(QWidget):
         else:
             zone_count = 3
 
-        # 기본 보고서 비용: 실측=200,000원, 가속=300,000원
-        if test_method in ['real', 'custom_real']:
+        # 중간보고서 여부 확인 (보고서 비용 결정에 필요)
+        report_interim = schedule.get('report_interim', False)
+
+        # 기본 보고서 비용 설정:
+        # - 가속 또는 의뢰자요청(가속): 300,000원
+        # - 실측 또는 의뢰자요청(실측): 200,000원
+        # - 중간보고서가 있는 경우: 200,000원
+        if report_interim:
+            # 중간보고서가 있으면 보고서 비용 200,000원
             default_report_cost = 200000
         elif test_method in ['acceleration', 'custom_acceleration']:
             default_report_cost = 300000
+        elif test_method in ['real', 'custom_real']:
+            default_report_cost = 200000
         else:
             default_report_cost = 200000
-
-        # 중간보고서 여부 확인
-        report_interim = schedule.get('report_interim', False)
         default_interim_cost = 200000 if report_interim else 0
 
         # 중간 보고서 필드 표시/숨김
@@ -3646,11 +3652,21 @@ class ScheduleManagementTab(QWidget):
         else:
             zone_count = 3
 
-        # 기본 보고서 비용
-        if test_method in ['real', 'custom_real']:
+        # 중간보고서 여부 확인
+        report_interim = schedule.get('report_interim', False)
+
+        # 기본 보고서 비용 설정:
+        # - 가속 또는 의뢰자요청(가속): 300,000원
+        # - 실측 또는 의뢰자요청(실측): 200,000원
+        # - 중간보고서가 있는 경우: 200,000원
+        if report_interim:
+            default_report_cost = 200000
+        elif test_method in ['acceleration', 'custom_acceleration']:
+            default_report_cost = 300000
+        elif test_method in ['real', 'custom_real']:
             default_report_cost = 200000
         else:
-            default_report_cost = 300000
+            default_report_cost = 200000
 
         # 검사항목 및 수수료
         food_type_id = schedule.get('food_type_id')
