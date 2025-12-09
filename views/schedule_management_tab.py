@@ -2529,7 +2529,7 @@ class ScheduleManagementTab(QWidget):
         # 1차 부가세 포함 (통일된 형식)
         first_vat = int(first_cost_no_vat * 0.1)
         first_with_vat = first_cost_no_vat + first_vat
-        self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
+        self.first_cost_vat.setText(f"{first_with_vat:,}원")
 
         # ========== 중단 견적 계산 ==========
         schedule_status = schedule.get('status', '')
@@ -2548,7 +2548,7 @@ class ScheduleManagementTab(QWidget):
             self.suspend_cost_formula.setText(suspend_formula)
             suspend_vat = int(suspend_cost_no_vat * 0.1)
             suspend_with_vat = suspend_cost_no_vat + suspend_vat
-            self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
+            self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
         else:
             self.row_suspend_widget.hide()
 
@@ -2572,7 +2572,7 @@ class ScheduleManagementTab(QWidget):
             self.extend_cost_formula.setText(extend_formula)
             extend_vat = int(extend_cost_no_vat * 0.1)
             extend_with_vat = extend_cost_no_vat + extend_vat
-            self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
+            self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
         else:
             self.row_extend_widget.hide()
 
@@ -4471,7 +4471,7 @@ class ScheduleManagementTab(QWidget):
         first_vat = int(first_cost_no_vat * 0.1)
         first_with_vat = first_cost_no_vat + first_vat
         if hasattr(self, 'first_cost_vat'):
-            self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
+            self.first_cost_vat.setText(f"{first_with_vat:,}원")
 
         # ========== 중단 견적 계산 (상태가 중단일 때만) ==========
         schedule_status = self.current_schedule.get('status', '')
@@ -4513,7 +4513,7 @@ class ScheduleManagementTab(QWidget):
             suspend_vat = int(suspend_cost_no_vat * 0.1)
             suspend_with_vat = suspend_cost_no_vat + suspend_vat
             if hasattr(self, 'suspend_cost_vat'):
-                self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
+                self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
         else:
             self.row_suspend_widget.hide()
 
@@ -4561,7 +4561,7 @@ class ScheduleManagementTab(QWidget):
             extend_vat = int(extend_cost_no_vat * 0.1)
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
-                self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
+                self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
         else:
             self.row_extend_widget.hide()
 
@@ -4651,7 +4651,7 @@ class ScheduleManagementTab(QWidget):
         first_vat = int(first_cost_no_vat * 0.1)
         first_with_vat = first_cost_no_vat + first_vat
         if hasattr(self, 'first_cost_vat'):
-            self.first_cost_vat.setText(f"{first_cost_no_vat:,}+{first_vat:,}")
+            self.first_cost_vat.setText(f"{first_with_vat:,}원")
 
         # 금액을 DB에 저장 (1차 견적 기준)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
@@ -4687,7 +4687,7 @@ class ScheduleManagementTab(QWidget):
             suspend_vat = int(suspend_cost_no_vat * 0.1)
             suspend_with_vat = suspend_cost_no_vat + suspend_vat
             if hasattr(self, 'suspend_cost_vat'):
-                self.suspend_cost_vat.setText(f"{suspend_cost_no_vat:,}+{suspend_vat:,}")
+                self.suspend_cost_vat.setText(f"{suspend_with_vat:,}원")
 
         # ========== 연장 견적 계산 (연장 회차 있을 때만) ==========
         extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
@@ -4720,7 +4720,7 @@ class ScheduleManagementTab(QWidget):
             extend_vat = int(extend_cost_no_vat * 0.1)
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
-                self.extend_cost_vat.setText(f"{extend_cost_no_vat:,}+{extend_vat:,}")
+                self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
 
     def save_as_jpg(self):
         """스케줄 관리 화면을 JPG로 저장"""
