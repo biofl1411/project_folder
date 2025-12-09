@@ -509,15 +509,15 @@ class ScheduleTab(QWidget):
             all_schedules = [dict(s) for s in raw_schedules]
 
             # 사용자 권한에 따라 스케줄 필터링
-            # 고객지원팀, 마케팅팀은 전체 스케줄 볼 수 있음
-            # 그 외는 본인(sales_rep)의 스케줄만 표시
+            # 열람권한(can_view_all)이 있으면 전체 스케줄 볼 수 있음
+            # 없으면 본인(sales_rep)의 스케줄만 표시
             if self.current_user:
-                department = self.current_user.get('department', '')
                 user_name = self.current_user.get('name', '')
                 role = self.current_user.get('role', '')
+                can_view_all = self.current_user.get('can_view_all', 0)
 
-                # 관리자, 고객지원팀, 마케팅팀은 전체 조회 가능
-                if role == 'admin' or department in ['고객지원팀', '마케팅팀']:
+                # 관리자 또는 열람권한이 있는 사용자는 전체 조회 가능
+                if role == 'admin' or can_view_all:
                     self.all_schedules = all_schedules
                 else:
                     # 본인 담당 업체의 스케줄만 필터링 (sales_rep과 사용자 이름 일치)

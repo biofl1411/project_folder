@@ -429,26 +429,20 @@ class ClientTab(QWidget):
             self.load_clients()
 
     def get_sales_rep_filter(self):
-        """권한에 따라 영업담당 필터 반환"""
+        """권한에 따라 영업담당 필터 반환 (열람권한 기반)"""
         if not self.current_user:
             return None
-
-        from models.users import User
 
         # 관리자는 모든 업체 보기
         if self.current_user.get('role') == 'admin':
             return None
 
-        # 모든 업체보기 권한이 있으면 필터 없음
-        if User.has_permission(self.current_user, 'client_view_all'):
+        # 열람권한(can_view_all)이 있으면 모든 업체 보기
+        if self.current_user.get('can_view_all', 0):
             return None
 
-        # 해당 업체만 보기 권한이 있으면 로그인한 사용자 이름으로 필터
-        if User.has_permission(self.current_user, 'client_view_own'):
-            return self.current_user.get('name', '')
-
-        # 두 권한 모두 없으면 빈 결과 (아무것도 볼 수 없음)
-        return '__NO_ACCESS__'
+        # 열람권한이 없으면 본인 담당 업체만
+        return self.current_user.get('name', '')
 
     def load_clients(self):
         """업체 목록 로드 (페이지네이션 적용)"""

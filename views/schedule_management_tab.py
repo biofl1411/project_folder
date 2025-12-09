@@ -733,7 +733,26 @@ class ScheduleSelectDialog(QDialog):
         """스케줄 목록 로드"""
         try:
             raw_schedules = Schedule.get_all() or []
-            self.all_schedules = [dict(s) for s in raw_schedules]
+            all_schedules = [dict(s) for s in raw_schedules]
+
+            # 열람권한에 따라 스케줄 필터링
+            if self.current_user:
+                user_name = self.current_user.get('name', '')
+                role = self.current_user.get('role', '')
+                can_view_all = self.current_user.get('can_view_all', 0)
+
+                # 관리자 또는 열람권한이 있는 사용자는 전체 조회 가능
+                if role == 'admin' or can_view_all:
+                    self.all_schedules = all_schedules
+                else:
+                    # 본인 담당 업체의 스케줄만 필터링
+                    self.all_schedules = [
+                        s for s in all_schedules
+                        if (s.get('sales_rep', '') or '') == user_name
+                    ]
+            else:
+                self.all_schedules = all_schedules
+
             self.display_schedules(self.all_schedules)
         except Exception as e:
             print(f"스케줄 로드 오류: {e}")

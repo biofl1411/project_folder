@@ -1079,15 +1079,15 @@ class ScheduleCreateDialog(QDialog):
                 print("ClientSearchDialog 클래스를 찾을 수 없음 - 임시 모드 사용")
 
             if dialog_exists:
-                # 현재 사용자의 이름으로 업체 필터링 (영업담당과 일치하는 업체만 표시)
-                # 단, 관리자 또는 고객지원팀/마케팅팀은 전체 업체 조회 가능
+                # 현재 사용자의 열람권한에 따라 업체 필터링
+                # 관리자 또는 열람권한이 있으면 전체 업체 조회 가능
                 sales_rep_filter = None
                 if self.current_user:
                     role = self.current_user.get('role', '')
-                    department = self.current_user.get('department', '')
+                    can_view_all = self.current_user.get('can_view_all', 0)
 
-                    # 관리자 또는 고객지원팀/마케팅팀은 전체 업체 조회
-                    if role != 'admin' and department not in ['고객지원팀', '마케팅팀']:
+                    # 관리자 또는 열람권한이 있으면 전체 업체 조회
+                    if role != 'admin' and not can_view_all:
                         sales_rep_filter = self.current_user.get('name', '')
 
                 # 실제 다이얼로그 사용

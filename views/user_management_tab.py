@@ -27,6 +27,9 @@ class UserManagementTab(QWidget):
         self.selected_user_id = None
         self.permission_checkboxes = {}
         self.category_checkboxes = {}  # 카테고리 전체선택 체크박스
+        self.all_users = []  # 전체 사용자 목록 (검색/정렬용)
+        self.sort_column = 2  # 기본 정렬 컬럼 (이름)
+        self.sort_order = Qt.AscendingOrder  # 기본 정렬 순서
         self.initUI()
         self.load_users()
 
@@ -44,21 +47,35 @@ class UserManagementTab(QWidget):
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 사용자 목록 라벨
+        # 사용자 목록 라벨 + 검색
+        header_layout = QHBoxLayout()
         list_label = QLabel("사용자 목록")
         list_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        left_layout.addWidget(list_label)
+        header_layout.addWidget(list_label)
+        header_layout.addStretch()
+
+        # 검색 입력창
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("이름 검색...")
+        self.search_input.setFixedWidth(150)
+        self.search_input.textChanged.connect(self.filter_users)
+        header_layout.addWidget(self.search_input)
+
+        left_layout.addLayout(header_layout)
 
         # 사용자 테이블
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(7)
-        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '이메일', '마지막 로그인', '활성화'])
+        self.user_table.setColumnCount(8)
+        self.user_table.setHorizontalHeaderLabels(['ID', '아이디', '이름', '부서', '이메일', '마지막 로그인', '활성화', '열람권한'])
         self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.user_table.setSelectionMode(QTableWidget.SingleSelection)
         self.user_table.itemSelectionChanged.connect(self.on_user_selected)
         self.user_table.cellDoubleClicked.connect(self.on_cell_double_clicked)
         self.user_table.setColumnHidden(0, True)  # ID 컬럼 숨김
+        # 헤더 클릭 시 정렬
+        self.user_table.horizontalHeader().setSortIndicatorShown(True)
+        self.user_table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
         left_layout.addWidget(self.user_table)
 
         # 버튼 영역 1 (기본 기능)
@@ -308,11 +325,19 @@ class UserManagementTab(QWidget):
         self.user_table.setRowCount(0)
         users = User.get_all()
 
-        for user in users:
-            # admin 계정은 목록에서 제외 (수정/삭제 방지)
-            if user.get('username') == 'admin':
-                continue
+        # admin 계정 제외하고 저장
+        self.all_users = [u for u in users if u.get('username') != 'admin']
 
+        # 검색 필터 적용
+        search_text = self.search_input.text().strip().lower() if hasattr(self, 'search_input') else ''
+        filtered_users = self.all_users
+        if search_text:
+            filtered_users = [u for u in self.all_users if search_text in u.get('name', '').lower()]
+
+        # 정렬 적용
+        filtered_users = self._sort_users(filtered_users)
+
+        for user in filtered_users:
             row = self.user_table.rowCount()
             self.user_table.insertRow(row)
 
@@ -337,6 +362,17 @@ class UserManagementTab(QWidget):
                 active_item.setForeground(QColor('#f44336'))  # 빨간색
             active_item.setFont(QFont('Arial', 12, QFont.Bold))
             self.user_table.setItem(row, 6, active_item)
+
+            # 열람권한 상태 (O/X)
+            can_view_all = user.get('can_view_all', 0)
+            view_item = QTableWidgetItem('O' if can_view_all else 'X')
+            view_item.setTextAlignment(Qt.AlignCenter)
+            if can_view_all:
+                view_item.setForeground(QColor('#2196F3'))  # 파란색
+            else:
+                view_item.setForeground(QColor('#f44336'))  # 빨간색
+            view_item.setFont(QFont('Arial', 12, QFont.Bold))
+            self.user_table.setItem(row, 7, view_item)
 
     def on_user_selected(self):
         """사용자 선택 시"""
@@ -483,8 +519,8 @@ class UserManagementTab(QWidget):
                 QMessageBox.critical(self, "오류", "비밀번호 초기화에 실패했습니다.")
 
     def on_cell_double_clicked(self, row, column):
-        """셀 더블클릭 시 - 활성화 컬럼(6)만 처리"""
-        if column != 6:  # 활성화 컬럼이 아니면 무시
+        """셀 더블클릭 시 - 활성화 컬럼(6) 또는 열람권한 컬럼(7) 처리"""
+        if column not in [6, 7]:  # 활성화 또는 열람권한 컬럼이 아니면 무시
             return
 
         # 사용자 ID 가져오기
@@ -493,36 +529,69 @@ class UserManagementTab(QWidget):
             return
 
         user_id = int(user_id_item.text())
-        current_status = self.user_table.item(row, 6).text()
-        is_currently_active = current_status == 'O'
 
-        if is_currently_active:
-            # 비활성화
-            reply = QMessageBox.question(
-                self, "사용자 비활성화",
-                "선택한 사용자를 비활성화하시겠습니까?\n비활성화된 사용자는 로그인할 수 없습니다.",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                if User.toggle_active(user_id, activate=False):
-                    QMessageBox.information(self, "성공", "사용자가 비활성화되었습니다.")
-                    self.load_users()  # 즉시 새로고침
-                else:
-                    QMessageBox.critical(self, "오류", "비활성화에 실패했습니다.")
-        else:
-            # 활성화
-            reply = QMessageBox.question(
-                self, "사용자 활성화",
-                f"선택한 사용자를 활성화하시겠습니까?\n비밀번호가 초기값({DEFAULT_PASSWORD})으로 설정됩니다.",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                if User.toggle_active(user_id, activate=True):
-                    QMessageBox.information(self, "성공",
-                        f"사용자가 활성화되었습니다.\n초기 비밀번호: {DEFAULT_PASSWORD}")
-                    self.load_users()  # 즉시 새로고침
-                else:
-                    QMessageBox.critical(self, "오류", "활성화에 실패했습니다.")
+        if column == 6:  # 활성화 컬럼
+            current_status = self.user_table.item(row, 6).text()
+            is_currently_active = current_status == 'O'
+
+            if is_currently_active:
+                # 비활성화
+                reply = QMessageBox.question(
+                    self, "사용자 비활성화",
+                    "선택한 사용자를 비활성화하시겠습니까?\n비활성화된 사용자는 로그인할 수 없습니다.",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    if User.toggle_active(user_id, activate=False):
+                        QMessageBox.information(self, "성공", "사용자가 비활성화되었습니다.")
+                        self.load_users()  # 즉시 새로고침
+                    else:
+                        QMessageBox.critical(self, "오류", "비활성화에 실패했습니다.")
+            else:
+                # 활성화
+                reply = QMessageBox.question(
+                    self, "사용자 활성화",
+                    f"선택한 사용자를 활성화하시겠습니까?\n비밀번호가 초기값({DEFAULT_PASSWORD})으로 설정됩니다.",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    if User.toggle_active(user_id, activate=True):
+                        QMessageBox.information(self, "성공",
+                            f"사용자가 활성화되었습니다.\n초기 비밀번호: {DEFAULT_PASSWORD}")
+                        self.load_users()  # 즉시 새로고침
+                    else:
+                        QMessageBox.critical(self, "오류", "활성화에 실패했습니다.")
+
+        elif column == 7:  # 열람권한 컬럼
+            current_status = self.user_table.item(row, 7).text()
+            can_currently_view = current_status == 'O'
+
+            if can_currently_view:
+                # 열람권한 해제
+                reply = QMessageBox.question(
+                    self, "열람권한 해제",
+                    "선택한 사용자의 열람권한을 해제하시겠습니까?\n본인의 데이터만 볼 수 있게 됩니다.",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    if User.toggle_view_all(user_id, can_view=False):
+                        QMessageBox.information(self, "성공", "열람권한이 해제되었습니다.")
+                        self.load_users()
+                    else:
+                        QMessageBox.critical(self, "오류", "열람권한 해제에 실패했습니다.")
+            else:
+                # 열람권한 부여
+                reply = QMessageBox.question(
+                    self, "열람권한 부여",
+                    "선택한 사용자에게 열람권한을 부여하시겠습니까?\n모든 데이터를 볼 수 있게 됩니다.",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    if User.toggle_view_all(user_id, can_view=True):
+                        QMessageBox.information(self, "성공", "열람권한이 부여되었습니다.")
+                        self.load_users()
+                    else:
+                        QMessageBox.critical(self, "오류", "열람권한 부여에 실패했습니다.")
 
     def download_template(self):
         """엑셀 양식 다운로드"""
@@ -715,3 +784,96 @@ class UserManagementTab(QWidget):
             QMessageBox.critical(self, "오류", "openpyxl 라이브러리가 설치되지 않았습니다.\npip install openpyxl")
         except Exception as e:
             QMessageBox.critical(self, "오류", f"엑셀 불러오기 중 오류 발생: {str(e)}")
+
+    def filter_users(self, search_text):
+        """검색어로 사용자 필터링"""
+        self.user_table.setRowCount(0)
+
+        search_text = search_text.strip().lower()
+        filtered_users = self.all_users
+        if search_text:
+            filtered_users = [u for u in self.all_users if search_text in u.get('name', '').lower()]
+
+        # 정렬 적용
+        filtered_users = self._sort_users(filtered_users)
+
+        for user in filtered_users:
+            row = self.user_table.rowCount()
+            self.user_table.insertRow(row)
+
+            self.user_table.setItem(row, 0, QTableWidgetItem(str(user.get('id', ''))))
+            self.user_table.setItem(row, 1, QTableWidgetItem(user.get('username', '')))
+            self.user_table.setItem(row, 2, QTableWidgetItem(user.get('name', '')))
+            self.user_table.setItem(row, 3, QTableWidgetItem(user.get('department', '')))
+            self.user_table.setItem(row, 4, QTableWidgetItem(user.get('email', '') or ''))
+
+            last_login = user.get('last_login', '')
+            last_login_str = str(last_login) if last_login else ''
+            self.user_table.setItem(row, 5, QTableWidgetItem(last_login_str))
+
+            # 활성화 상태
+            is_active = user.get('is_active', 0)
+            active_item = QTableWidgetItem('O' if is_active else 'X')
+            active_item.setTextAlignment(Qt.AlignCenter)
+            if is_active:
+                active_item.setForeground(QColor('#4CAF50'))
+            else:
+                active_item.setForeground(QColor('#f44336'))
+            active_item.setFont(QFont('Arial', 12, QFont.Bold))
+            self.user_table.setItem(row, 6, active_item)
+
+            # 열람권한 상태
+            can_view_all = user.get('can_view_all', 0)
+            view_item = QTableWidgetItem('O' if can_view_all else 'X')
+            view_item.setTextAlignment(Qt.AlignCenter)
+            if can_view_all:
+                view_item.setForeground(QColor('#2196F3'))
+            else:
+                view_item.setForeground(QColor('#f44336'))
+            view_item.setFont(QFont('Arial', 12, QFont.Bold))
+            self.user_table.setItem(row, 7, view_item)
+
+    def on_header_clicked(self, column):
+        """헤더 클릭 시 정렬"""
+        if column == 0:  # ID 컬럼은 숨김이므로 무시
+            return
+
+        # 같은 컬럼 클릭 시 정렬 순서 토글
+        if self.sort_column == column:
+            self.sort_order = Qt.DescendingOrder if self.sort_order == Qt.AscendingOrder else Qt.AscendingOrder
+        else:
+            self.sort_column = column
+            self.sort_order = Qt.AscendingOrder
+
+        # 정렬 인디케이터 표시
+        self.user_table.horizontalHeader().setSortIndicator(column, self.sort_order)
+
+        # 테이블 다시 로드 (필터 유지)
+        self.filter_users(self.search_input.text())
+
+    def _sort_users(self, users):
+        """사용자 목록 정렬"""
+        # 컬럼별 정렬 키 매핑
+        sort_keys = {
+            1: 'username',
+            2: 'name',
+            3: 'department',
+            4: 'email',
+            5: 'last_login',
+            6: 'is_active',
+            7: 'can_view_all'
+        }
+
+        key = sort_keys.get(self.sort_column, 'name')
+        reverse = self.sort_order == Qt.DescendingOrder
+
+        def get_sort_value(user):
+            val = user.get(key, '')
+            if val is None:
+                return ''
+            # 숫자 타입 처리
+            if key in ['is_active', 'can_view_all']:
+                return int(val) if val else 0
+            return str(val).lower()
+
+        return sorted(users, key=get_sort_value, reverse=reverse)
