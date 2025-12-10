@@ -289,31 +289,28 @@ class UpdateDialog(QDialog):
                     with zipfile.ZipFile(self.downloaded_file, 'r') as zip_ref:
                         zip_ref.extractall(extract_dir)
 
-                    # 배치 스크립트로 폴더 전체 복사
-                    batch_script = os.path.join(tempfile.gettempdir(), "update.bat")
-                    with open(batch_script, 'w', encoding='utf-8') as f:
-                        f.write('@echo off\n')
-                        f.write('chcp 65001 > nul\n')
-                        f.write('echo 업데이트 중...\n')
-                        f.write('timeout /t 2 /nobreak > nul\n')  # 2초 대기
-                        f.write(f'xcopy /E /Y /Q "{extract_dir}\\*" "{app_dir}\\"\n')
-                        f.write(f'start "" "{current_exe}"\n')
-                        f.write(f'rmdir /S /Q "{extract_dir}"\n')
-                        f.write(f'del "%~f0"\n')  # 배치 파일 자체 삭제
+                    # PowerShell 스크립트로 폴더 전체 복사 (한글 경로 지원)
+                    ps_script = os.path.join(tempfile.gettempdir(), "update.ps1")
+                    with open(ps_script, 'w', encoding='utf-8-sig') as f:
+                        f.write('Start-Sleep -Seconds 2\n')
+                        f.write(f'Copy-Item -Path "{extract_dir}\\*" -Destination "{app_dir}" -Recurse -Force\n')
+                        f.write(f'Start-Process -FilePath "{current_exe}"\n')
+                        f.write(f'Remove-Item -Path "{extract_dir}" -Recurse -Force\n')
+                        f.write(f'Remove-Item -Path "{ps_script}" -Force\n')
                 else:
                     # 단일 EXE 파일인 경우
-                    batch_script = os.path.join(tempfile.gettempdir(), "update.bat")
-                    with open(batch_script, 'w', encoding='utf-8') as f:
-                        f.write('@echo off\n')
-                        f.write('echo 업데이트 중...\n')
-                        f.write('timeout /t 2 /nobreak > nul\n')  # 2초 대기
-                        f.write(f'copy /Y "{self.downloaded_file}" "{current_exe}"\n')
-                        f.write(f'start "" "{current_exe}"\n')
-                        f.write(f'del "%~f0"\n')  # 배치 파일 자체 삭제
+                    ps_script = os.path.join(tempfile.gettempdir(), "update.ps1")
+                    with open(ps_script, 'w', encoding='utf-8-sig') as f:
+                        f.write('Start-Sleep -Seconds 2\n')
+                        f.write(f'Copy-Item -Path "{self.downloaded_file}" -Destination "{current_exe}" -Force\n')
+                        f.write(f'Start-Process -FilePath "{current_exe}"\n')
+                        f.write(f'Remove-Item -Path "{ps_script}" -Force\n')
 
-                # 배치 스크립트 실행 후 종료
-                subprocess.Popen(['cmd', '/c', batch_script],
-                               creationflags=subprocess.CREATE_NO_WINDOW)
+                # PowerShell 스크립트 실행 후 종료
+                subprocess.Popen(
+                    ['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_script],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
 
                 QMessageBox.information(
                     self, "업데이트",

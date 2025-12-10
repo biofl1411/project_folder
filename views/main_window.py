@@ -156,6 +156,9 @@ class MainWindow(QMainWindow):
         # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
         self.schedule_tab.schedule_double_clicked.connect(self.show_schedule_detail)
 
+        # 스케줄 작성 탭에서 스케줄 삭제 시 스케줄 관리 탭에 알림
+        self.schedule_tab.schedule_deleted.connect(self.schedule_management_tab.on_schedule_deleted)
+
         # 스케줄 관리 탭에서 견적서 보기 버튼 연결
         self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
 
@@ -633,7 +636,7 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("준비 완료")
 
         # 중앙 개발자 정보
-        dev_info_label = QLabel("개발 및 문의 : hskim@biofl.co.kr (김희성 070-7410-1411)")
+        dev_info_label = QLabel("Copyright © 2025 KIM HEE SUNG. All rights reserved. 프로그램 문의(오류) 김희성 070-7410-1411")
         dev_info_label.setStyleSheet("color: #666; font-size: 11px;")
         dev_info_label.setAlignment(Qt.AlignCenter)
 

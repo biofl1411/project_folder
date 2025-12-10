@@ -2085,6 +2085,26 @@ class ScheduleManagementTab(QWidget):
         if dialog.exec_() and dialog.selected_schedule_id:
             self.select_schedule_by_id(dialog.selected_schedule_id)
 
+    def clear_schedule_selection(self):
+        """스케줄 선택 초기화 (삭제 또는 다른 탭에서 변경 시)"""
+        self.current_schedule = None
+        self.selected_schedule_label.setText("선택: -")
+        # 실험 테이블 초기화
+        if hasattr(self, 'experiment_table'):
+            self.experiment_table.setRowCount(0)
+            self.experiment_table.setColumnCount(0)
+        # 정보 패널 초기화
+        if hasattr(self, 'info_panel'):
+            for i in range(self.info_panel.count()):
+                widget = self.info_panel.itemAt(i).widget()
+                if widget and hasattr(widget, 'setText'):
+                    widget.setText('')
+
+    def on_schedule_deleted(self, deleted_schedule_id):
+        """다른 탭에서 스케줄이 삭제되었을 때 호출"""
+        if self.current_schedule and self.current_schedule.get('id') == deleted_schedule_id:
+            self.clear_schedule_selection()
+
     def select_schedule_by_id(self, schedule_id):
         """ID로 스케줄 선택"""
         schedule = Schedule.get_by_id(schedule_id)
@@ -3019,17 +3039,24 @@ class ScheduleManagementTab(QWidget):
             QMessageBox.warning(self, "알림", "먼저 스케줄을 선택해주세요.")
             return
 
-        # DB에서 최신 스케줄 데이터 가져오기
+        # DB에서 최신 스케줄 데이터 가져오기 (삭제된 스케줄 감지)
         schedule_id = self.current_schedule.get('id')
         if schedule_id:
             from models.schedules import Schedule
             fresh_schedule = Schedule.get_by_id(schedule_id)
             if fresh_schedule:
                 schedule_data = dict(fresh_schedule)
+                # current_schedule도 최신 데이터로 업데이트
+                self.current_schedule = fresh_schedule
             else:
-                schedule_data = dict(self.current_schedule)
+                # 스케줄이 삭제된 경우 - 선택 초기화 및 경고
+                QMessageBox.warning(self, "알림", "선택한 스케줄이 삭제되었습니다.\n다시 스케줄을 선택해주세요.")
+                self.clear_schedule_selection()
+                return
         else:
-            schedule_data = dict(self.current_schedule)
+            QMessageBox.warning(self, "알림", "유효하지 않은 스케줄입니다.\n다시 스케줄을 선택해주세요.")
+            self.clear_schedule_selection()
+            return
 
         # 식품유형 이름 및 검사항목 추가
         if schedule_data.get('food_type_id'):

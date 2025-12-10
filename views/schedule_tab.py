@@ -178,6 +178,8 @@ class ScheduleDisplaySettingsDialog(QDialog):
 class ScheduleTab(QWidget):
     # 더블클릭 시 스케줄 ID를 전달하는 시그널
     schedule_double_clicked = pyqtSignal(int)
+    # 스케줄 삭제 시그널 (삭제된 스케줄 ID 전달)
+    schedule_deleted = pyqtSignal(int)
 
     # 한글 초성 매핑
     CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
@@ -892,6 +894,8 @@ class ScheduleTab(QWidget):
                 if success:
                     QMessageBox.information(self, "삭제 완료", "스케줄이 삭제되었습니다.")
                     self.load_schedules()
+                    # 삭제된 스케줄 ID를 다른 탭에 알림
+                    self.schedule_deleted.emit(schedule_id)
                 else:
                     QMessageBox.warning(self, "삭제 실패", "스케줄 삭제에 실패했습니다.")
             except Exception as e:

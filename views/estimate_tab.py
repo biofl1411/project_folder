@@ -20,6 +20,7 @@ class EstimateTab(QWidget):
         self.current_schedule = None
         self.current_user = None
         self.discount_rate = 0  # 할인율 (0, 5, 10, 15, 20, 25, 30)
+        self.email_use_discount = False  # 이메일 할인 버전 사용 여부
         self.initUI()
 
     def set_current_user(self, user):
@@ -2546,7 +2547,7 @@ class EstimateTab(QWidget):
         btn_layout.addStretch()
 
         self.email_preview_btn = QPushButton("미리보기 새로고침")
-        self.email_preview_btn.clicked.connect(self.refresh_email_template)
+        self.email_preview_btn.clicked.connect(self.on_email_preview_click)
         btn_layout.addWidget(self.email_preview_btn)
 
         self.email_send_btn = QPushButton("이메일 발송")
@@ -2580,6 +2581,20 @@ class EstimateTab(QWidget):
             self.email_toggle_btn.setText("이메일 전송 ▲")
             # 이메일 템플릿 로드
             self.refresh_email_template()
+
+    def on_email_preview_click(self):
+        """이메일 미리보기 버튼 클릭 - 할인 버전 선택"""
+        if not self.current_schedule:
+            self.refresh_email_template()
+            return
+
+        # 할인 버전 선택 다이얼로그
+        version = self.show_estimate_version_dialog("이메일 미리보기")
+        if version is None:
+            return  # 취소
+
+        self.email_use_discount = (version == 1)
+        self.refresh_email_template()
 
     def refresh_email_template(self):
         """이메일 템플릿 새로고침"""
@@ -2667,9 +2682,16 @@ class EstimateTab(QWidget):
         else:
             sample_text = f"총 {total_samples}ea 이상"
 
-        # 총액 계산
+        # 총액 계산 (할인 적용 여부에 따라)
         total_price = self.calculate_total_price(self.current_schedule)
-        vat = int(total_price * 0.1)
+        if self.email_use_discount and self.discount_rate > 0:
+            # 할인 적용
+            discount_amount = int(total_price * self.discount_rate / 100)
+            total_price = total_price - discount_amount
+            price_note = f" ({self.discount_rate}% 할인 적용)"
+        else:
+            price_note = ""
+        vat = round(total_price * 0.1)
         total_with_vat = total_price + vat
 
         # 제목 설정
@@ -2699,7 +2721,7 @@ class EstimateTab(QWidget):
   - 실험횟수: {sampling_count}회 (온도 {zone_count}구간)
   - 실험주기: {experiment_interval}일
   - 필요시료: {sample_text}
-  - 견적금액: {total_with_vat:,}원 (VAT 포함)
+  - 견적금액: {total_with_vat:,}원 (VAT 포함){price_note}
 
 첨부된 견적서를 확인해 주시기 바랍니다.
 문의사항이 있으시면 언제든 연락 부탁드립니다.
@@ -2733,12 +2755,8 @@ class EstimateTab(QWidget):
             QMessageBox.warning(self, "오류", "견적서를 먼저 선택해주세요.")
             return
 
-        # 견적서 버전 선택
-        version = self.show_estimate_version_dialog("이메일 발송")
-        if version is None:
-            return  # 취소됨
-
-        use_discounted = (version == 1)
+        # 미리보기에서 선택한 버전 사용 (할인 적용 여부)
+        use_discounted = self.email_use_discount
 
         # SMTP 설정 가져오기
         try:
