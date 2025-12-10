@@ -39,6 +39,15 @@ class FeeTab(QWidget):
         """현재 로그인한 사용자 설정 및 권한 적용"""
         self.current_user = user
         self.apply_permissions()
+        # 사용자 변경 시 데이터 다시 로드
+        self.load_fees()
+
+    def clear_data(self):
+        """탭 데이터 초기화 (로그아웃 시 호출)"""
+        self.all_fees = []
+        self.current_user = None
+        if hasattr(self, 'fee_table') and self.fee_table:
+            self.fee_table.setRowCount(0)
 
     def apply_permissions(self):
         """사용자 권한에 따라 버튼 활성화/비활성화"""

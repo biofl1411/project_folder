@@ -43,6 +43,21 @@ class CommunicationTab(QWidget):
         self.load_email_logs()
         self.check_unread()
 
+    def clear_data(self):
+        """탭 데이터 초기화 (로그아웃 시 호출)"""
+        self.current_user = None
+        self.current_chat_partner_id = None
+        self.all_users = []
+        # 채팅 목록 초기화
+        if hasattr(self, 'partner_list') and self.partner_list:
+            self.partner_list.clear()
+        # 채팅 메시지 초기화
+        if hasattr(self, 'chat_display') and self.chat_display:
+            self.chat_display.clear()
+        # 이메일 로그 초기화
+        if hasattr(self, 'email_table') and self.email_table:
+            self.email_table.setRowCount(0)
+
     def initUI(self):
         """UI 초기화"""
         layout = QVBoxLayout(self)
