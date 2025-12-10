@@ -636,7 +636,7 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("준비 완료")
 
         # 중앙 개발자 정보
-        dev_info_label = QLabel("개발 및 문의 : hskim@biofl.co.kr (김희성 070-7410-1411)")
+        dev_info_label = QLabel("Copyright © 2025 KIM HEE SUNG. All rights reserved. 프로그램 문의(오류) 김희성 070-7410-1411")
         dev_info_label.setStyleSheet("color: #666; font-size: 11px;")
         dev_info_label.setAlignment(Qt.AlignCenter)
 
