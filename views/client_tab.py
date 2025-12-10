@@ -57,6 +57,12 @@ class ClientTab(QWidget):
         # 권한에 따라 데이터 다시 로드
         self.load_clients()
 
+    def clear_data(self):
+        """탭 데이터 초기화 (로그아웃 시 호출)"""
+        self.current_user = None
+        if hasattr(self, 'client_table') and self.client_table:
+            self.client_table.setRowCount(0)
+
     def apply_permissions(self):
         """사용자 권한에 따라 버튼 활성화/비활성화"""
         if not self.current_user:

@@ -6,21 +6,31 @@
 '''
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                           QLineEdit, QPushButton, QMessageBox)
+                           QLineEdit, QPushButton, QMessageBox, QApplication)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont, QIcon, QCloseEvent
 
 # 사용자 모델 클래스 - 나중에 구현할 예정
 # from ..models.users import User
 
 class LoginWindow(QWidget):
     # 로그인 성공 시그널 (사용자 정보를 전달)
-    login_successful = pyqtSignal(dict) 
-    
+    login_successful = pyqtSignal(dict)
+
     def __init__(self):
         super().__init__()
-        
+
+        # 로그인 성공 여부 (X 버튼으로 닫을 때 앱 종료 결정용)
+        self._login_success = False
+
         self.initUI()
+
+    def closeEvent(self, event: QCloseEvent):
+        """창 닫기 이벤트 처리 - 로그인 성공 없이 닫으면 앱 종료"""
+        if not self._login_success:
+            # 로그인하지 않고 X 버튼으로 닫으면 앱 종료
+            QApplication.quit()
+        event.accept()
     
     def initUI(self):
         """UI 초기화"""
@@ -116,6 +126,9 @@ class LoginWindow(QWidget):
                     action_type='user_login',
                     details={'username': username}
                 )
+
+                # 로그인 성공 플래그 설정 (closeEvent에서 앱 종료 방지)
+                self._login_success = True
 
                 # 로그인 성공
                 self.login_successful.emit(user_data)

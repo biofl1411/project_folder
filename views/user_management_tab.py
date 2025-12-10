@@ -36,6 +36,16 @@ class UserManagementTab(QWidget):
     def set_current_user(self, user):
         """현재 로그인한 사용자 설정"""
         self.current_user = user
+        # 사용자 변경 시 데이터 다시 로드
+        self.load_users()
+
+    def clear_data(self):
+        """탭 데이터 초기화 (로그아웃 시 호출)"""
+        self.current_user = None
+        self.selected_user_id = None
+        self.all_users = []
+        if hasattr(self, 'user_table') and self.user_table:
+            self.user_table.setRowCount(0)
 
     def initUI(self):
         """UI 초기화"""
