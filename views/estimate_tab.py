@@ -37,12 +37,12 @@ class EstimateTab(QWidget):
         if hasattr(self, 'items_table') and self.items_table:
             self.items_table.setRowCount(0)
         # 금액 표시 초기화
-        if hasattr(self, 'supply_label'):
-            self.supply_label.setText("0")
-        if hasattr(self, 'tax_label'):
-            self.tax_label.setText("0")
-        if hasattr(self, 'total_label'):
-            self.total_label.setText("0")
+        if hasattr(self, 'subtotal_label'):
+            self.subtotal_label.setText("0 원")
+        if hasattr(self, 'vat_label'):
+            self.vat_label.setText("0 원")
+        if hasattr(self, 'total_amount_label'):
+            self.total_amount_label.setText("( ₩0 )")
 
     def initUI(self):
         """UI 초기화"""

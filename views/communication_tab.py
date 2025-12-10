@@ -49,14 +49,14 @@ class CommunicationTab(QWidget):
         self.current_chat_partner_id = None
         self.all_users = []
         # 채팅 목록 초기화
-        if hasattr(self, 'partner_list') and self.partner_list:
-            self.partner_list.clear()
+        if hasattr(self, 'chat_list') and self.chat_list:
+            self.chat_list.clear()
         # 채팅 메시지 초기화
-        if hasattr(self, 'chat_display') and self.chat_display:
-            self.chat_display.clear()
+        if hasattr(self, 'message_area') and self.message_area:
+            self.message_area.clear()
         # 이메일 로그 초기화
-        if hasattr(self, 'email_table') and self.email_table:
-            self.email_table.setRowCount(0)
+        if hasattr(self, 'email_log_table') and self.email_log_table:
+            self.email_log_table.setRowCount(0)
 
     def initUI(self):
         """UI 초기화"""

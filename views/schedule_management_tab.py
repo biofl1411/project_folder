@@ -1040,8 +1040,8 @@ class ScheduleManagementTab(QWidget):
         self.current_user = None
         if hasattr(self, 'schedule_table') and self.schedule_table:
             self.schedule_table.setRowCount(0)
-        if hasattr(self, 'detail_table') and self.detail_table:
-            self.detail_table.setRowCount(0)
+        if hasattr(self, 'item_table') and self.item_table:
+            self.item_table.setRowCount(0)
 
     def apply_permissions(self):
         """사용자 권한에 따라 버튼 활성화/비활성화"""
