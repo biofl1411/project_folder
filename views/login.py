@@ -16,20 +16,19 @@ from PyQt5.QtGui import QFont, QIcon
 class LoginWindow(QWidget):
     # 로그인 성공 시그널 (사용자 정보를 전달)
     login_successful = pyqtSignal(dict)
+    # 로그인 없이 창이 닫힐 때 시그널
+    closed_without_login = pyqtSignal()
 
     def __init__(self):
         super().__init__()
-
-        # 로그인 성공 여부 (X 버튼으로 닫을 때 앱 종료 결정용)
         self._login_success = False
-
         self.initUI()
 
     def closeEvent(self, event):
-        """창 닫기 이벤트 처리 - 로그인 성공 없이 닫으면 앱 종료"""
+        """창 닫기 이벤트 처리"""
         if not self._login_success:
-            # 로그인하지 않고 X 버튼으로 닫으면 앱 종료
-            QApplication.quit()
+            # 로그인하지 않고 닫으면 시그널 발생
+            self.closed_without_login.emit()
         event.accept()
     
     def initUI(self):
