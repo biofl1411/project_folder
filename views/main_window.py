@@ -821,8 +821,53 @@ class MainWindow(QMainWindow):
 
         if reply == QMessageBox.Yes:
             self.current_user = None
+
+            # 각 탭의 데이터 초기화
+            self.clear_all_tab_data()
+
             self.hide()
             self.show_login()
+
+    def clear_all_tab_data(self):
+        """모든 탭의 데이터를 초기화 (로그아웃 시 호출)"""
+        # 스케줄 작성 탭 초기화
+        if hasattr(self, 'schedule_tab') and self.schedule_tab:
+            self.schedule_tab.clear_data()
+
+        # 스케줄 관리 탭 초기화
+        if hasattr(self, 'schedule_management_tab') and self.schedule_management_tab:
+            self.schedule_management_tab.clear_data()
+
+        # 업체 관리 탭 초기화
+        if hasattr(self, 'client_tab') and self.client_tab:
+            self.client_tab.clear_data()
+
+        # 식품 유형 탭 초기화
+        if hasattr(self, 'food_type_tab') and self.food_type_tab:
+            self.food_type_tab.clear_data()
+
+        # 수수료 탭 초기화
+        if hasattr(self, 'fee_tab') and self.fee_tab:
+            self.fee_tab.clear_data()
+
+        # 견적서 탭 초기화
+        if hasattr(self, 'estimate_tab') and self.estimate_tab:
+            self.estimate_tab.clear_data()
+
+        # 커뮤니케이션 탭 초기화
+        if hasattr(self, 'communication_tab') and self.communication_tab:
+            self.communication_tab.clear_data()
+
+        # 사용자 관리 탭 초기화
+        if hasattr(self, 'user_management_tab') and self.user_management_tab:
+            self.user_management_tab.clear_data()
+
+        # 대시보드 데이터 초기화
+        self.dashboard_all_schedules = []
+        if hasattr(self, 'dashboard_detail_table') and self.dashboard_detail_table:
+            self.dashboard_detail_table.setRowCount(0)
+        if hasattr(self, 'dashboard_estimate_table') and self.dashboard_estimate_table:
+            self.dashboard_estimate_table.setRowCount(0)
 
     def show_schedule_detail(self, schedule_id):
         """스케줄 관리 탭으로 이동하고 해당 스케줄 선택"""

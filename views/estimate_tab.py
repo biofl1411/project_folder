@@ -27,6 +27,23 @@ class EstimateTab(QWidget):
         """로그인 사용자 정보 설정"""
         self.current_user = user
 
+    def clear_data(self):
+        """탭 데이터 초기화 (로그아웃 시 호출)"""
+        self.current_schedule = None
+        self.current_user = None
+        self.discount_rate = 0
+        self.email_use_discount = False
+        # 견적서 테이블 초기화
+        if hasattr(self, 'items_table') and self.items_table:
+            self.items_table.setRowCount(0)
+        # 금액 표시 초기화
+        if hasattr(self, 'subtotal_label'):
+            self.subtotal_label.setText("0 원")
+        if hasattr(self, 'vat_label'):
+            self.vat_label.setText("0 원")
+        if hasattr(self, 'total_amount_label'):
+            self.total_amount_label.setText("( ₩0 )")
+
     def initUI(self):
         """UI 초기화"""
         main_layout = QVBoxLayout(self)
