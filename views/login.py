@@ -8,7 +8,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit, QPushButton, QMessageBox, QApplication)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QCloseEvent
+from PyQt5.QtGui import QFont, QIcon
 
 # 사용자 모델 클래스 - 나중에 구현할 예정
 # from ..models.users import User
@@ -25,7 +25,7 @@ class LoginWindow(QWidget):
 
         self.initUI()
 
-    def closeEvent(self, event: QCloseEvent):
+    def closeEvent(self, event):
         """창 닫기 이벤트 처리 - 로그인 성공 없이 닫으면 앱 종료"""
         if not self._login_success:
             # 로그인하지 않고 X 버튼으로 닫으면 앱 종료
