@@ -604,7 +604,11 @@ class ClientTab(QWidget):
             if '가' <= char <= '힣':
                 char_code = ord(char) - ord('가')
                 chosung_idx = char_code // 588
-                result += self.CHOSUNG_LIST[chosung_idx]
+                # 인덱스 범위 확인 (0-18)
+                if 0 <= chosung_idx < len(self.CHOSUNG_LIST):
+                    result += self.CHOSUNG_LIST[chosung_idx]
+                else:
+                    result += char  # 범위 밖이면 원래 문자 유지
             else:
                 result += char
         return result
@@ -692,7 +696,11 @@ class ClientTab(QWidget):
 
         # 고객/회사명 컬럼 인덱스 찾기
         name_col = self.get_name_column_index()
-        client_name = self.client_table.item(selected_row, name_col).text()
+        name_item = self.client_table.item(selected_row, name_col)
+        if not name_item:
+            QMessageBox.warning(self, "데이터 오류", "업체명을 찾을 수 없습니다.")
+            return
+        client_name = name_item.text()
 
         clients = Client.search(client_name)
         if not clients:
@@ -735,7 +743,10 @@ class ClientTab(QWidget):
 
             # 선택된 행의 역순으로 삭제 (인덱스 변화 방지)
             for row in sorted(selected_rows, reverse=True):
-                client_name = self.client_table.item(row, name_col).text()
+                name_item = self.client_table.item(row, name_col)
+                if not name_item:
+                    continue  # 이름을 찾을 수 없으면 건너뛰기
+                client_name = name_item.text()
 
                 clients = Client.search(client_name)
                 if clients and Client.delete(clients[0]['id']):

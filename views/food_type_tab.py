@@ -344,7 +344,11 @@ class FoodTypeTab(QWidget):
             if '가' <= char <= '힣':
                 char_code = ord(char) - ord('가')
                 chosung_idx = char_code // 588
-                result += self.CHOSUNG_LIST[chosung_idx]
+                # 인덱스 범위 확인 (0-18)
+                if 0 <= chosung_idx < len(self.CHOSUNG_LIST):
+                    result += self.CHOSUNG_LIST[chosung_idx]
+                else:
+                    result += char  # 범위 밖이면 원래 문자 유지
             else:
                 result += char
         return result

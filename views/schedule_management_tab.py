@@ -492,7 +492,9 @@ class TestItemSelectDialog(QDialog):
         selected = self.item_table.selectedIndexes()
         if selected:
             row = selected[0].row()
-            self.selected_item = self.item_table.item(row, 0).text()
+            item = self.item_table.item(row, 0)
+            if item:
+                self.selected_item = item.text()
         super().accept()
 
 
@@ -902,7 +904,11 @@ class ScheduleSelectDialog(QDialog):
             if '가' <= char <= '힣':
                 char_code = ord(char) - ord('가')
                 chosung_idx = char_code // 588
-                result += self.CHOSUNG_LIST[chosung_idx]
+                # 인덱스 범위 확인 (0-18)
+                if 0 <= chosung_idx < len(self.CHOSUNG_LIST):
+                    result += self.CHOSUNG_LIST[chosung_idx]
+                else:
+                    result += char  # 범위 밖이면 원래 문자 유지
             else:
                 result += char
         return result
@@ -984,7 +990,12 @@ class ScheduleSelectDialog(QDialog):
         selected = self.schedule_table.selectedIndexes()
         if selected:
             row = selected[0].row()
-            self.selected_schedule_id = int(self.schedule_table.item(row, 0).text())
+            id_item = self.schedule_table.item(row, 0)
+            if id_item:
+                try:
+                    self.selected_schedule_id = int(id_item.text())
+                except (ValueError, TypeError):
+                    pass
         super().accept()
 
 

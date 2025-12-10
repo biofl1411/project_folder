@@ -873,7 +873,10 @@ class UserManagementTab(QWidget):
                 return ''
             # 숫자 타입 처리
             if key in ['is_active', 'can_view_all']:
-                return int(val) if val else 0
+                try:
+                    return int(val) if val else 0
+                except (ValueError, TypeError):
+                    return 0
             return str(val).lower()
 
         return sorted(users, key=get_sort_value, reverse=reverse)

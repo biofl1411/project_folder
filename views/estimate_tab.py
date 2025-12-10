@@ -873,9 +873,12 @@ class EstimateTab(QWidget):
             QMessageBox.warning(self, "알림", "먼저 스케줄을 선택해주세요.")
             return
 
-        # 할인율 가져오기
+        # 할인율 가져오기 (숫자 변환 오류 방지)
         discount_text = self.discount_combo.currentText()
-        self.discount_rate = int(discount_text.replace('%', ''))
+        try:
+            self.discount_rate = int(discount_text.replace('%', '').strip())
+        except (ValueError, TypeError):
+            self.discount_rate = 0
 
         # 할인 라벨 업데이트
         self.discounted_label.setText(f"◀ 할인 적용 견적서 ({self.discount_rate}%) ▶")
@@ -924,15 +927,15 @@ class EstimateTab(QWidget):
             self.disc_stamp_label.show()
             self.disc_stamp_label.raise_()
 
-        # 원래 금액 계산
+        # 원래 금액 계산 (round 사용으로 정밀도 개선)
         original_subtotal = self.calculate_total_price(schedule)
-        original_vat = int(original_subtotal * 0.1)
+        original_vat = round(original_subtotal * 0.1)
         original_total = original_subtotal + original_vat
 
-        # 할인 적용 금액 계산
+        # 할인 적용 금액 계산 (round 사용으로 정밀도 개선)
         discount_multiplier = (100 - self.discount_rate) / 100
-        discounted_subtotal = int(original_subtotal * discount_multiplier)
-        discounted_vat = int(discounted_subtotal * 0.1)
+        discounted_subtotal = round(original_subtotal * discount_multiplier)
+        discounted_vat = round(discounted_subtotal * 0.1)
         discounted_total = discounted_subtotal + discounted_vat
 
         # 할인 금액
@@ -1739,7 +1742,7 @@ class EstimateTab(QWidget):
     def calculate_and_display_totals(self, schedule):
         """금액 계산 및 표시"""
         subtotal = self.calculate_total_price(schedule)
-        vat = int(subtotal * 0.1)
+        vat = round(subtotal * 0.1)  # round 사용으로 정밀도 개선
         total = subtotal + vat
 
         # 금액을 한글로 변환
@@ -1934,11 +1937,11 @@ class EstimateTab(QWidget):
 
             # 1차 견적 금액 계산 (부가세 포함)
             first_price = self._calculate_first_price(schedule, zone_count, sampling_count)
-            first_price_with_vat = int(first_price * 1.1)  # 부가세 10% 포함
+            first_price_with_vat = round(first_price * 1.1)  # 부가세 10% 포함, round 사용
 
             # 중단 시 진행한 실험 비용 계산 (부가세 포함)
             suspend_price = self._calculate_suspend_price(schedule, completed_rounds, zone_count)
-            suspend_price_with_vat = int(suspend_price * 1.1)  # 부가세 10% 포함
+            suspend_price_with_vat = round(suspend_price * 1.1)  # 부가세 10% 포함, round 사용
 
             # 잔여 금액 계산
             remaining_price = first_price_with_vat - suspend_price_with_vat
@@ -2178,6 +2181,12 @@ class EstimateTab(QWidget):
                 widget = self.estimate_container
                 widget_width = widget.sizeHint().width() if widget.sizeHint().width() > 0 else widget.width()
                 widget_height = widget.sizeHint().height() if widget.sizeHint().height() > 0 else widget.height()
+
+                # Division by zero 방지
+                if widget_width <= 0:
+                    widget_width = 800  # 기본값
+                if widget_height <= 0:
+                    widget_height = 1000  # 기본값
 
                 # A4 너비에 맞게 스케일 계산
                 scale = page_rect.width() / widget_width

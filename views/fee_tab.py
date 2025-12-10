@@ -294,8 +294,10 @@ class FeeTab(QWidget):
                     sample_qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     self.fee_table.setItem(row, 4, sample_qty_item)
 
-                    # 정렬순서 설정
-                    display_order = fee.get('display_order', row + 1) or (row + 1)
+                    # 정렬순서 설정 (0도 유효한 값으로 처리)
+                    display_order = fee.get('display_order')
+                    if display_order is None:
+                        display_order = row + 1
                     order_item = QTableWidgetItem(str(display_order))
                     order_item.setTextAlignment(Qt.AlignCenter)
                     self.fee_table.setItem(row, 5, order_item)
@@ -672,7 +674,7 @@ class FeeTab(QWidget):
                     "검사항목": fee_dict["test_item"],
                     "식품 카테고리": fee_dict["food_category"] or "",
                     "가격": fee_dict["price"],
-                    "검체 수량(g)": fee_dict["description"] or "",
+                    "검체 수량(g)": fee_dict.get("sample_quantity", "") or "",  # 수정: description -> sample_quantity
                     "정렬순서": fee_dict["display_order"],
                     "생성일": created_at_val or ""
                 })

@@ -126,12 +126,15 @@ class ScheduleDisplaySettingsDialog(QDialog):
         try:
             from database import get_connection
             conn = get_connection()
+            if not conn:
+                return
+
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_tab_columns'")
             result = cursor.fetchone()
             conn.close()
 
-            if result:
+            if result and result.get('value'):
                 visible_columns = result['value'].split(',')
                 for col_key, checkbox in self.checkboxes.items():
                     checkbox.setChecked(col_key in visible_columns)
@@ -147,6 +150,10 @@ class ScheduleDisplaySettingsDialog(QDialog):
             value = ','.join(visible_columns)
 
             conn = get_connection()
+            if not conn:
+                QMessageBox.warning(self, "오류", "데이터베이스 연결에 실패했습니다.")
+                return
+
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -737,7 +744,11 @@ class ScheduleTab(QWidget):
             if '가' <= char <= '힣':
                 char_code = ord(char) - ord('가')
                 chosung_idx = char_code // 588
-                result += self.CHOSUNG_LIST[chosung_idx]
+                # 인덱스 범위 확인 (0-18)
+                if 0 <= chosung_idx < len(self.CHOSUNG_LIST):
+                    result += self.CHOSUNG_LIST[chosung_idx]
+                else:
+                    result += char  # 범위 밖이면 원래 문자 유지
             else:
                 result += char
         return result
@@ -829,8 +840,11 @@ class ScheduleTab(QWidget):
         row = index.row()
         schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
         if schedule_id_item:
-            schedule_id = int(schedule_id_item.text())
-            self.schedule_double_clicked.emit(schedule_id)
+            try:
+                schedule_id = int(schedule_id_item.text())
+                self.schedule_double_clicked.emit(schedule_id)
+            except (ValueError, TypeError):
+                log_error('ScheduleTab', f'잘못된 스케줄 ID 형식: {schedule_id_item.text()}')
 
     def get_checked_row(self):
         """체크박스가 선택된 첫 번째 행 반환 (없으면 None)"""
@@ -852,9 +866,17 @@ class ScheduleTab(QWidget):
         if not schedule_id_item:
             return
 
-        schedule_id = int(schedule_id_item.text())
-        client_name = self.schedule_table.item(row, 2).text()  # 업체명은 2번 열
-        product_name = self.schedule_table.item(row, 3).text()  # 제품명은 3번 열
+        try:
+            schedule_id = int(schedule_id_item.text())
+        except (ValueError, TypeError):
+            QMessageBox.warning(self, "삭제 실패", "유효하지 않은 스케줄 ID입니다.")
+            return
+
+        # NoneType 오류 방지: .item()이 None을 반환할 수 있음
+        client_name_item = self.schedule_table.item(row, 2)  # 업체명은 2번 열
+        product_name_item = self.schedule_table.item(row, 3)  # 제품명은 3번 열
+        client_name = client_name_item.text() if client_name_item else ''
+        product_name = product_name_item.text() if product_name_item else ''
 
         reply = QMessageBox.question(
             self, '삭제 확인',
@@ -903,7 +925,11 @@ class ScheduleTab(QWidget):
         if not schedule_id_item:
             return
 
-        schedule_id = int(schedule_id_item.text())
+        try:
+            schedule_id = int(schedule_id_item.text())
+        except (ValueError, TypeError):
+            QMessageBox.warning(self, "수정 실패", "유효하지 않은 스케줄 ID입니다.")
+            return
 
         try:
             print(f"스케줄 수정 시작: ID {schedule_id}")
@@ -929,13 +955,21 @@ class ScheduleTab(QWidget):
         if not schedule_id_item:
             return
 
-        schedule_id = int(schedule_id_item.text())
+        try:
+            schedule_id = int(schedule_id_item.text())
+        except (ValueError, TypeError):
+            QMessageBox.warning(self, "복사 실패", "유효하지 않은 스케줄 ID입니다.")
+            return
 
         try:
             from database import get_connection
 
             # 원본 스케줄 데이터 조회
             conn = get_connection()
+            if not conn:
+                QMessageBox.warning(self, "복사 실패", "데이터베이스 연결에 실패했습니다.")
+                return
+
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM schedules WHERE id = %s", (schedule_id,))
             original = cursor.fetchone()
@@ -966,11 +1000,16 @@ class ScheduleTab(QWidget):
             original_data['completed_rounds'] = None
             original_data['extend_rounds_cost'] = None
 
-            # INSERT 쿼리 생성
-            columns = [k for k in original_data.keys() if k not in exclude_columns]
+            # INSERT 쿼리 생성 (SQL 인젝션 방지: 컬럼명 검증)
+            import re
+            # 허용되는 컬럼명 패턴: 영문자, 숫자, 언더스코어만 허용
+            valid_column_pattern = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+            columns = [k for k in original_data.keys()
+                       if k not in exclude_columns and valid_column_pattern.match(k)]
             values = [original_data[k] for k in columns]
             placeholders = ', '.join(['%s'] * len(columns))
-            columns_str = ', '.join(columns)
+            # 백틱으로 컬럼명 감싸기 (예약어 보호)
+            columns_str = ', '.join([f'`{col}`' for col in columns])
 
             cursor.execute(f"""
                 INSERT INTO schedules ({columns_str})
@@ -1037,9 +1076,12 @@ class ScheduleTab(QWidget):
                 for row in checked_rows:
                     schedule_id_item = self.schedule_table.item(row, 1)  # ID는 1번 열
                     if schedule_id_item:
-                        schedule_id = int(schedule_id_item.text())
-                        if Schedule.update_status(schedule_id, new_status):
-                            success_count += 1
+                        try:
+                            schedule_id = int(schedule_id_item.text())
+                            if Schedule.update_status(schedule_id, new_status):
+                                success_count += 1
+                        except (ValueError, TypeError):
+                            log_error('ScheduleTab', f'잘못된 스케줄 ID 형식: {schedule_id_item.text()}')
 
                 QMessageBox.information(
                     self, "변경 완료",
@@ -1084,22 +1126,26 @@ class ScheduleTab(QWidget):
 
     def get_column_settings(self):
         """데이터베이스에서 컬럼 설정 로드"""
+        default_columns = [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
         try:
             from database import get_connection
             conn = get_connection()
+            if not conn:
+                return default_columns
+
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_tab_columns'")
             result = cursor.fetchone()
             conn.close()
 
-            if result:
+            if result and result.get('value'):
                 return result['value'].split(',')
             else:
                 # 기본값: 기본 표시 컬럼
-                return [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
+                return default_columns
         except Exception as e:
             print(f"컬럼 설정 로드 오류: {e}")
-            return [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
+            return default_columns
 
     def apply_column_settings(self):
         """컬럼 표시 설정을 테이블에 적용"""
@@ -1138,6 +1184,9 @@ class ScheduleTab(QWidget):
             order_str = ','.join(order)
 
             conn = get_connection()
+            if not conn:
+                return
+
             cursor = conn.cursor()
             cursor.execute("""
                 REPLACE INTO settings (`key`, value)
@@ -1154,13 +1203,19 @@ class ScheduleTab(QWidget):
         try:
             from database import get_connection
             conn = get_connection()
+            if not conn:
+                return None
+
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE `key` = 'schedule_column_order'")
             result = cursor.fetchone()
             conn.close()
 
-            if result:
-                return [int(x) for x in result['value'].split(',')]
+            if result and result.get('value'):
+                try:
+                    return [int(x) for x in result['value'].split(',')]
+                except (ValueError, TypeError):
+                    return None
             return None
         except Exception as e:
             print(f"열 순서 로드 오류: {e}")

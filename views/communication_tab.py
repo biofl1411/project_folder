@@ -395,11 +395,12 @@ class CommunicationTab(QWidget):
                 is_mine = msg['sender_id'] == self.current_user['id']
                 sender_name = msg['sender_name'] or '알 수 없음'
                 content = msg['content']
-                created_at = msg['created_at']
+                created_at = msg.get('created_at', '')
                 if created_at and not isinstance(created_at, str):
                     created_at = str(created_at)
-                time_str = created_at[11:16] if created_at and len(created_at) > 16 else ''  # HH:MM 형식
-                date_str = created_at[:10] if created_at else ''  # YYYY-MM-DD 형식
+                # 문자열 길이 검증 후 슬라이싱
+                time_str = created_at[11:16] if created_at and len(created_at) >= 16 else ''  # HH:MM 형식
+                date_str = created_at[:10] if created_at and len(created_at) >= 10 else ''  # YYYY-MM-DD 형식
 
                 if is_mine:
                     # 내가 보낸 메시지 (오른쪽, 노란색 - 카카오톡 스타일)
