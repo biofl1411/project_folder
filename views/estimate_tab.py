@@ -1625,12 +1625,8 @@ class EstimateTab(QWidget):
         # 1차 견적 전용 보고서 비용 (first_report_cost 우선 사용)
         report_cost = schedule.get('first_report_cost', 0) or schedule.get('report_cost', 0) or 0
         if report_cost == 0:
-            # 중간보고서 여부 확인
-            report_interim = schedule.get('report_interim', False)
-            # 기본 보고서 비용: 가속=300,000원, 실측=200,000원, 중간보고서 있으면=200,000원
-            if report_interim:
-                report_cost = 200000
-            elif test_method in ['acceleration', 'custom_acceleration']:
+            # 기본 보고서 비용: 가속=300,000원, 실측=200,000원
+            if test_method in ['acceleration', 'custom_acceleration']:
                 report_cost = 300000
             else:
                 report_cost = 200000
@@ -1673,12 +1669,8 @@ class EstimateTab(QWidget):
         # 중단 견적 전용 보고서 비용 (suspend_report_cost 우선 사용)
         report_cost = schedule.get('suspend_report_cost', 0) or schedule.get('report_cost', 0) or 0
         if report_cost == 0:
-            # 중간보고서 여부 확인
-            report_interim = schedule.get('report_interim', False)
-            # 기본 보고서 비용: 가속=300,000원, 실측=200,000원, 중간보고서 있으면=200,000원
-            if report_interim:
-                report_cost = 200000
-            elif test_method in ['acceleration', 'custom_acceleration']:
+            # 기본 보고서 비용: 가속=300,000원, 실측=200,000원
+            if test_method in ['acceleration', 'custom_acceleration']:
                 report_cost = 300000
             else:
                 report_cost = 200000
