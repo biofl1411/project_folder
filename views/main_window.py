@@ -156,6 +156,9 @@ class MainWindow(QMainWindow):
         # 스케줄 작성 탭 더블클릭 시 스케줄 관리 탭으로 이동
         self.schedule_tab.schedule_double_clicked.connect(self.show_schedule_detail)
 
+        # 스케줄 작성 탭에서 스케줄 삭제 시 스케줄 관리 탭에 알림
+        self.schedule_tab.schedule_deleted.connect(self.schedule_management_tab.on_schedule_deleted)
+
         # 스케줄 관리 탭에서 견적서 보기 버튼 연결
         self.schedule_management_tab.show_estimate_requested.connect(self.show_estimate)
 
