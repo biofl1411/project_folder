@@ -381,7 +381,13 @@ class UserManagementTab(QWidget):
             return
 
         row = selected[0].row()
-        user_id = int(self.user_table.item(row, 0).text())
+        user_id_item = self.user_table.item(row, 0)
+        if not user_id_item:
+            return
+        try:
+            user_id = int(user_id_item.text())
+        except (ValueError, TypeError):
+            return
         self.selected_user_id = user_id
 
         user = User.get_by_id(user_id)
@@ -528,10 +534,16 @@ class UserManagementTab(QWidget):
         if not user_id_item:
             return
 
-        user_id = int(user_id_item.text())
+        try:
+            user_id = int(user_id_item.text())
+        except (ValueError, TypeError):
+            return
 
         if column == 6:  # 활성화 컬럼
-            current_status = self.user_table.item(row, 6).text()
+            status_item = self.user_table.item(row, 6)
+            if not status_item:
+                return
+            current_status = status_item.text()
             is_currently_active = current_status == 'O'
 
             if is_currently_active:
@@ -563,7 +575,10 @@ class UserManagementTab(QWidget):
                         QMessageBox.critical(self, "오류", "활성화에 실패했습니다.")
 
         elif column == 7:  # 열람권한 컬럼
-            current_status = self.user_table.item(row, 7).text()
+            view_status_item = self.user_table.item(row, 7)
+            if not view_status_item:
+                return
+            current_status = view_status_item.text()
             can_currently_view = current_status == 'O'
 
             if can_currently_view:

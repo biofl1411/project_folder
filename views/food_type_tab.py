@@ -481,7 +481,11 @@ class FoodTypeTab(QWidget):
                 return
 
             # 선택된 행의 데이터 가져오기
-            type_name = self.food_type_table.item(selected_row, 1).text()
+            type_name_item = self.food_type_table.item(selected_row, 1)
+            if not type_name_item:
+                QMessageBox.warning(self, "데이터 오류", "식품유형명을 찾을 수 없습니다.")
+                return
+            type_name = type_name_item.text()
             log_message('FoodTypeTab', f"식품유형 '{type_name}' 수정 시도")
 
             # 해당 식품유형 정보 가져오기
@@ -533,8 +537,11 @@ class FoodTypeTab(QWidget):
             deleted_count = 0
             # 선택된 행의 역순으로 삭제 (인덱스 변화 방지)
             for row in sorted(selected_rows, reverse=True):
-                type_name = self.food_type_table.item(row, 1).text()
-                
+                type_name_item = self.food_type_table.item(row, 1)
+                if not type_name_item:
+                    continue
+                type_name = type_name_item.text()
+
                 # 해당 식품유형 정보 가져오기
                 food_type = ProductType.get_by_name(type_name)
                 if food_type and ProductType.delete(food_type['id']):
