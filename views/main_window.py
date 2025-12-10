@@ -664,7 +664,9 @@ class MainWindow(QMainWindow):
     def on_login_closed(self):
         """로그인 없이 로그인 창이 닫힐 때 처리"""
         from PyQt5.QtWidgets import QApplication
-        QApplication.quit()
+        from PyQt5.QtCore import QTimer
+        # EXE에서 이벤트 루프 타이밍 문제 방지를 위해 지연 호출
+        QTimer.singleShot(0, QApplication.quit)
     
     def on_login_successful(self, user_data):
         """로그인 성공 시 처리"""
