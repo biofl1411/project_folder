@@ -26,6 +26,8 @@ class EstimateTab(QWidget):
     def set_current_user(self, user):
         """로그인 사용자 정보 설정"""
         self.current_user = user
+        # 사용자 변경 시 이전 사용자의 견적서 데이터 초기화
+        self.current_schedule = None
 
     def initUI(self):
         """UI 초기화"""

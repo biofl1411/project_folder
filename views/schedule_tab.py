@@ -208,6 +208,8 @@ class ScheduleTab(QWidget):
         """현재 로그인한 사용자 설정 및 권한 적용"""
         self.current_user = user
         self.apply_permissions()
+        # 사용자 변경 시 스케줄 목록 다시 로드 (권한 필터링 적용)
+        self.load_schedules()
 
     def apply_permissions(self):
         """사용자 권한에 따라 버튼 활성화/비활성화"""

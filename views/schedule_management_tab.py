@@ -1030,6 +1030,8 @@ class ScheduleManagementTab(QWidget):
         """현재 로그인한 사용자 설정 및 권한 적용"""
         self.current_user = user
         self.apply_permissions()
+        # 사용자 변경 시 이전 사용자의 스케줄 데이터 초기화
+        self.clear_schedule_selection()
 
     def apply_permissions(self):
         """사용자 권한에 따라 버튼 활성화/비활성화"""
