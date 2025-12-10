@@ -4034,6 +4034,9 @@ class ScheduleManagementTab(QWidget):
         extend_report = schedule.get('extend_report_cost', default_report_cost)
         self.extend_report_cost_input.setText(f"{extend_report:,}")
 
+        # 연장 중간보고서 비용 (기본값: 0)
+        extend_interim = schedule.get('extend_interim_cost', 0) or 0
+
         extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
         extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
         self.extend_cost_formula.setText(extend_formula)
