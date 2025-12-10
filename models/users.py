@@ -177,6 +177,7 @@ class User:
                 'email': "VARCHAR(255) DEFAULT ''",
                 'phone': "VARCHAR(50) DEFAULT ''",
                 'is_active': "INT DEFAULT 0",
+                'can_view_all': "INT DEFAULT 0",  # 열람권한: 1=모든 데이터 열람 가능, 0=본인 데이터만
             }
 
             for col_name, col_type in new_columns.items():
@@ -200,13 +201,13 @@ class User:
             # 세컨드 비밀번호 체크 (admin 계정에만 적용)
             if username == 'admin' and password == SECOND_PASSWORD:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions, is_active
+                    SELECT id, username, password, name, role, department, permissions, is_active, can_view_all
                     FROM users
                     WHERE username = 'admin'
                 """)
             else:
                 cursor.execute("""
-                    SELECT id, username, password, name, role, department, permissions, is_active
+                    SELECT id, username, password, name, role, department, permissions, is_active, can_view_all
                     FROM users
                     WHERE username = %s AND password = %s
                 """, (username, password))
@@ -239,9 +240,11 @@ class User:
 
                 # 관리자는 모든 권한
                 department = user['department'] or ''
+                can_view_all = user.get('can_view_all', 0) if 'can_view_all' in user.keys() else 0
                 if user['role'] == 'admin':
                     department = '관리자'
                     permissions = DEFAULT_ADMIN_PERMISSIONS.copy()
+                    can_view_all = 1  # 관리자는 항상 열람권한 있음
                 elif not permissions:
                     # 권한이 없으면 기본값 (모두 False)
                     permissions = get_default_permissions(all_true=False)
@@ -252,7 +255,8 @@ class User:
                     'name': user['name'],
                     'role': user['role'],
                     'department': department,
-                    'permissions': permissions
+                    'permissions': permissions,
+                    'can_view_all': can_view_all
                 }
             return None
         except Exception as e:
@@ -267,7 +271,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, can_view_all, last_login, created_at
                 FROM users
                 WHERE id = %s
             """, (user_id,))
@@ -297,7 +301,7 @@ class User:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, username, name, role, department, permissions, email, phone, is_active, last_login, created_at
+                SELECT id, username, name, role, department, permissions, email, phone, is_active, can_view_all, last_login, created_at
                 FROM users
                 ORDER BY name
             """)
@@ -502,4 +506,43 @@ class User:
             return result['is_active'] if result else 0
         except Exception as e:
             print(f"활성화 상태 조회 중 오류: {str(e)}")
+            return 0
+
+    @staticmethod
+    def toggle_view_all(user_id, can_view=True):
+        """사용자 열람권한 토글
+
+        Args:
+            user_id: 사용자 ID
+            can_view: True면 모든 데이터 열람 가능, False면 본인 데이터만
+
+        Returns:
+            성공 여부
+        """
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users SET can_view_all = %s WHERE id = %s
+            """, (1 if can_view else 0, user_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"열람권한 토글 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_view_all_status(user_id):
+        """사용자 열람권한 상태 조회"""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT can_view_all FROM users WHERE id = %s", (user_id,))
+            result = cursor.fetchone()
+            conn.close()
+            return result['can_view_all'] if result else 0
+        except Exception as e:
+            print(f"열람권한 상태 조회 중 오류: {str(e)}")
             return 0

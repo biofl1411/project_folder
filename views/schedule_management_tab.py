@@ -492,7 +492,9 @@ class TestItemSelectDialog(QDialog):
         selected = self.item_table.selectedIndexes()
         if selected:
             row = selected[0].row()
-            self.selected_item = self.item_table.item(row, 0).text()
+            item = self.item_table.item(row, 0)
+            if item:
+                self.selected_item = item.text()
         super().accept()
 
 
@@ -733,7 +735,26 @@ class ScheduleSelectDialog(QDialog):
         """스케줄 목록 로드"""
         try:
             raw_schedules = Schedule.get_all() or []
-            self.all_schedules = [dict(s) for s in raw_schedules]
+            all_schedules = [dict(s) for s in raw_schedules]
+
+            # 열람권한에 따라 스케줄 필터링
+            if self.current_user:
+                user_name = self.current_user.get('name', '')
+                role = self.current_user.get('role', '')
+                can_view_all = self.current_user.get('can_view_all', 0)
+
+                # 관리자 또는 열람권한이 있는 사용자는 전체 조회 가능
+                if role == 'admin' or can_view_all:
+                    self.all_schedules = all_schedules
+                else:
+                    # 본인 담당 업체의 스케줄만 필터링
+                    self.all_schedules = [
+                        s for s in all_schedules
+                        if (s.get('sales_rep', '') or '') == user_name
+                    ]
+            else:
+                self.all_schedules = all_schedules
+
             self.display_schedules(self.all_schedules)
         except Exception as e:
             print(f"스케줄 로드 오류: {e}")
@@ -883,7 +904,11 @@ class ScheduleSelectDialog(QDialog):
             if '가' <= char <= '힣':
                 char_code = ord(char) - ord('가')
                 chosung_idx = char_code // 588
-                result += self.CHOSUNG_LIST[chosung_idx]
+                # 인덱스 범위 확인 (0-18)
+                if 0 <= chosung_idx < len(self.CHOSUNG_LIST):
+                    result += self.CHOSUNG_LIST[chosung_idx]
+                else:
+                    result += char  # 범위 밖이면 원래 문자 유지
             else:
                 result += char
         return result
@@ -965,7 +990,12 @@ class ScheduleSelectDialog(QDialog):
         selected = self.schedule_table.selectedIndexes()
         if selected:
             row = selected[0].row()
-            self.selected_schedule_id = int(self.schedule_table.item(row, 0).text())
+            id_item = self.schedule_table.item(row, 0)
+            if id_item:
+                try:
+                    self.selected_schedule_id = int(id_item.text())
+                except (ValueError, TypeError):
+                    pass
         super().accept()
 
 
@@ -2729,11 +2759,15 @@ class ScheduleManagementTab(QWidget):
             self.first_interim_cost_input.show()
             self.suspend_interim_cost_label.show()
             self.suspend_interim_cost_input.show()
+            self.extend_interim_cost_label.show()
+            self.extend_interim_cost_input.show()
         else:
             self.first_interim_cost_label.hide()
             self.first_interim_cost_input.hide()
             self.suspend_interim_cost_label.hide()
             self.suspend_interim_cost_input.hide()
+            self.extend_interim_cost_label.hide()
+            self.extend_interim_cost_input.hide()
 
         # ========== 1차 견적 (저장된 값이 있으면 사용, 없으면 계산 후 저장) ==========
         saved_first_supply = schedule.get('first_supply_amount', 0) or 0
@@ -2883,6 +2917,11 @@ class ScheduleManagementTab(QWidget):
                 # 보고서 비용: 저장된 값이 0이면 기본값 사용
                 extend_report_saved = schedule.get('extend_report_cost', 0) or default_report_cost
                 self.extend_report_cost_input.setText(f"{extend_report_saved:,}")
+                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                extend_interim_saved = schedule.get('extend_interim_cost', 0)
+                if report_interim and extend_interim_saved == 0:
+                    extend_interim_saved = default_interim_cost
+                self.extend_interim_cost_input.setText(f"{extend_interim_saved:,}")
                 self.extend_cost_formula.setText(schedule.get('extend_formula_text', '-'))
                 extend_with_vat = schedule.get('extend_total_amount', 0) or 0
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
@@ -2904,10 +2943,16 @@ class ScheduleManagementTab(QWidget):
 
                 # 보고서 비용: 저장된 값이 0이면 기본값 사용
                 extend_report = schedule.get('extend_report_cost', 0) or default_report_cost
+                # 중간 비용: 저장된 값이 0이면 기본값 사용
+                extend_interim = schedule.get('extend_interim_cost', 0) or default_interim_cost
                 self.extend_report_cost_input.setText(f"{extend_report:,}")
+                self.extend_interim_cost_input.setText(f"{extend_interim:,}")
 
-                extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
-                extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
+                extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report + extend_interim)
+                if extend_interim > 0:
+                    extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}+{extend_interim:,}={extend_cost_no_vat:,}원"
+                else:
+                    extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
                 self.extend_cost_formula.setText(extend_formula)
 
                 extend_vat = int(extend_cost_no_vat * 0.1)
@@ -2919,7 +2964,7 @@ class ScheduleManagementTab(QWidget):
                     from models.schedules import Schedule
                     Schedule.save_extend_estimate(
                         schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
-                        extend_report, extend_formula,
+                        extend_report, extend_interim, extend_formula,
                         extend_cost_no_vat, extend_vat, extend_with_vat
                     )
         else:
@@ -3493,7 +3538,10 @@ class ScheduleManagementTab(QWidget):
                 from models.schedules import Schedule
                 schedule_id = self.current_schedule.get('id')
                 if schedule_id:
-                    Schedule.update(schedule_id, report_interim=1 if is_requested else 0)
+                    # 현재 스케줄 데이터를 복사하고 report_interim 값 업데이트
+                    update_data = dict(self.current_schedule)
+                    update_data['report_interim'] = 1 if is_requested else 0
+                    Schedule.update(schedule_id, update_data)
             except Exception as e:
                 print(f"중간보고서 저장 오류: {e}")
 
@@ -3562,7 +3610,10 @@ class ScheduleManagementTab(QWidget):
                 from models.schedules import Schedule
                 schedule_id = self.current_schedule.get('id')
                 if schedule_id:
-                    Schedule.update(schedule_id, extension_test=1 if is_extension else 0)
+                    # 현재 스케줄 데이터를 복사하고 extension_test 값 업데이트
+                    update_data = dict(self.current_schedule)
+                    update_data['extension_test'] = 1 if is_extension else 0
+                    Schedule.update(schedule_id, update_data)
             except Exception as e:
                 print(f"연장실험 저장 오류: {e}")
 
@@ -3983,6 +4034,9 @@ class ScheduleManagementTab(QWidget):
         extend_report = schedule.get('extend_report_cost', default_report_cost)
         self.extend_report_cost_input.setText(f"{extend_report:,}")
 
+        # 연장 중간보고서 비용 (기본값: 0)
+        extend_interim = schedule.get('extend_interim_cost', 0) or 0
+
         extend_cost_no_vat = int(extend_total_rounds * zone_count + extend_report)
         extend_formula = f"{extend_total_rounds:,}×{zone_count}+{extend_report:,}={extend_cost_no_vat:,}원"
         self.extend_cost_formula.setText(extend_formula)
@@ -3997,7 +4051,7 @@ class ScheduleManagementTab(QWidget):
             from models.schedules import Schedule
             Schedule.save_extend_estimate(
                 schedule_id, extend_item_detail, cost_per_test, extend_total_rounds,
-                extend_report, extend_formula,
+                extend_report, extend_interim, extend_formula,
                 extend_cost_no_vat, extend_vat, extend_with_vat
             )
 
@@ -5158,6 +5212,19 @@ class ScheduleManagementTab(QWidget):
             extend_with_vat = extend_cost_no_vat + extend_vat
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
+
+            # 연장 견적 DB에 저장 (견적서 금액 일치 위해)
+            if schedule_id and hasattr(self, 'extend_item_cost_detail'):
+                try:
+                    extend_item_detail = self.extend_item_cost_detail.text() if self.extend_item_cost_detail.text() != '-' else '-'
+                    from models.schedules import Schedule
+                    Schedule.save_extend_estimate(
+                        schedule_id, extend_item_detail, cost_per_test, extend_total_cost,
+                        extend_report_cost, extend_interim_cost, extend_formula,
+                        extend_cost_no_vat, extend_vat, extend_with_vat
+                    )
+                except Exception as e:
+                    print(f"연장 견적 저장 오류 (recalculate_costs): {e}")
         else:
             if hasattr(self, 'row_extend_widget'):
                 self.row_extend_widget.hide()
@@ -5347,7 +5414,7 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'extend_cost_vat'):
                 self.extend_cost_vat.setText(f"{extend_with_vat:,}원")
 
-            # 연장 견적 전체 저장 (보고서 비용 포함)
+            # 연장 견적 전체 저장 (보고서/중간 비용 포함)
             if schedule_id:
                 try:
                     extend_item_detail = self.extend_item_cost_detail.text() if hasattr(self, 'extend_item_cost_detail') else '-'
@@ -5355,7 +5422,7 @@ class ScheduleManagementTab(QWidget):
                     from models.schedules import Schedule
                     Schedule.save_extend_estimate(
                         schedule_id, extend_item_detail, extend_cost_per_test, extend_rounds_cost,
-                        extend_report_cost, extend_formula,
+                        extend_report_cost, extend_interim_cost, extend_formula,
                         extend_cost_no_vat, extend_vat, extend_with_vat
                     )
                 except Exception as e:
