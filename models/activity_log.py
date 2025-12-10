@@ -63,18 +63,18 @@ class ActivityLog:
 
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS activity_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                user_name TEXT NOT NULL,
-                department TEXT,
-                action_type TEXT NOT NULL,
-                action_name TEXT NOT NULL,
-                target_type TEXT,
-                target_id INTEGER,
-                target_name TEXT,
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                username VARCHAR(100) NOT NULL,
+                user_name VARCHAR(100) NOT NULL,
+                department VARCHAR(100),
+                action_type VARCHAR(50) NOT NULL,
+                action_name VARCHAR(100) NOT NULL,
+                target_type VARCHAR(50),
+                target_id INT,
+                target_name VARCHAR(200),
                 details TEXT,
-                ip_address TEXT,
+                ip_address VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
