@@ -1030,8 +1030,10 @@ class ScheduleManagementTab(QWidget):
         """현재 로그인한 사용자 설정 및 권한 적용"""
         self.current_user = user
         self.apply_permissions()
-        # 사용자 변경 시 데이터 다시 로드 (열람권한 적용)
-        self.load_schedules()
+        # 사용자 변경 시 이전 스케줄 선택 초기화 후 데이터 다시 로드
+        self.clear_schedule_selection()
+        if hasattr(self, 'load_schedules'):
+            self.load_schedules()
 
     def clear_data(self):
         """탭 데이터 초기화 (로그아웃 시 호출)"""
