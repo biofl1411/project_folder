@@ -436,8 +436,12 @@ class FoodTypeSelectionDialog(QDialog):
         
         # 선택된 행 정보 가져오기
         row = selected_indexes[0].row()
-        food_type_id = self.food_type_table.item(row, 0).text()
-        food_type_name = self.food_type_table.item(row, 1).text()
+        id_item = self.food_type_table.item(row, 0)
+        name_item = self.food_type_table.item(row, 1)
+        if not id_item or not name_item:
+            return
+        food_type_id = id_item.text()
+        food_type_name = name_item.text()
         category = self.food_type_table.item(row, 2).text() if self.food_type_table.item(row, 2) else ""
         sterilization = self.food_type_table.item(row, 3).text() if self.food_type_table.item(row, 3) else ""
         pasteurization = self.food_type_table.item(row, 4).text() if self.food_type_table.item(row, 4) else ""
