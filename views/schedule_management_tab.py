@@ -3202,7 +3202,12 @@ class ScheduleManagementTab(QWidget):
 
     def get_display_settings(self):
         """데이터베이스에서 표시 설정 로드"""
+        default_fields = [opt[0] for opt in DisplaySettingsDialog.FIELD_OPTIONS]
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return default_fields  # 외부망에서는 기본값 사용
+
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
@@ -3214,10 +3219,10 @@ class ScheduleManagementTab(QWidget):
                 return result['value'].split(',')
             else:
                 # 기본값: 모든 필드 표시
-                return [opt[0] for opt in DisplaySettingsDialog.FIELD_OPTIONS]
+                return default_fields
         except Exception as e:
             print(f"표시 설정 로드 오류: {e}")
-            return [opt[0] for opt in DisplaySettingsDialog.FIELD_OPTIONS]
+            return default_fields
 
     def apply_display_settings(self):
         """표시 설정을 UI에 적용"""

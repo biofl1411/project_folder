@@ -80,16 +80,27 @@ class ActivityLog:
             )
             ''')
 
-            # 인덱스 생성 (빠른 검색을 위해)
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs (user_id)
-            ''')
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs (created_at)
-            ''')
-            cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_activity_logs_action_type ON activity_logs (action_type)
-            ''')
+            # 인덱스 생성 (빠른 검색을 위해) - 이미 존재하면 무시
+            try:
+                cursor.execute('''
+                CREATE INDEX idx_activity_logs_user_id ON activity_logs (user_id)
+                ''')
+            except:
+                pass  # 인덱스가 이미 존재함
+
+            try:
+                cursor.execute('''
+                CREATE INDEX idx_activity_logs_created_at ON activity_logs (created_at)
+                ''')
+            except:
+                pass  # 인덱스가 이미 존재함
+
+            try:
+                cursor.execute('''
+                CREATE INDEX idx_activity_logs_action_type ON activity_logs (action_type)
+                ''')
+            except:
+                pass  # 인덱스가 이미 존재함
 
             conn.commit()
             conn.close()
