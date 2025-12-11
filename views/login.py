@@ -111,29 +111,52 @@ class LoginWindow(QWidget):
             QMessageBox.warning(self, "입력 오류", "사용자명과 비밀번호를 모두 입력하세요.")
             return
 
-        # 데이터베이스에서 사용자 인증
+        # 연결 모드 확인
         try:
-            from models.users import User
-            from models.activity_log import ActivityLog
+            from connection_manager import is_internal_mode, connection_manager
 
-            user_data = User.authenticate(username, password)
-
-            if user_data:
-                # 로그인 활동 로그 기록
-                ActivityLog.log(
-                    user=user_data,
-                    action_type='user_login',
-                    details={'username': username}
-                )
-
-                # 로그인 성공 플래그 설정 (closeEvent에서 앱 종료 방지)
-                self._login_success = True
-
-                # 로그인 성공
-                self.login_successful.emit(user_data)
-                self.close()
+            if is_internal_mode():
+                # 내부망: DB 직접 연결
+                self._login_internal(username, password)
             else:
-                QMessageBox.warning(self, "로그인 실패", "사용자명 또는 비밀번호가 올바르지 않습니다.")
+                # 외부망: API 연결
+                self._login_external(username, password)
+
         except Exception as e:
             print(f"로그인 중 오류: {str(e)}")
             QMessageBox.critical(self, "오류", f"로그인 처리 중 오류가 발생했습니다: {str(e)}")
+
+    def _login_internal(self, username, password):
+        """내부망 로그인 (DB 직접 연결)"""
+        from models.users import User
+        from models.activity_log import ActivityLog
+
+        user_data = User.authenticate(username, password)
+
+        if user_data:
+            # 로그인 활동 로그 기록
+            ActivityLog.log(
+                user=user_data,
+                action_type='user_login',
+                details={'username': username, 'mode': 'internal'}
+            )
+
+            self._login_success = True
+            self.login_successful.emit(user_data)
+            self.close()
+        else:
+            QMessageBox.warning(self, "로그인 실패", "사용자명 또는 비밀번호가 올바르지 않습니다.")
+
+    def _login_external(self, username, password):
+        """외부망 로그인 (API 연결)"""
+        from connection_manager import connection_manager
+
+        api = connection_manager.get_api_client()
+        user_data = api.login(username, password)
+
+        if user_data:
+            self._login_success = True
+            self.login_successful.emit(user_data)
+            self.close()
+        else:
+            QMessageBox.warning(self, "로그인 실패", "사용자명 또는 비밀번호가 올바르지 않습니다.")

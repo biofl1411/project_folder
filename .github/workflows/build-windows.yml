@@ -1,0 +1,46 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'claude/*'
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller==5.13.2
+        pip install -r requirements.txt
+
+    - name: Build executable
+      run: |
+        pyinstaller --name=FoodLabManager --windowed --onedir --add-data "config;config" --hidden-import=requests --hidden-import=urllib3 --hidden-import=charset_normalizer --hidden-import=certifi --hidden-import=idna --hidden-import=connection_manager --hidden-import=api_client --collect-submodules=requests main.py
+
+    - name: Copy additional resources
+      run: |
+        mkdir -p dist/FoodLabManager/data
+        mkdir -p dist/FoodLabManager/output
+        Copy-Item -Path "config/*" -Destination "dist/FoodLabManager/config/" -Recurse -Force
+      shell: pwsh
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: FoodLabManager-Windows
+        path: dist/FoodLabManager/
+        retention-days: 30

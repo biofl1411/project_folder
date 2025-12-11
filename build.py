@@ -28,6 +28,14 @@ def build_executable():
         "--windowed",  # GUI 애플리케이션
         "--onedir",    # 폴더로 빌드 (--onefile 옵션을 사용하면 단일 파일로 빌드)
         "--add-data=config;config",  # 추가 데이터 파일 (Windows 형식)
+        "--hidden-import=requests",
+        "--hidden-import=urllib3",
+        "--hidden-import=charset_normalizer",
+        "--hidden-import=certifi",
+        "--hidden-import=idna",
+        "--hidden-import=connection_manager",
+        "--hidden-import=api_client",
+        "--collect-submodules=requests",
         "main.py"
     ]
 
@@ -43,7 +51,16 @@ def build_executable():
                 pyinstaller_cmd[i] = cmd.replace(";", ":")
     
     print("실행 파일 빌드 중...")
-    subprocess.call(pyinstaller_cmd)
+    print(f"명령어: {' '.join(pyinstaller_cmd)}")
+    result = subprocess.call(pyinstaller_cmd)
+
+    if result != 0:
+        print(f"\n빌드 실패! (종료 코드: {result})")
+        print("해결 방법:")
+        print("  1. pip install --upgrade pyinstaller")
+        print("  2. pip cache purge")
+        print("  3. 다시 python build.py 실행")
+        return
     
     print("추가 리소스 복사 중...")
     # 필요한 폴더 생성
