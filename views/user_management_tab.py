@@ -31,7 +31,7 @@ class UserManagementTab(QWidget):
         self.sort_column = 2  # 기본 정렬 컬럼 (이름)
         self.sort_order = Qt.AscendingOrder  # 기본 정렬 순서
         self.initUI()
-        self.load_users()
+        # load_users()는 set_current_user()에서 호출됨 (로그인 후 데이터 로드)
 
     def set_current_user(self, user):
         """현재 로그인한 사용자 설정"""
