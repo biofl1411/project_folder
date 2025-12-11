@@ -1,0 +1,6 @@
+{
+    "mode": null,
+    "internal_host": "192.168.0.96",
+    "internal_port": 3306,
+    "auto_detect": true
+}
