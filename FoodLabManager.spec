@@ -1,9 +1,26 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+import os
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
+
+# Visual C++ 런타임 DLL 자동 포함
+binaries = []
+try:
+    # PyQt5의 DLL 경로에서 필요한 파일 수집
+    import PyQt5
+    pyqt5_path = os.path.dirname(PyQt5.__file__)
+
+    # Qt 플랫폼 플러그인 포함
+    plugins_path = os.path.join(pyqt5_path, 'Qt5', 'plugins', 'platforms')
+    if os.path.exists(plugins_path):
+        for f in os.listdir(plugins_path):
+            if f.endswith('.dll'):
+                binaries.append((os.path.join(plugins_path, f), 'platforms'))
+except Exception as e:
+    print(f"PyQt5 DLL 수집 중 오류: {e}")
 
 # 모든 하위 모듈 수집
 hidden_imports = [
@@ -83,7 +100,7 @@ hidden_imports += collect_submodules('reportlab')
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=[
         ('config', 'config'),
     ],
