@@ -15,17 +15,38 @@ if getattr(sys, 'frozen', False):
 else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 
-# 오류 로그 파일 경로
+# 오류 로그 파일 경로 (exe와 같은 폴더 + 바탕화면에도 저장)
 error_log_path = os.path.join(application_path, 'startup_error.log')
+desktop_log_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'foodlab_startup.log')
 
 def write_error(msg):
-    """오류를 파일에 기록"""
+    """오류를 파일에 기록 (여러 위치에 저장)"""
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_line = f"[{timestamp}] {msg}\n"
+
+    # 1. exe 폴더에 저장
     try:
         with open(error_log_path, 'a', encoding='utf-8') as f:
-            from datetime import datetime
-            f.write(f"[{datetime.now()}] {msg}\n")
+            f.write(log_line)
+            f.flush()
     except:
         pass
+
+    # 2. 바탕화면에도 저장 (백업)
+    try:
+        with open(desktop_log_path, 'a', encoding='utf-8') as f:
+            f.write(log_line)
+            f.flush()
+    except:
+        pass
+
+# 시작 즉시 로그 기록
+write_error("=" * 50)
+write_error("프로그램 시작")
+write_error(f"실행 경로: {application_path}")
+write_error(f"Python: {sys.version}")
+write_error(f"Frozen: {getattr(sys, 'frozen', False)}")
 
 # 모든 예외를 파일에 기록
 def excepthook(exc_type, exc_value, exc_tb):
@@ -37,21 +58,22 @@ def excepthook(exc_type, exc_value, exc_tb):
 sys.excepthook = excepthook
 
 try:
-    write_error("프로그램 시작...")
-
+    write_error("기본 모듈 임포트 시작...")
     import traceback
     import logging
     from datetime import datetime
+    write_error("기본 모듈 임포트 완료")
 
     # 실행 파일 위치를 기준으로 경로 설정
     os.chdir(application_path)
     sys.path.insert(0, application_path)
-    write_error(f"작업 경로: {application_path}")
+    write_error(f"작업 경로 설정: {os.getcwd()}")
 
     # 로그 파일 설정
     log_dir = os.path.join(application_path, 'logs')
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+    write_error(f"로그 폴더: {log_dir}")
 
     log_file = os.path.join(log_dir, f'app_{datetime.now().strftime("%Y%m%d")}.log')
     logging.basicConfig(
@@ -65,19 +87,26 @@ try:
     logger = logging.getLogger(__name__)
     write_error("로깅 설정 완료")
 
+    write_error("PyQt5 임포트 시작...")
     from PyQt5.QtWidgets import QApplication, QMessageBox
     from PyQt5.QtGui import QIcon
     from PyQt5.QtCore import QTimer
     write_error("PyQt5 임포트 완료")
 
+    write_error("views 임포트 시작...")
     from views import MainWindow
+    write_error("views 임포트 완료")
+
+    write_error("version 임포트 시작...")
     from version import VERSION, APP_DISPLAY_NAME
-    write_error("views, version 임포트 완료")
+    write_error(f"version 임포트 완료 (v{VERSION})")
+
     logger.info("기본 모듈 로드 완료")
 
 except Exception as e:
     import traceback
-    write_error(f"초기화 오류: {e}\n{traceback.format_exc()}")
+    write_error(f"초기화 오류: {e}")
+    write_error(traceback.format_exc())
     sys.exit(1)
 
 def check_dependencies():
