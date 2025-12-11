@@ -513,8 +513,7 @@ class ScheduleTab(QWidget):
         # 저장된 열 순서 적용
         self.apply_column_order()
 
-        # 초기 데이터 로드
-        self.load_schedules()
+        # load_schedules()는 set_current_user()에서 호출됨 (로그인 후 데이터 로드)
     
     def load_schedules(self):
         """스케줄 목록 로드"""

@@ -1,8 +1,22 @@
 # models/communications.py
 """커뮤니케이션 모델 - 사용자 간 메시지 및 이메일 로그"""
 
-from database import get_connection
 from datetime import datetime
+
+
+def _is_internal_mode():
+    """내부망 모드 여부 확인"""
+    try:
+        from connection_manager import is_internal_mode
+        return is_internal_mode()
+    except:
+        return True  # 기본값: 내부망
+
+
+def _get_connection():
+    """DB 연결 반환 (내부망 전용)"""
+    from database import get_connection
+    return get_connection()
 
 
 class Message:
@@ -10,9 +24,11 @@ class Message:
 
     @staticmethod
     def _ensure_tables():
-        """필요한 테이블 생성 (MySQL)"""
+        """필요한 테이블 생성 (MySQL) - 내부망 전용"""
+        if not _is_internal_mode():
+            return  # 외부망에서는 테이블 생성 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 메시지 테이블
@@ -89,10 +105,12 @@ class Message:
 
     @staticmethod
     def send(sender_id, receiver_id, content, message_type='chat', subject=None):
-        """메시지 전송"""
+        """메시지 전송 - 내부망 전용"""
+        if not _is_internal_mode():
+            return None  # 외부망에서는 메시지 전송 불가
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -110,10 +128,12 @@ class Message:
 
     @staticmethod
     def get_conversation(user1_id, user2_id, limit=100):
-        """두 사용자 간의 대화 내역 조회"""
+        """두 사용자 간의 대화 내역 조회 - 내부망 전용"""
+        if not _is_internal_mode():
+            return []  # 외부망에서는 빈 목록 반환
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -138,10 +158,12 @@ class Message:
 
     @staticmethod
     def get_chat_partners(user_id):
-        """대화 상대 목록 조회 (최근 메시지 순)"""
+        """대화 상대 목록 조회 (최근 메시지 순) - 내부망 전용"""
+        if not _is_internal_mode():
+            return []  # 외부망에서는 빈 목록 반환
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -174,10 +196,12 @@ class Message:
 
     @staticmethod
     def mark_as_read(message_id, user_id):
-        """메시지 읽음 처리"""
+        """메시지 읽음 처리 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -194,10 +218,12 @@ class Message:
 
     @staticmethod
     def mark_conversation_as_read(user_id, partner_id):
-        """특정 대화의 모든 메시지 읽음 처리"""
+        """특정 대화의 모든 메시지 읽음 처리 - 내부망 전용"""
+        if not _is_internal_mode():
+            return 0
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 상대방이 보낸 메시지 중 안 읽은 것들 조회
@@ -225,10 +251,12 @@ class Message:
 
     @staticmethod
     def get_unread_count(user_id):
-        """읽지 않은 메시지 수"""
+        """읽지 않은 메시지 수 - 내부망 전용"""
+        if not _is_internal_mode():
+            return 0
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -247,10 +275,12 @@ class Message:
 
     @staticmethod
     def get_unread_by_partner(user_id):
-        """상대별 읽지 않은 메시지 수"""
+        """상대별 읽지 않은 메시지 수 - 내부망 전용"""
+        if not _is_internal_mode():
+            return {}
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -270,9 +300,11 @@ class Message:
 
     @staticmethod
     def delete_message(message_id, user_id):
-        """메시지 삭제 (본인이 보낸 메시지만)"""
+        """메시지 삭제 (본인이 보낸 메시지만) - 내부망 전용"""
+        if not _is_internal_mode():
+            return False
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 읽음 상태도 함께 삭제
@@ -293,9 +325,11 @@ class Message:
 
     @staticmethod
     def delete_conversation(user_id, partner_id):
-        """두 사용자 간의 대화 전체 삭제"""
+        """두 사용자 간의 대화 전체 삭제 - 내부망 전용"""
+        if not _is_internal_mode():
+            return 0
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 해당 대화의 메시지 ID들 조회
@@ -330,10 +364,12 @@ class EmailLog:
     @staticmethod
     def save(schedule_id, estimate_type, sender_email, to_emails, cc_emails,
              subject, body, attachment_name, sent_by=None, client_name=None):
-        """이메일 발송 로그 저장"""
+        """이메일 발송 로그 저장 - 내부망 전용"""
+        if not _is_internal_mode():
+            return None  # 외부망에서는 로그 저장 불가
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -356,10 +392,12 @@ class EmailLog:
 
     @staticmethod
     def get_all(limit=100, sent_by=None):
-        """전체 이메일 로그 조회 (sent_by로 필터링 가능)"""
+        """전체 이메일 로그 조회 (sent_by로 필터링 가능) - 내부망 전용"""
+        if not _is_internal_mode():
+            return []
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             if sent_by:
@@ -389,10 +427,12 @@ class EmailLog:
 
     @staticmethod
     def get_by_schedule(schedule_id):
-        """스케줄별 이메일 로그 조회"""
+        """스케줄별 이메일 로그 조회 - 내부망 전용"""
+        if not _is_internal_mode():
+            return []
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -412,9 +452,11 @@ class EmailLog:
 
     @staticmethod
     def get_by_id(log_id):
-        """이메일 로그 상세 조회"""
+        """이메일 로그 상세 조회 - 내부망 전용"""
+        if not _is_internal_mode():
+            return None
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -433,10 +475,12 @@ class EmailLog:
 
     @staticmethod
     def search(keyword=None, start_date=None, end_date=None, limit=100, sent_by=None):
-        """이메일 로그 검색 (sent_by로 필터링 가능)"""
+        """이메일 로그 검색 (sent_by로 필터링 가능) - 내부망 전용"""
+        if not _is_internal_mode():
+            return []
         try:
             Message._ensure_tables()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             query = """
@@ -476,9 +520,11 @@ class EmailLog:
 
     @staticmethod
     def delete(log_id, user_id=None):
-        """이메일 로그 삭제 (본인 기록만 삭제 가능)"""
+        """이메일 로그 삭제 (본인 기록만 삭제 가능) - 내부망 전용"""
+        if not _is_internal_mode():
+            return False
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             if user_id:
@@ -501,9 +547,11 @@ class EmailLog:
 
     @staticmethod
     def update_status(log_id, status=None, received=None, received_at=None):
-        """이메일 로그 상태 업데이트"""
+        """이메일 로그 상태 업데이트 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             updates = []

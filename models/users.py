@@ -1,7 +1,21 @@
 # models/users.py
-from database import get_connection
 import datetime
 import json
+
+
+def _is_internal_mode():
+    """내부망 모드 여부 확인"""
+    try:
+        from connection_manager import is_internal_mode
+        return is_internal_mode()
+    except:
+        return True  # 기본값: 내부망
+
+
+def _get_connection():
+    """DB 연결 반환 (내부망 전용)"""
+    from database import get_connection
+    return get_connection()
 
 # 부서 목록
 DEPARTMENTS = [
@@ -164,9 +178,11 @@ DEFAULT_PASSWORD = 'bfl1411'
 class User:
     @staticmethod
     def _ensure_columns():
-        """필요한 컬럼이 없으면 추가"""
+        """필요한 컬럼이 없으면 추가 - 내부망 전용"""
+        if not _is_internal_mode():
+            return  # 외부망에서는 컬럼 추가 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("SHOW COLUMNS FROM users")
             columns = [col['Field'] for col in cursor.fetchall()]
@@ -192,10 +208,12 @@ class User:
 
     @staticmethod
     def authenticate(username, password):
-        """사용자 인증"""
+        """사용자 인증 - 내부망 전용 (외부망은 API 사용)"""
+        if not _is_internal_mode():
+            return None  # 외부망에서는 API 로그인 사용
         try:
             User._ensure_columns()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 세컨드 비밀번호 체크 (admin 계정에만 적용)
@@ -266,9 +284,18 @@ class User:
     @staticmethod
     def get_by_id(user_id):
         """ID로 사용자 조회"""
+        if not _is_internal_mode():
+            # 외부망에서는 API 사용
+            try:
+                from connection_manager import connection_manager
+                api = connection_manager.get_api_client()
+                return api.get_user(user_id)
+            except Exception as e:
+                print(f"사용자 조회 API 오류: {e}")
+                return None
         try:
             User._ensure_columns()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, username, name, role, department, permissions, email, phone, is_active, can_view_all, last_login, created_at
@@ -296,9 +323,18 @@ class User:
     @staticmethod
     def get_all():
         """모든 사용자 조회"""
+        if not _is_internal_mode():
+            # 외부망에서는 API 사용
+            try:
+                from connection_manager import connection_manager
+                api = connection_manager.get_api_client()
+                return api.get_users()
+            except Exception as e:
+                print(f"사용자 목록 조회 API 오류: {e}")
+                return []
         try:
             User._ensure_columns()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, username, name, role, department, permissions, email, phone, is_active, can_view_all, last_login, created_at
@@ -326,10 +362,12 @@ class User:
 
     @staticmethod
     def create(username, password, name, role='user', department='', permissions=None, email='', phone=''):
-        """새 사용자 생성"""
+        """새 사용자 생성 - 내부망 전용"""
+        if not _is_internal_mode():
+            return None  # 외부망에서는 사용자 생성 불가
         try:
             User._ensure_columns()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             # 기본 권한 설정 (모두 False)
@@ -352,10 +390,12 @@ class User:
 
     @staticmethod
     def update(user_id, name=None, department=None, permissions=None, email=None, phone=None):
-        """사용자 정보 업데이트"""
+        """사용자 정보 업데이트 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False  # 외부망에서는 사용자 수정 불가
         try:
             User._ensure_columns()
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             updates = []
@@ -396,9 +436,11 @@ class User:
 
     @staticmethod
     def update_password(user_id, new_password):
-        """비밀번호 변경"""
+        """비밀번호 변경 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False  # 외부망에서는 비밀번호 변경 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE users SET password = %s WHERE id = %s
@@ -413,9 +455,11 @@ class User:
 
     @staticmethod
     def verify_password(user_id, password):
-        """현재 비밀번호 확인"""
+        """현재 비밀번호 확인 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False  # 외부망에서는 비밀번호 확인 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id FROM users WHERE id = %s AND password = %s
@@ -429,9 +473,11 @@ class User:
 
     @staticmethod
     def delete(user_id):
-        """사용자 삭제"""
+        """사용자 삭제 - 내부망 전용"""
+        if not _is_internal_mode():
+            return False  # 외부망에서는 사용자 삭제 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             success = cursor.rowcount > 0
@@ -462,7 +508,7 @@ class User:
 
     @staticmethod
     def toggle_active(user_id, activate=True):
-        """사용자 활성화/비활성화 토글
+        """사용자 활성화/비활성화 토글 - 내부망 전용
 
         Args:
             user_id: 사용자 ID
@@ -471,8 +517,10 @@ class User:
         Returns:
             성공 여부
         """
+        if not _is_internal_mode():
+            return False  # 외부망에서는 활성화 토글 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
 
             if activate:
@@ -496,9 +544,11 @@ class User:
 
     @staticmethod
     def get_active_status(user_id):
-        """사용자 활성화 상태 조회"""
+        """사용자 활성화 상태 조회 - 내부망 전용"""
+        if not _is_internal_mode():
+            return 0  # 외부망에서는 기본값 반환
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT is_active FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
@@ -510,7 +560,7 @@ class User:
 
     @staticmethod
     def toggle_view_all(user_id, can_view=True):
-        """사용자 열람권한 토글
+        """사용자 열람권한 토글 - 내부망 전용
 
         Args:
             user_id: 사용자 ID
@@ -519,8 +569,10 @@ class User:
         Returns:
             성공 여부
         """
+        if not _is_internal_mode():
+            return False  # 외부망에서는 열람권한 토글 불가
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE users SET can_view_all = %s WHERE id = %s
@@ -535,9 +587,11 @@ class User:
 
     @staticmethod
     def get_view_all_status(user_id):
-        """사용자 열람권한 상태 조회"""
+        """사용자 열람권한 상태 조회 - 내부망 전용"""
+        if not _is_internal_mode():
+            return 0  # 외부망에서는 기본값 반환
         try:
-            conn = get_connection()
+            conn = _get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT can_view_all FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
