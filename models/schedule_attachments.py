@@ -108,7 +108,12 @@ class ScheduleAttachment:
             (success, message, attachment_id)
         """
         if not _is_internal_mode():
-            return False, "첨부파일 업로드는 내부망에서만 가능합니다.", None
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.upload_attachment(schedule_id, source_file_path)
+            except Exception as e:
+                return False, f"첨부파일 업로드 오류 (API): {str(e)}", None
         ScheduleAttachment._ensure_table()
 
         try:
@@ -181,7 +186,12 @@ class ScheduleAttachment:
             (success, message)
         """
         if not _is_internal_mode():
-            return False, "첨부파일 삭제는 내부망에서만 가능합니다."
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.delete_attachment(attachment_id)
+            except Exception as e:
+                return False, f"첨부파일 삭제 오류 (API): {str(e)}"
         try:
             conn = get_connection()
             cursor = conn.cursor()
