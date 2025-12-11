@@ -8,6 +8,15 @@ import datetime
 import json
 
 
+def _is_internal_mode():
+    """내부망 모드 여부 확인"""
+    try:
+        from connection_manager import is_internal_mode
+        return is_internal_mode()
+    except:
+        return True
+
+
 # 활동 유형 정의
 ACTION_TYPES = {
     # 스케줄 관련
@@ -57,6 +66,8 @@ class ActivityLog:
     @staticmethod
     def _ensure_table():
         """activity_logs 테이블이 없으면 생성"""
+        if not _is_internal_mode():
+            return  # 외부망에서는 테이블 생성 불필요
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -120,6 +131,10 @@ class ActivityLog:
             target_name: 대상 이름 (예: 업체명, 제품명 등)
             details: 추가 상세 정보 (dict 또는 문자열)
         """
+        # 외부망에서는 로그 기록 생략
+        if not _is_internal_mode():
+            return None
+
         # 관리자는 로그 기록 제외 (선택사항 - 필요시 주석 처리)
         # if user and user.get('role') == 'admin':
         #     return None
@@ -170,6 +185,8 @@ class ActivityLog:
     @staticmethod
     def get_by_user(user_id, limit=100, offset=0):
         """특정 사용자의 활동 로그 조회"""
+        if not _is_internal_mode():
+            return []  # 외부망에서는 빈 목록 반환
         try:
             ActivityLog._ensure_table()
 
@@ -207,6 +224,8 @@ class ActivityLog:
                 - date_to: 종료 날짜 (YYYY-MM-DD)
                 - target_type: 대상 타입
         """
+        if not _is_internal_mode():
+            return []  # 외부망에서는 빈 목록 반환
         try:
             ActivityLog._ensure_table()
 
@@ -256,6 +275,8 @@ class ActivityLog:
     @staticmethod
     def get_count(filters=None):
         """활동 로그 총 개수 조회"""
+        if not _is_internal_mode():
+            return 0  # 외부망에서는 0 반환
         try:
             ActivityLog._ensure_table()
 
@@ -298,6 +319,8 @@ class ActivityLog:
     @staticmethod
     def get_user_summary():
         """사용자별 활동 요약 (최근 활동 수)"""
+        if not _is_internal_mode():
+            return []  # 외부망에서는 빈 목록 반환
         try:
             ActivityLog._ensure_table()
 
