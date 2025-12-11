@@ -62,7 +62,7 @@ class ApiClient:
         """API 요청 실행"""
         url = f"{self._base_url}{endpoint}"
         # 타임아웃 설정: (연결 타임아웃, 읽기 타임아웃)
-        timeout = (10, 60)  # 연결 10초, 읽기 60초
+        timeout = (2, 5)  # 연결 2초, 읽기 5초
 
         try:
             if method == "GET":
@@ -367,6 +367,18 @@ class ApiClient:
         """스케줄 첨부파일 목록"""
         result = self._request("GET", f"/api/schedules/{schedule_id}/attachments")
         return result.get("data", [])
+
+    # ==================== Settings ====================
+
+    def get_settings(self):
+        """모든 설정 조회"""
+        result = self._request("GET", "/api/settings")
+        return result.get("data", {})
+
+    def get_setting(self, key):
+        """특정 설정 조회"""
+        result = self._request("GET", f"/api/settings/{key}")
+        return result.get("data")
 
     # ==================== Health Check ====================
 

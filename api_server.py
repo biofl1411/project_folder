@@ -578,6 +578,40 @@ async def get_schedule_attachments(schedule_id: int, user: dict = Depends(verify
     return {"success": True, "data": attachments_list}
 
 
+# ==================== Settings API ====================
+
+@app.get("/api/settings")
+async def get_settings(user: dict = Depends(verify_token)):
+    """설정 목록 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT `key`, value FROM settings")
+        settings = cursor.fetchall()
+        conn.close()
+        settings_dict = {s['key']: s['value'] for s in settings}
+        return {"success": True, "data": settings_dict}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": {}}
+
+@app.get("/api/settings/{key}")
+async def get_setting(key: str, user: dict = Depends(verify_token)):
+    """특정 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE `key` = %s", (key,))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            return {"success": True, "data": result['value']}
+        return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": None}
+
+
 # ==================== Health Check ====================
 
 @app.get("/api/health")

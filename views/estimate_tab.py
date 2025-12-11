@@ -1153,25 +1153,29 @@ class EstimateTab(QWidget):
         """설정에서 회사 정보 불러오기"""
         import os
 
-        # 외부망 모드 체크
         try:
             from connection_manager import is_internal_mode
-            if not is_internal_mode():
-                # 외부망에서는 기본값 사용
-                self._set_default_company_info()
-                return
-        except:
-            pass
+            if is_internal_mode():
+                # 내부망: DB 직접 접근
+                from database import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT `key`, value FROM settings")
+                settings = cursor.fetchall()
+                conn.close()
+                settings_dict = {s['key']: s['value'] for s in settings}
+            else:
+                # 외부망: API 사용
+                from api_client import get_api_client
+                api = get_api_client()
+                settings_dict = api.get_settings()
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+            self._set_default_company_info()
+            return
 
         try:
-            from database import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT `key`, value FROM settings")
-            settings = cursor.fetchall()
-            conn.close()
-
-            settings_dict = {s['key']: s['value'] for s in settings}
+            settings_dict = settings_dict or {}
 
             # 회사명
             company_name = settings_dict.get('company_name', '(주)바이오푸드랩')

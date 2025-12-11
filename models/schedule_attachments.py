@@ -14,6 +14,12 @@ def _is_internal_mode():
         return True
 
 
+def _get_api():
+    """API 클라이언트 반환"""
+    from api_client import get_api_client
+    return get_api_client()
+
+
 class ScheduleAttachment:
     """스케줄 첨부파일 관리"""
 
@@ -69,20 +75,23 @@ class ScheduleAttachment:
     @staticmethod
     def get_by_schedule(schedule_id):
         """스케줄 ID로 첨부파일 목록 조회"""
-        if not _is_internal_mode():
-            return []  # 외부망에서는 첨부파일 조회 불가
-        ScheduleAttachment._ensure_table()
         try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT * FROM schedule_attachments
-                WHERE schedule_id = %s
-                ORDER BY uploaded_at DESC
-            ''', (schedule_id,))
-            result = cursor.fetchall()
-            conn.close()
-            return result
+            if _is_internal_mode():
+                ScheduleAttachment._ensure_table()
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM schedule_attachments
+                    WHERE schedule_id = %s
+                    ORDER BY uploaded_at DESC
+                ''', (schedule_id,))
+                result = cursor.fetchall()
+                conn.close()
+                return result
+            else:
+                # 외부망: API 사용
+                api = _get_api()
+                return api.get_schedule_attachments(schedule_id)
         except Exception as e:
             print(f"첨부파일 조회 오류: {str(e)}")
             return []
