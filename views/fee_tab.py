@@ -33,7 +33,7 @@ class FeeTab(QWidget):
         self.search_timer.timeout.connect(self.filter_fees)
 
         self.initUI()
-        self.load_fees()
+        # load_fees()는 set_current_user()에서 호출됨 (로그인 후 데이터 로드)
 
     def set_current_user(self, user):
         """현재 로그인한 사용자 설정 및 권한 적용"""
