@@ -1141,6 +1141,10 @@ class ScheduleTab(QWidget):
         """데이터베이스에서 컬럼 설정 로드"""
         default_columns = [opt[0] for opt in ScheduleDisplaySettingsDialog.COLUMN_OPTIONS if opt[2]]
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return default_columns
+
             from database import get_connection
             conn = get_connection()
             if not conn:
@@ -1185,6 +1189,10 @@ class ScheduleTab(QWidget):
     def save_column_order(self):
         """현재 열 순서를 데이터베이스에 저장"""
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return  # 외부망에서는 저장 안 함
+
             from database import get_connection
             header = self.schedule_table.horizontalHeader()
 
@@ -1214,6 +1222,10 @@ class ScheduleTab(QWidget):
     def get_column_order(self):
         """데이터베이스에서 열 순서 로드"""
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return None  # 외부망에서는 기본 순서 사용
+
             from database import get_connection
             conn = get_connection()
             if not conn:

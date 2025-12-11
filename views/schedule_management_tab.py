@@ -700,7 +700,12 @@ class ScheduleSelectDialog(QDialog):
 
     def get_column_settings(self):
         """데이터베이스에서 스케줄 작성 탭 컬럼 설정 로드"""
+        default_columns = [col[0] for col in self.ALL_COLUMNS if col[3]]
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return default_columns  # 외부망에서는 기본값 사용
+
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()
@@ -712,10 +717,10 @@ class ScheduleSelectDialog(QDialog):
                 return result['value'].split(',')
             else:
                 # 기본값: 기본 표시 컬럼
-                return [col[0] for col in self.ALL_COLUMNS if col[3]]
+                return default_columns
         except Exception as e:
             print(f"컬럼 설정 로드 오류: {e}")
-            return [col[0] for col in self.ALL_COLUMNS if col[3]]
+            return default_columns
 
     def apply_column_settings(self):
         """컬럼 표시 설정을 테이블에 적용"""
