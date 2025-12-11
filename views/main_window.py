@@ -436,6 +436,10 @@ class MainWindow(QMainWindow):
         """대시보드 세부 내역 컬럼 설정 가져오기"""
         default_columns = ['client_name', 'product_name', 'start_date', 'end_date', 'status', 'interim_date']
         try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                return default_columns  # 외부망에서는 기본값 사용
+
             from database import get_connection
             conn = get_connection()
             cursor = conn.cursor()

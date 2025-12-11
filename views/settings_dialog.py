@@ -23,6 +23,10 @@ def get_status_settings():
     ]
 
     try:
+        from connection_manager import is_internal_mode
+        if not is_internal_mode():
+            return default_statuses  # 외부망에서는 기본값 사용
+
         from database import get_connection
         conn = get_connection()
         cursor = conn.cursor()
