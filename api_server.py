@@ -578,12 +578,87 @@ async def get_schedule_attachments(schedule_id: int, user: dict = Depends(verify
     return {"success": True, "data": attachments_list}
 
 
+# ==================== Settings API ====================
+
+@app.get("/api/settings")
+async def get_settings(user: dict = Depends(verify_token)):
+    """설정 목록 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT `key`, value FROM settings")
+        settings = cursor.fetchall()
+        conn.close()
+        settings_dict = {s['key']: s['value'] for s in settings}
+        return {"success": True, "data": settings_dict}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": {}}
+
+@app.get("/api/settings/{key}")
+async def get_setting(key: str, user: dict = Depends(verify_token)):
+    """특정 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE `key` = %s", (key,))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            return {"success": True, "data": result['value']}
+        return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": None}
+
+
 # ==================== Health Check ====================
 
 @app.get("/api/health")
 async def health_check():
     """서버 상태 확인"""
     return {"status": "ok", "message": "API 서버가 정상 작동중입니다"}
+
+
+@app.get("/api/debug/db-config")
+async def get_db_config():
+    """데이터베이스 설정 확인 (진단용)"""
+    from database import load_db_config
+    config = load_db_config()
+    # 보안을 위해 비밀번호는 마스킹
+    return {
+        "host": config.get("host"),
+        "port": config.get("port"),
+        "database": config.get("database"),
+        "user": config.get("user"),
+        "charset": config.get("charset")
+    }
+
+
+@app.get("/api/debug/db-stats")
+async def get_db_stats():
+    """데이터베이스 통계 확인 (진단용)"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        stats = {}
+
+        # 각 테이블의 레코드 수 확인
+        tables = ['clients', 'schedules', 'users', 'fees', 'food_types']
+        for table in tables:
+            try:
+                cursor.execute(f"SELECT COUNT(*) as cnt FROM {table}")
+                result = cursor.fetchone()
+                stats[table] = result['cnt'] if result else 0
+            except:
+                stats[table] = "error"
+
+        conn.close()
+        return {"success": True, "data": stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ==================== 서버 실행 ====================

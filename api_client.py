@@ -61,18 +61,20 @@ class ApiClient:
     def _request(self, method, endpoint, data=None, params=None):
         """API 요청 실행"""
         url = f"{self._base_url}{endpoint}"
+        # 타임아웃 설정: (연결 타임아웃, 읽기 타임아웃)
+        timeout = (2, 5)  # 연결 2초, 읽기 5초
 
         try:
             if method == "GET":
-                response = requests.get(url, headers=self._get_headers(), params=params, timeout=30)
+                response = requests.get(url, headers=self._get_headers(), params=params, timeout=timeout)
             elif method == "POST":
-                response = requests.post(url, headers=self._get_headers(), json=data, timeout=30)
+                response = requests.post(url, headers=self._get_headers(), json=data, timeout=timeout)
             elif method == "PUT":
-                response = requests.put(url, headers=self._get_headers(), json=data, timeout=30)
+                response = requests.put(url, headers=self._get_headers(), json=data, timeout=timeout)
             elif method == "PATCH":
-                response = requests.patch(url, headers=self._get_headers(), json=data, params=params, timeout=30)
+                response = requests.patch(url, headers=self._get_headers(), json=data, params=params, timeout=timeout)
             elif method == "DELETE":
-                response = requests.delete(url, headers=self._get_headers(), timeout=30)
+                response = requests.delete(url, headers=self._get_headers(), timeout=timeout)
             else:
                 raise ValueError(f"지원하지 않는 HTTP 메서드: {method}")
 
@@ -85,15 +87,15 @@ class ApiClient:
             response.raise_for_status()
             return response.json()
 
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError as e:
             # 내부망 실패시 외부망 시도
             if self._base_url == API_BASE_URL:
                 self._base_url = API_EXTERNAL_URL
                 return self._request(method, endpoint, data, params)
-            raise Exception("서버에 연결할 수 없습니다. 네트워크를 확인해주세요.")
+            raise Exception(f"서버에 연결할 수 없습니다: {str(e)}")
 
         except requests.exceptions.Timeout:
-            raise Exception("서버 응답 시간이 초과되었습니다.")
+            raise Exception("서버 응답 시간이 초과되었습니다. (60초)")
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"API 요청 오류: {str(e)}")
@@ -365,6 +367,18 @@ class ApiClient:
         """스케줄 첨부파일 목록"""
         result = self._request("GET", f"/api/schedules/{schedule_id}/attachments")
         return result.get("data", [])
+
+    # ==================== Settings ====================
+
+    def get_settings(self):
+        """모든 설정 조회"""
+        result = self._request("GET", "/api/settings")
+        return result.get("data", {})
+
+    def get_setting(self, key):
+        """특정 설정 조회"""
+        result = self._request("GET", f"/api/settings/{key}")
+        return result.get("data")
 
     # ==================== Health Check ====================
 

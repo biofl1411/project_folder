@@ -1152,15 +1152,30 @@ class EstimateTab(QWidget):
     def load_company_info(self):
         """설정에서 회사 정보 불러오기"""
         import os
-        try:
-            from database import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT `key`, value FROM settings")
-            settings = cursor.fetchall()
-            conn.close()
 
-            settings_dict = {s['key']: s['value'] for s in settings}
+        try:
+            from connection_manager import is_internal_mode
+            if is_internal_mode():
+                # 내부망: DB 직접 접근
+                from database import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT `key`, value FROM settings")
+                settings = cursor.fetchall()
+                conn.close()
+                settings_dict = {s['key']: s['value'] for s in settings}
+            else:
+                # 외부망: API 사용
+                from api_client import get_api_client
+                api = get_api_client()
+                settings_dict = api.get_settings()
+        except Exception as e:
+            print(f"설정 로드 오류: {e}")
+            self._set_default_company_info()
+            return
+
+        try:
+            settings_dict = settings_dict or {}
 
             # 회사명
             company_name = settings_dict.get('company_name', '(주)바이오푸드랩')
@@ -1271,7 +1286,31 @@ class EstimateTab(QWidget):
         except Exception as e:
             print(f"회사 정보 로드 오류: {e}")
             # 기본값 설정
-            self.right_company_info.setText("""회사명 : (주)바이오푸드랩
+            self._set_default_company_info()
+
+    def _set_default_company_info(self):
+        """기본 회사 정보 설정 (외부망 또는 오류 시)"""
+        # 기본 텍스트 로고
+        self.logo_label.setText("BFL")
+        self.logo_label.setStyleSheet("""
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e90ff;
+            font-family: Arial;
+        """)
+
+        # 회사명
+        self.header_company_label.setText("(주)바이오푸드랩")
+        self.sender_input.setText("(주)바이오푸드랩")
+
+        # 주소
+        self.header_address_label.setText("서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호")
+
+        # 직인 숨김
+        self.stamp_label.clear()
+
+        # 오른쪽 회사 정보
+        self.right_company_info.setText("""회사명 : (주)바이오푸드랩
 대표자 : 이용표
 담당자 :
 연락처 :
