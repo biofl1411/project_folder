@@ -29,7 +29,7 @@ jobs:
 
     - name: Build executable
       run: |
-        pyinstaller --name=FoodLabManager --windowed --onedir --add-data "config;config" --hidden-import=requests --hidden-import=urllib3 --hidden-import=charset_normalizer --hidden-import=certifi --hidden-import=idna --hidden-import=connection_manager --hidden-import=api_client --hidden-import=logging --hidden-import=pymysql --collect-submodules=requests --collect-submodules=pymysql main.py
+        pyinstaller --name=FoodLabManager --console --onedir --add-data "config;config" --hidden-import=requests --hidden-import=urllib3 --hidden-import=charset_normalizer --hidden-import=certifi --hidden-import=idna --hidden-import=connection_manager --hidden-import=api_client --hidden-import=logging --hidden-import=pymysql --collect-submodules=requests --collect-submodules=pymysql main.py
 
     - name: Copy additional resources
       run: |
