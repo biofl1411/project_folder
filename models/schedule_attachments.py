@@ -4,6 +4,16 @@ import os
 import shutil
 from datetime import datetime
 
+
+def _is_internal_mode():
+    """내부망 모드 여부 확인"""
+    try:
+        from connection_manager import is_internal_mode
+        return is_internal_mode()
+    except:
+        return True
+
+
 class ScheduleAttachment:
     """스케줄 첨부파일 관리"""
 
@@ -20,6 +30,8 @@ class ScheduleAttachment:
     @staticmethod
     def _ensure_table():
         """테이블이 없으면 생성"""
+        if not _is_internal_mode():
+            return  # 외부망에서는 테이블 생성 불필요
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -57,6 +69,8 @@ class ScheduleAttachment:
     @staticmethod
     def get_by_schedule(schedule_id):
         """스케줄 ID로 첨부파일 목록 조회"""
+        if not _is_internal_mode():
+            return []  # 외부망에서는 첨부파일 조회 불가
         ScheduleAttachment._ensure_table()
         try:
             conn = get_connection()
@@ -84,6 +98,8 @@ class ScheduleAttachment:
         Returns:
             (success, message, attachment_id)
         """
+        if not _is_internal_mode():
+            return False, "첨부파일 업로드는 내부망에서만 가능합니다.", None
         ScheduleAttachment._ensure_table()
 
         try:
@@ -155,6 +171,8 @@ class ScheduleAttachment:
         Returns:
             (success, message)
         """
+        if not _is_internal_mode():
+            return False, "첨부파일 삭제는 내부망에서만 가능합니다."
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -198,6 +216,8 @@ class ScheduleAttachment:
         Returns:
             절대 경로 또는 None
         """
+        if not _is_internal_mode():
+            return None  # 외부망에서는 파일 경로 조회 불가
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -227,6 +247,8 @@ class ScheduleAttachment:
     @staticmethod
     def get_by_id(attachment_id):
         """ID로 첨부파일 정보 조회"""
+        if not _is_internal_mode():
+            return None  # 외부망에서는 첨부파일 정보 조회 불가
         try:
             conn = get_connection()
             cursor = conn.cursor()

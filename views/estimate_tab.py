@@ -1152,6 +1152,17 @@ class EstimateTab(QWidget):
     def load_company_info(self):
         """설정에서 회사 정보 불러오기"""
         import os
+
+        # 외부망 모드 체크
+        try:
+            from connection_manager import is_internal_mode
+            if not is_internal_mode():
+                # 외부망에서는 기본값 사용
+                self._set_default_company_info()
+                return
+        except:
+            pass
+
         try:
             from database import get_connection
             conn = get_connection()
@@ -1271,7 +1282,31 @@ class EstimateTab(QWidget):
         except Exception as e:
             print(f"회사 정보 로드 오류: {e}")
             # 기본값 설정
-            self.right_company_info.setText("""회사명 : (주)바이오푸드랩
+            self._set_default_company_info()
+
+    def _set_default_company_info(self):
+        """기본 회사 정보 설정 (외부망 또는 오류 시)"""
+        # 기본 텍스트 로고
+        self.logo_label.setText("BFL")
+        self.logo_label.setStyleSheet("""
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e90ff;
+            font-family: Arial;
+        """)
+
+        # 회사명
+        self.header_company_label.setText("(주)바이오푸드랩")
+        self.sender_input.setText("(주)바이오푸드랩")
+
+        # 주소
+        self.header_address_label.setText("서울특별시 구로구 디지털로 30길 28, 마리오타워 1410~1414호")
+
+        # 직인 숨김
+        self.stamp_label.clear()
+
+        # 오른쪽 회사 정보
+        self.right_company_info.setText("""회사명 : (주)바이오푸드랩
 대표자 : 이용표
 담당자 :
 연락처 :
