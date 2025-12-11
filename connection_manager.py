@@ -7,6 +7,7 @@
 '''
 
 import os
+import sys
 import json
 import socket
 
@@ -16,6 +17,30 @@ CONFIG_PATH = 'config/connection_config.json'
 # 연결 모드
 MODE_INTERNAL = 'internal'  # 내부망 - DB 직접 연결
 MODE_EXTERNAL = 'external'  # 외부망 - API 연결
+
+def _write_log(msg):
+    """연결 관리자 로그 기록"""
+    try:
+        from datetime import datetime
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        log_path = os.path.join(base_path, 'startup_error.log')
+        desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'foodlab_startup.log')
+
+        log_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [ConnectionManager] {msg}\n"
+
+        for path in [log_path, desktop_path]:
+            try:
+                with open(path, 'a', encoding='utf-8') as f:
+                    f.write(log_line)
+                    f.flush()
+            except:
+                pass
+    except:
+        pass
 
 
 class ConnectionManager:
@@ -59,32 +84,46 @@ class ConnectionManager:
 
     def _detect_mode(self):
         """연결 모드 자동 감지"""
-        config = self._load_config()
+        _write_log("연결 모드 감지 시작...")
+
+        try:
+            config = self._load_config()
+            _write_log(f"설정 로드 완료: {config}")
+        except Exception as e:
+            _write_log(f"설정 로드 오류: {e}")
+            config = {}
 
         # 수동 설정이 있으면 사용
         if config.get('mode'):
             self._mode = config['mode']
+            _write_log(f"수동 설정 사용: {self._mode}")
             return
 
         # 자동 감지: 내부망 서버에 연결 시도
         internal_host = config.get('internal_host', '192.168.0.96')
         internal_port = config.get('internal_port', 3306)
+        _write_log(f"내부망 연결 시도: {internal_host}:{internal_port}")
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)
+            sock.settimeout(1)  # 타임아웃 1초로 단축
             result = sock.connect_ex((internal_host, internal_port))
             sock.close()
 
             if result == 0:
                 self._mode = MODE_INTERNAL
+                _write_log("내부망 감지됨 - DB 직접 연결 사용")
                 print(f"[연결 모드] 내부망 감지됨 - DB 직접 연결 사용")
             else:
                 self._mode = MODE_EXTERNAL
+                _write_log(f"외부망 감지됨 (연결 실패 코드: {result}) - API 연결 사용")
                 print(f"[연결 모드] 외부망 감지됨 - API 연결 사용")
-        except:
+        except Exception as e:
             self._mode = MODE_EXTERNAL
+            _write_log(f"연결 예외 발생: {e} - 외부망으로 설정")
             print(f"[연결 모드] 외부망으로 설정 - API 연결 사용")
+
+        _write_log(f"최종 연결 모드: {self._mode}")
 
     def get_mode(self):
         """현재 연결 모드 반환"""

@@ -8,25 +8,105 @@
 
 import sys
 import os
-import traceback
 
-# 실행 파일 위치를 기준으로 경로 설정 (빌드 후 실행을 위해 필요)
+# 가장 먼저 오류 로그 설정 (모든 오류 캡처)
 if getattr(sys, 'frozen', False):
-    # 실행 파일로 빌드된 경우
     application_path = os.path.dirname(sys.executable)
-    os.chdir(application_path)
-    sys.path.insert(0, application_path)
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+# 오류 로그 파일 경로 (exe와 같은 폴더 + 바탕화면에도 저장)
+error_log_path = os.path.join(application_path, 'startup_error.log')
+desktop_log_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'foodlab_startup.log')
+
+def write_error(msg):
+    """오류를 파일에 기록 (여러 위치에 저장)"""
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_line = f"[{timestamp}] {msg}\n"
+
+    # 1. exe 폴더에 저장
+    try:
+        with open(error_log_path, 'a', encoding='utf-8') as f:
+            f.write(log_line)
+            f.flush()
+    except:
+        pass
+
+    # 2. 바탕화면에도 저장 (백업)
+    try:
+        with open(desktop_log_path, 'a', encoding='utf-8') as f:
+            f.write(log_line)
+            f.flush()
+    except:
+        pass
+
+# 시작 즉시 로그 기록
+write_error("=" * 50)
+write_error("프로그램 시작")
+write_error(f"실행 경로: {application_path}")
+write_error(f"Python: {sys.version}")
+write_error(f"Frozen: {getattr(sys, 'frozen', False)}")
+
+# 모든 예외를 파일에 기록
+def excepthook(exc_type, exc_value, exc_tb):
+    import traceback
+    error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    write_error(f"Unhandled exception:\n{error_msg}")
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = excepthook
 
 try:
+    write_error("기본 모듈 임포트 시작...")
+    import traceback
+    import logging
+    from datetime import datetime
+    write_error("기본 모듈 임포트 완료")
+
+    # 실행 파일 위치를 기준으로 경로 설정
+    os.chdir(application_path)
+    sys.path.insert(0, application_path)
+    write_error(f"작업 경로 설정: {os.getcwd()}")
+
+    # 로그 파일 설정
+    log_dir = os.path.join(application_path, 'logs')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    write_error(f"로그 폴더: {log_dir}")
+
+    log_file = os.path.join(log_dir, f'app_{datetime.now().strftime("%Y%m%d")}.log')
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    write_error("로깅 설정 완료")
+
+    write_error("PyQt5 임포트 시작...")
     from PyQt5.QtWidgets import QApplication, QMessageBox
     from PyQt5.QtGui import QIcon
     from PyQt5.QtCore import QTimer
+    write_error("PyQt5 임포트 완료")
 
+    write_error("views 임포트 시작...")
     from views import MainWindow
-    from database import init_database
+    write_error("views 임포트 완료")
+
+    write_error("version 임포트 시작...")
     from version import VERSION, APP_DISPLAY_NAME
-except ImportError as e:
-    print(f"필요한 라이브러리를 불러올 수 없습니다: {e}")
+    write_error(f"version 임포트 완료 (v{VERSION})")
+
+    logger.info("기본 모듈 로드 완료")
+
+except Exception as e:
+    import traceback
+    write_error(f"초기화 오류: {e}")
+    write_error(traceback.format_exc())
     sys.exit(1)
 
 def check_dependencies():
@@ -41,17 +121,36 @@ def check_dependencies():
 def setup_environment():
     """환경 설정"""
     # 필요한 폴더 확인 및 생성
-    folders = ['data', 'output', 'templates', 'config']
+    folders = ['data', 'output', 'templates', 'config', 'logs']
     for folder in folders:
         if not os.path.exists(folder):
             os.makedirs(folder)
+            logger.info(f"폴더 생성: {folder}")
 
-    # 데이터베이스 초기화
+    # 연결 모드 확인
     try:
-        init_database()
+        from connection_manager import is_internal_mode, get_connection_mode
+        mode = get_connection_mode()
+        logger.info(f"연결 모드: {mode}")
+
+        if is_internal_mode():
+            # 내부망: 데이터베이스 직접 초기화
+            from database import init_database
+            init_database()
+            logger.info("데이터베이스 초기화 완료 (내부망)")
+        else:
+            # 외부망: API 서버 연결 확인
+            from api_client import ApiClient
+            api = ApiClient()
+            if api.health_check():
+                logger.info("API 서버 연결 확인 완료 (외부망)")
+            else:
+                logger.warning("API 서버 연결 실패 - 오프라인 모드")
+
     except Exception as e:
-        print(f"데이터베이스 초기화 중 오류 발생: {e}")
-        return False
+        logger.error(f"환경 설정 중 오류 발생: {e}")
+        logger.error(traceback.format_exc())
+        # 오류가 발생해도 계속 진행 (로그인 시도 가능)
 
     return True
 
@@ -67,32 +166,46 @@ def check_for_updates(window):
 
 def main():
     """메인 함수"""
+    logger.info("=" * 50)
+    logger.info("프로그램 시작")
+    logger.info(f"버전: {VERSION}")
+    logger.info("=" * 50)
+
     # 의존성 체크
     if not check_dependencies():
+        logger.error("필요한 라이브러리가 설치되지 않았습니다.")
         print("필요한 라이브러리가 설치되지 않았습니다.")
         print("pip install -r requirements.txt 명령으로 필요한 라이브러리를 설치하세요.")
         return
 
     # 환경 설정
+    logger.info("환경 설정 시작...")
     if not setup_environment():
+        logger.error("환경 설정 중 오류가 발생했습니다.")
         print("환경 설정 중 오류가 발생했습니다.")
         return
+
+    logger.info("환경 설정 완료")
 
     # QApplication 생성
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # 모던한 스타일 적용
     app.setApplicationName(APP_DISPLAY_NAME)
     app.setApplicationVersion(VERSION)
+    logger.info("QApplication 생성 완료")
 
     # 메인 윈도우 생성 및 표시
     try:
+        logger.info("메인 윈도우 생성 중...")
         window = MainWindow()
+        logger.info("메인 윈도우 생성 완료")
 
         # 2초 후 업데이트 확인 (비동기)
         QTimer.singleShot(2000, lambda: check_for_updates(window))
 
     except Exception as e:
         error_msg = f"프로그램 초기화 중 오류가 발생했습니다:\n{e}\n\n{traceback.format_exc()}"
+        logger.error(error_msg)
         print(error_msg)
 
         # GUI 오류 메시지
@@ -105,12 +218,14 @@ def main():
         return
 
     # 앱 실행
+    logger.info("앱 실행 시작")
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"예상치 못한 오류가 발생했습니다: {e}")
-        print(traceback.format_exc())
+        error_msg = f"예상치 못한 오류가 발생했습니다: {e}\n{traceback.format_exc()}"
+        logger.critical(error_msg)
+        print(error_msg)
         sys.exit(1)
