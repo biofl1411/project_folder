@@ -3478,6 +3478,32 @@ class ScheduleManagementTab(QWidget):
 
         return data
 
+    def _save_experiment_data_to_db(self):
+        """O/X 상태 데이터를 DB에 즉시 저장 (자동 저장)"""
+        if not self.current_schedule:
+            return
+
+        schedule_id = self.current_schedule.get('id')
+        if not schedule_id:
+            return
+
+        try:
+            import json
+            from database import get_connection
+
+            experiment_data = self._collect_experiment_schedule_data()
+            experiment_data_json = json.dumps(experiment_data, ensure_ascii=False) if experiment_data else None
+
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE schedules SET experiment_schedule_data = %s WHERE id = %s
+            """, (experiment_data_json, schedule_id))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"O/X 상태 자동 저장 오류: {e}")
+
     def change_status(self):
         """상태 클릭 시 변경 가능하도록 (커스텀 상태 사용, 즉시 DB 저장)"""
         if not self.current_schedule:
@@ -4762,6 +4788,9 @@ class ScheduleManagementTab(QWidget):
             details={'test_item': test_item_name, 'round': col, 'old_value': current_value, 'new_value': new_value}
         )
 
+        # O/X 상태를 DB에 즉시 저장
+        self._save_experiment_data_to_db()
+
         # 비용 재계산
         self.recalculate_costs()
 
@@ -4819,6 +4848,8 @@ class ScheduleManagementTab(QWidget):
                 'schedule_experiment_bulk_x',
                 details={'changed_cells': changed_count}
             )
+            # O/X 상태를 DB에 즉시 저장
+            self._save_experiment_data_to_db()
             # 비용 재계산
             self.recalculate_costs()
             QMessageBox.information(self, "일괄 변경 완료", f"{changed_count}개 셀이 X로 변경되었습니다.")
