@@ -3,65 +3,114 @@
 
 """
 애플리케이션 로깅 유틸리티
-모든 작업과 오류를 기록합니다.
+- Python logging 모듈과 통합
+- 기존 API(log_message, log_error 등) 호환 유지
+- 통일된 로그 형식 사용
 """
 
+import logging
 import datetime
 import traceback
 import os
 import sys
 
-# 로그 파일 경로 설정
-LOG_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'app_log.txt')
+# 로그 디렉토리 및 파일 경로 설정
+if getattr(sys, 'frozen', False):
+    BASE_PATH = os.path.dirname(sys.executable)
+else:
+    BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+LOG_DIR = os.path.join(BASE_PATH, 'logs')
+LOG_FILE_PATH = os.path.join(BASE_PATH, 'app_log.txt')
+
+# 로그 디렉토리 생성
+if not os.path.exists(LOG_DIR):
+    try:
+        os.makedirs(LOG_DIR)
+    except:
+        pass
 
 
 class AppLogger:
-    """애플리케이션 로거 클래스"""
+    """
+    애플리케이션 로거 클래스
+    Python logging을 래핑하여 카테고리 기반 로깅 제공
+    """
 
     _instance = None
+    _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
         return cls._instance
 
     def __init__(self):
-        if self._initialized:
+        if AppLogger._initialized:
             return
-        self._initialized = True
-        self.log_file_path = LOG_FILE_PATH
+        AppLogger._initialized = True
+        self._setup_logging()
 
-    def _write_log(self, level, category, message):
-        """로그를 파일과 콘솔에 기록"""
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        log_entry = f"[{timestamp}] [{level}] [{category}] {message}"
+    def _setup_logging(self):
+        """Python logging 설정"""
+        # 루트 로거 가져오기
+        self.root_logger = logging.getLogger('FoodLabManager')
+        self.root_logger.setLevel(logging.DEBUG)
 
-        # 콘솔 출력
-        print(log_entry)
+        # 기존 핸들러 제거 (중복 방지)
+        self.root_logger.handlers.clear()
 
-        # 파일 출력
+        # 통일된 로그 형식
+        # 형식: [2025-12-12 09:41:37.587] [INFO] [ScheduleTab] 메시지
+        formatter = logging.Formatter(
+            '[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+
+        # 콘솔 핸들러
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.root_logger.addHandler(console_handler)
+
+        # 일반 로그 파일 핸들러 (app_log.txt)
         try:
-            with open(self.log_file_path, 'a', encoding='utf-8') as log_file:
-                log_file.write(log_entry + '\n')
+            file_handler = logging.FileHandler(LOG_FILE_PATH, encoding='utf-8')
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(formatter)
+            self.root_logger.addHandler(file_handler)
         except Exception as e:
-            print(f"[{timestamp}] [ERROR] [Logger] 로그 파일 쓰기 실패: {str(e)}")
+            print(f"[WARNING] 로그 파일 핸들러 생성 실패: {e}")
+
+        # 일별 로그 파일 핸들러 (logs/app_YYYYMMDD.log)
+        try:
+            daily_log_file = os.path.join(LOG_DIR, f"app_{datetime.datetime.now().strftime('%Y%m%d')}.log")
+            daily_handler = logging.FileHandler(daily_log_file, encoding='utf-8')
+            daily_handler.setLevel(logging.DEBUG)
+            daily_handler.setFormatter(formatter)
+            self.root_logger.addHandler(daily_handler)
+        except Exception as e:
+            print(f"[WARNING] 일별 로그 파일 핸들러 생성 실패: {e}")
+
+    def _get_logger(self, category):
+        """카테고리별 로거 반환"""
+        return logging.getLogger(f'FoodLabManager.{category}')
 
     def info(self, category, message):
         """정보 로그"""
-        self._write_log('INFO', category, message)
+        self._get_logger(category).info(message)
 
     def warning(self, category, message):
         """경고 로그"""
-        self._write_log('WARNING', category, message)
+        self._get_logger(category).warning(message)
 
     def error(self, category, message):
         """오류 로그"""
-        self._write_log('ERROR', category, message)
+        self._get_logger(category).error(message)
 
     def critical(self, category, message):
         """치명적 오류 로그"""
-        self._write_log('CRITICAL', category, message)
+        self._get_logger(category).critical(message)
 
     def exception(self, category, message, exc_info=None):
         """예외 로그 (트레이스백 포함)"""
@@ -70,11 +119,11 @@ class AppLogger:
 
         tb_str = ''.join(traceback.format_exception(*exc_info))
         full_message = f"{message}\n{tb_str}"
-        self._write_log('EXCEPTION', category, full_message)
+        self._get_logger(category).error(full_message)
 
     def debug(self, category, message):
         """디버그 로그"""
-        self._write_log('DEBUG', category, message)
+        self._get_logger(category).debug(message)
 
 
 # 전역 로거 인스턴스
@@ -82,7 +131,15 @@ _logger = AppLogger()
 
 
 def log_message(category, message, level='INFO'):
-    """간편한 로그 함수"""
+    """
+    간편한 로그 함수
+
+    Args:
+        category: 로그 카테고리 (예: 'ScheduleTab', 'ClientTab')
+        message: 로그 메시지
+        level: 로그 레벨 ('INFO', 'WARNING', 'ERROR', 'DEBUG', 'CRITICAL')
+    """
+    level = level.upper()
     if level == 'INFO':
         _logger.info(category, message)
     elif level == 'WARNING':
@@ -93,6 +150,8 @@ def log_message(category, message, level='INFO'):
         _logger.debug(category, message)
     elif level == 'CRITICAL':
         _logger.critical(category, message)
+    else:
+        _logger.info(category, message)
 
 
 def log_error(category, message):
@@ -101,8 +160,32 @@ def log_error(category, message):
 
 
 def log_exception(category, message, exc_info=None):
-    """예외 로그 함수"""
+    """예외 로그 함수 (트레이스백 포함)"""
     _logger.exception(category, message, exc_info)
+
+
+def log_debug(category, message):
+    """디버그 로그 함수"""
+    _logger.debug(category, message)
+
+
+def log_warning(category, message):
+    """경고 로그 함수"""
+    _logger.warning(category, message)
+
+
+def get_logger(category):
+    """
+    카테고리별 Python 로거 반환
+    Python logging API 직접 사용 가능
+
+    Args:
+        category: 로그 카테고리
+
+    Returns:
+        logging.Logger 인스턴스
+    """
+    return logging.getLogger(f'FoodLabManager.{category}')
 
 
 def safe_get(obj, key, default=''):
