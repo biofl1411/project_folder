@@ -2810,10 +2810,12 @@ class ScheduleManagementTab(QWidget):
             self.item_cost_detail.setText(schedule.get('first_item_detail', '-'))
             self.cost_per_test.setText(f"1회:{schedule.get('first_cost_per_test', 0):,}원")
             self.total_rounds_cost.setText(f"회차:{schedule.get('first_rounds_cost', 0):,}원")
-            # 보고서 비용: 저장된 값이 0이면 기본값 사용
-            first_report_saved = schedule.get('first_report_cost', 0) or default_report_cost
+            # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+            first_report_saved = schedule.get('first_report_cost', 0)
+            if first_report_saved == 0:
+                first_report_saved = default_report_cost
             self.first_report_cost_input.setText(f"{first_report_saved:,}")
-            # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+            # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
             first_interim_saved = schedule.get('first_interim_cost', 0)
             if report_interim and first_interim_saved == 0:
                 first_interim_saved = default_interim_cost
@@ -2878,10 +2880,12 @@ class ScheduleManagementTab(QWidget):
                 self.suspend_item_cost_detail.setText(schedule.get('suspend_item_detail', '-'))
                 self.suspend_cost_per_test.setText(f"1회:{schedule.get('suspend_cost_per_test', 0):,}원")
                 self.suspend_rounds_cost.setText(f"회차:{schedule.get('suspend_rounds_cost', 0):,}원")
-                # 보고서 비용: 저장된 값이 0이면 기본값 사용
-                suspend_report_saved = schedule.get('suspend_report_cost', 0) or default_report_cost
+                # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+                suspend_report_saved = schedule.get('suspend_report_cost', 0)
+                if suspend_report_saved == 0:
+                    suspend_report_saved = default_report_cost
                 self.suspend_report_cost_input.setText(f"{suspend_report_saved:,}")
-                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
                 suspend_interim_saved = schedule.get('suspend_interim_cost', 0)
                 if report_interim and suspend_interim_saved == 0:
                     suspend_interim_saved = default_interim_cost
@@ -2947,10 +2951,12 @@ class ScheduleManagementTab(QWidget):
                 self.extend_item_cost_detail.setText(schedule.get('extend_item_detail', '-'))
                 self.extend_cost_per_test.setText(f"1회:{schedule.get('extend_cost_per_test', 0):,}원")
                 self.extend_rounds_cost.setText(f"회차:{schedule.get('extend_rounds_cost', 0):,}원")
-                # 보고서 비용: 저장된 값이 0이면 기본값 사용
-                extend_report_saved = schedule.get('extend_report_cost', 0) or default_report_cost
+                # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+                extend_report_saved = schedule.get('extend_report_cost', 0)
+                if extend_report_saved == 0:
+                    extend_report_saved = default_report_cost
                 self.extend_report_cost_input.setText(f"{extend_report_saved:,}")
-                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
                 extend_interim_saved = schedule.get('extend_interim_cost', 0)
                 if report_interim and extend_interim_saved == 0:
                     extend_interim_saved = default_interim_cost
@@ -5140,13 +5146,22 @@ class ScheduleManagementTab(QWidget):
             unit_price = int(fees.get(test_item, 0))
             item_costs[test_item] = o_count * unit_price
 
-        # 1차 견적 항목별 비용 내역 텍스트 생성 (전체 회차 기준 - 모든 항목 O로 가정)
+        # 1차 견적 항목별 비용 내역 텍스트 생성 (기본 회차 기준, O/X 상태 반영)
         first_detail_parts = []
+        # 기본 회차(1~sampling_count)에서 각 항목별 O 체크 수 계산
+        first_item_o_counts = {}
+        for col_idx in range(1, sampling_count + 1):
+            for row_idx, test_item in enumerate(test_items):
+                item = table.item(test_item_start_row + row_idx, col_idx)
+                if item and item.text() == 'O':
+                    first_item_o_counts[test_item] = first_item_o_counts.get(test_item, 0) + 1
         for test_item in test_items:
-            unit_price = int(fees.get(test_item, 0))
-            full_cost = unit_price * sampling_count
-            first_detail_parts.append(f"{test_item}({sampling_count}회)={full_cost:,}원")
-        self.item_cost_detail.setText(" | ".join(first_detail_parts))
+            o_count = first_item_o_counts.get(test_item, 0)
+            if o_count > 0:
+                unit_price = int(fees.get(test_item, 0))
+                item_cost = unit_price * o_count
+                first_detail_parts.append(f"{test_item}({o_count}회)={item_cost:,}원")
+        self.item_cost_detail.setText(" | ".join(first_detail_parts) if first_detail_parts else "-")
 
         # 중단 견적 항목별 비용 내역 텍스트 생성 (O로 체크된 것만)
         suspend_detail_parts = []
@@ -5180,8 +5195,8 @@ class ScheduleManagementTab(QWidget):
         self.total_rounds_cost.setText(f"회차:{total_rounds_cost:,}원")
 
         # ========== 1차 견적 계산 ==========
-        # 1차 견적은 O/X 상태와 무관하게 원래 전체 비용 (모든 항목 O로 가정)
-        first_total_rounds = cost_per_test * sampling_count
+        # 1차 견적은 기본 회차(1~sampling_count)의 O/X 상태 반영
+        first_total_rounds = total_rounds_cost  # 기본 회차의 O로 체크된 항목만 합산
         try:
             first_report_cost = int(self.first_report_cost_input.text().replace(',', '').replace('원', ''))
         except (ValueError, TypeError):
