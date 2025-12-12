@@ -5431,15 +5431,32 @@ class ScheduleManagementTab(QWidget):
         # 금액을 DB에 저장 (1차 견적 기준)
         self._save_amounts_to_db(first_cost_no_vat, first_vat, first_with_vat)
 
-        # 1차 견적 전체 저장 (보고서/중간 비용 포함)
+        # 1차 견적 강제 업데이트 (보고서/중간 비용 수정 시에도 반영)
         schedule_id = self.current_schedule.get('id')
         if schedule_id:
             try:
-                item_detail = self.item_cost_detail.text() if hasattr(self, 'item_cost_detail') else '-'
+                # 이전 값과 비교하여 변경 로그 기록
+                old_report_cost = self.current_schedule.get('first_report_cost', 0) or 0
+                old_interim_cost = self.current_schedule.get('first_interim_cost', 0) or 0
+
+                # 변경 로그 기록
+                if old_report_cost != first_report_cost:
+                    self.log_activity(
+                        'schedule_edit',
+                        details={'field': '1차 보고서 비용', 'old_value': f'{old_report_cost:,}원', 'new_value': f'{first_report_cost:,}원'}
+                    )
+                    self.current_schedule['first_report_cost'] = first_report_cost
+
+                if old_interim_cost != first_interim_cost:
+                    self.log_activity(
+                        'schedule_edit',
+                        details={'field': '1차 중간보고서 비용', 'old_value': f'{old_interim_cost:,}원', 'new_value': f'{first_interim_cost:,}원'}
+                    )
+                    self.current_schedule['first_interim_cost'] = first_interim_cost
+
                 from models.schedules import Schedule
-                Schedule.save_first_estimate(
-                    schedule_id, item_detail, cost_per_test, first_total_rounds,
-                    first_report_cost, first_interim_cost, first_formula,
+                Schedule.force_update_first_estimate(
+                    schedule_id, first_report_cost, first_interim_cost, first_formula,
                     first_cost_no_vat, first_vat, first_with_vat
                 )
             except Exception as e:
@@ -5481,6 +5498,24 @@ class ScheduleManagementTab(QWidget):
             # 중단 견적 전체 저장 (보고서/중간 비용 포함)
             if schedule_id:
                 try:
+                    # 이전 값과 비교하여 변경 로그 기록
+                    old_suspend_report = self.current_schedule.get('suspend_report_cost', 0) or 0
+                    old_suspend_interim = self.current_schedule.get('suspend_interim_cost', 0) or 0
+
+                    if old_suspend_report != suspend_report_cost:
+                        self.log_activity(
+                            'schedule_edit',
+                            details={'field': '중단 보고서 비용', 'old_value': f'{old_suspend_report:,}원', 'new_value': f'{suspend_report_cost:,}원'}
+                        )
+                        self.current_schedule['suspend_report_cost'] = suspend_report_cost
+
+                    if old_suspend_interim != suspend_interim_cost:
+                        self.log_activity(
+                            'schedule_edit',
+                            details={'field': '중단 중간보고서 비용', 'old_value': f'{old_suspend_interim:,}원', 'new_value': f'{suspend_interim_cost:,}원'}
+                        )
+                        self.current_schedule['suspend_interim_cost'] = suspend_interim_cost
+
                     suspend_item_detail = self.suspend_item_cost_detail.text() if hasattr(self, 'suspend_item_cost_detail') else '-'
                     suspend_cost_per_test = int(self.suspend_cost_per_test.text().replace('1회:', '').replace(',', '').replace('원', '')) if hasattr(self, 'suspend_cost_per_test') else 0
                     from models.schedules import Schedule
@@ -5528,6 +5563,24 @@ class ScheduleManagementTab(QWidget):
             # 연장 견적 전체 저장 (보고서/중간 비용 포함)
             if schedule_id:
                 try:
+                    # 이전 값과 비교하여 변경 로그 기록
+                    old_extend_report = self.current_schedule.get('extend_report_cost', 0) or 0
+                    old_extend_interim = self.current_schedule.get('extend_interim_cost', 0) or 0
+
+                    if old_extend_report != extend_report_cost:
+                        self.log_activity(
+                            'schedule_edit',
+                            details={'field': '연장 보고서 비용', 'old_value': f'{old_extend_report:,}원', 'new_value': f'{extend_report_cost:,}원'}
+                        )
+                        self.current_schedule['extend_report_cost'] = extend_report_cost
+
+                    if old_extend_interim != extend_interim_cost:
+                        self.log_activity(
+                            'schedule_edit',
+                            details={'field': '연장 중간보고서 비용', 'old_value': f'{old_extend_interim:,}원', 'new_value': f'{extend_interim_cost:,}원'}
+                        )
+                        self.current_schedule['extend_interim_cost'] = extend_interim_cost
+
                     extend_item_detail = self.extend_item_cost_detail.text() if hasattr(self, 'extend_item_cost_detail') else '-'
                     extend_cost_per_test = int(self.extend_cost_per_test.text().replace('1회:', '').replace(',', '').replace('원', '')) if hasattr(self, 'extend_cost_per_test') else 0
                     from models.schedules import Schedule
