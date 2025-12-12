@@ -10,6 +10,7 @@ API 클라이언트
 import requests
 import json
 import os
+import time
 
 # API 서버 설정
 API_BASE_URL = "http://192.168.0.96:8000"  # 내부망
@@ -58,47 +59,82 @@ class ApiClient:
             headers["Authorization"] = f"Bearer {self._token}"
         return headers
 
-    def _request(self, method, endpoint, data=None, params=None):
-        """API 요청 실행"""
+    def _request(self, method, endpoint, data=None, params=None, retry_count=3):
+        """
+        API 요청 실행 (재시도 및 타임아웃 개선)
+
+        Args:
+            method: HTTP 메서드 (GET, POST, PUT, PATCH, DELETE)
+            endpoint: API 엔드포인트
+            data: 요청 바디 데이터
+            params: 쿼리 파라미터
+            retry_count: 재시도 횟수 (기본 3회)
+        """
         url = f"{self._base_url}{endpoint}"
         # 타임아웃 설정: (연결 타임아웃, 읽기 타임아웃)
-        timeout = (2, 5)  # 연결 2초, 읽기 5초
+        # 외부망에서 큰 데이터(수수료 목록 등) 로드 시 충분한 시간 확보
+        timeout = (5, 30)  # 연결 5초, 읽기 30초
 
-        try:
-            if method == "GET":
-                response = requests.get(url, headers=self._get_headers(), params=params, timeout=timeout)
-            elif method == "POST":
-                response = requests.post(url, headers=self._get_headers(), json=data, timeout=timeout)
-            elif method == "PUT":
-                response = requests.put(url, headers=self._get_headers(), json=data, timeout=timeout)
-            elif method == "PATCH":
-                response = requests.patch(url, headers=self._get_headers(), json=data, params=params, timeout=timeout)
-            elif method == "DELETE":
-                response = requests.delete(url, headers=self._get_headers(), timeout=timeout)
-            else:
-                raise ValueError(f"지원하지 않는 HTTP 메서드: {method}")
+        last_exception = None
 
-            if response.status_code == 401:
-                # 인증 실패
-                self._token = None
-                self._user = None
-                raise Exception("인증이 만료되었습니다. 다시 로그인해주세요.")
+        for attempt in range(retry_count):
+            try:
+                if method == "GET":
+                    response = requests.get(url, headers=self._get_headers(), params=params, timeout=timeout)
+                elif method == "POST":
+                    response = requests.post(url, headers=self._get_headers(), json=data, timeout=timeout)
+                elif method == "PUT":
+                    response = requests.put(url, headers=self._get_headers(), json=data, timeout=timeout)
+                elif method == "PATCH":
+                    response = requests.patch(url, headers=self._get_headers(), json=data, params=params, timeout=timeout)
+                elif method == "DELETE":
+                    response = requests.delete(url, headers=self._get_headers(), timeout=timeout)
+                else:
+                    raise ValueError(f"지원하지 않는 HTTP 메서드: {method}")
 
-            response.raise_for_status()
-            return response.json()
+                if response.status_code == 401:
+                    # 인증 실패
+                    self._token = None
+                    self._user = None
+                    raise Exception("인증이 만료되었습니다. 다시 로그인해주세요.")
 
-        except requests.exceptions.ConnectionError as e:
-            # 내부망 실패시 외부망 시도
-            if self._base_url == API_BASE_URL:
-                self._base_url = API_EXTERNAL_URL
-                return self._request(method, endpoint, data, params)
-            raise Exception(f"서버에 연결할 수 없습니다: {str(e)}")
+                response.raise_for_status()
+                return response.json()
 
-        except requests.exceptions.Timeout:
-            raise Exception("서버 응답 시간이 초과되었습니다. (60초)")
+            except requests.exceptions.ConnectionError as e:
+                # 내부망 실패시 외부망 시도
+                if self._base_url == API_BASE_URL:
+                    self._base_url = API_EXTERNAL_URL
+                    return self._request(method, endpoint, data, params, retry_count)
+                last_exception = e
+                # 재시도 전 대기 (지수 백오프: 1초, 2초, 4초)
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt
+                    print(f"[API] 연결 실패, {wait_time}초 후 재시도... ({attempt + 1}/{retry_count})")
+                    time.sleep(wait_time)
+                    continue
 
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"API 요청 오류: {str(e)}")
+            except requests.exceptions.Timeout as e:
+                last_exception = e
+                # 타임아웃 시 재시도
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt
+                    print(f"[API] 타임아웃, {wait_time}초 후 재시도... ({attempt + 1}/{retry_count})")
+                    time.sleep(wait_time)
+                    continue
+
+            except requests.exceptions.RequestException as e:
+                last_exception = e
+                # 기타 요청 오류는 재시도 안함
+                break
+
+        # 모든 재시도 실패
+        if isinstance(last_exception, requests.exceptions.Timeout):
+            raise Exception(f"서버 응답 시간이 초과되었습니다. (재시도 {retry_count}회 실패)")
+        elif isinstance(last_exception, requests.exceptions.ConnectionError):
+            raise Exception(f"서버에 연결할 수 없습니다: {str(last_exception)}")
+        else:
+            raise Exception(f"API 요청 오류: {str(last_exception)}")
 
     # ==================== 인증 ====================
 
