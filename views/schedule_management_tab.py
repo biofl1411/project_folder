@@ -2810,10 +2810,12 @@ class ScheduleManagementTab(QWidget):
             self.item_cost_detail.setText(schedule.get('first_item_detail', '-'))
             self.cost_per_test.setText(f"1회:{schedule.get('first_cost_per_test', 0):,}원")
             self.total_rounds_cost.setText(f"회차:{schedule.get('first_rounds_cost', 0):,}원")
-            # 보고서 비용: 저장된 값이 0이면 기본값 사용
-            first_report_saved = schedule.get('first_report_cost', 0) or default_report_cost
+            # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+            first_report_saved = schedule.get('first_report_cost', 0)
+            if first_report_saved == 0:
+                first_report_saved = default_report_cost
             self.first_report_cost_input.setText(f"{first_report_saved:,}")
-            # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+            # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
             first_interim_saved = schedule.get('first_interim_cost', 0)
             if report_interim and first_interim_saved == 0:
                 first_interim_saved = default_interim_cost
@@ -2878,10 +2880,12 @@ class ScheduleManagementTab(QWidget):
                 self.suspend_item_cost_detail.setText(schedule.get('suspend_item_detail', '-'))
                 self.suspend_cost_per_test.setText(f"1회:{schedule.get('suspend_cost_per_test', 0):,}원")
                 self.suspend_rounds_cost.setText(f"회차:{schedule.get('suspend_rounds_cost', 0):,}원")
-                # 보고서 비용: 저장된 값이 0이면 기본값 사용
-                suspend_report_saved = schedule.get('suspend_report_cost', 0) or default_report_cost
+                # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+                suspend_report_saved = schedule.get('suspend_report_cost', 0)
+                if suspend_report_saved == 0:
+                    suspend_report_saved = default_report_cost
                 self.suspend_report_cost_input.setText(f"{suspend_report_saved:,}")
-                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
                 suspend_interim_saved = schedule.get('suspend_interim_cost', 0)
                 if report_interim and suspend_interim_saved == 0:
                     suspend_interim_saved = default_interim_cost
@@ -2947,10 +2951,12 @@ class ScheduleManagementTab(QWidget):
                 self.extend_item_cost_detail.setText(schedule.get('extend_item_detail', '-'))
                 self.extend_cost_per_test.setText(f"1회:{schedule.get('extend_cost_per_test', 0):,}원")
                 self.extend_rounds_cost.setText(f"회차:{schedule.get('extend_rounds_cost', 0):,}원")
-                # 보고서 비용: 저장된 값이 0이면 기본값 사용
-                extend_report_saved = schedule.get('extend_report_cost', 0) or default_report_cost
+                # 보고서 비용: DB에 저장된 값 사용 (0이면 기본값)
+                extend_report_saved = schedule.get('extend_report_cost', 0)
+                if extend_report_saved == 0:
+                    extend_report_saved = default_report_cost
                 self.extend_report_cost_input.setText(f"{extend_report_saved:,}")
-                # 중간 비용: 중간보고서가 있는데 저장된 값이 0이면 기본값 사용
+                # 중간 비용: DB에 저장된 값 사용 (중간보고서가 있는데 0이면 기본값)
                 extend_interim_saved = schedule.get('extend_interim_cost', 0)
                 if report_interim and extend_interim_saved == 0:
                     extend_interim_saved = default_interim_cost
