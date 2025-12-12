@@ -3610,12 +3610,36 @@ class ScheduleManagementTab(QWidget):
         report_interim = self.current_schedule.get('report_interim', 0)
 
         if report_interim:
+            # 1차 견적 중간보고서 비용 필드
             self.interim_cost_label.show()
             self.interim_report_cost_input.show()
             self.interim_report_cost_input.setText("200,000")
+            # 중단 견적 중간보고서 비용 필드
+            if hasattr(self, 'suspend_interim_cost_label'):
+                self.suspend_interim_cost_label.show()
+            if hasattr(self, 'suspend_interim_cost_input'):
+                self.suspend_interim_cost_input.show()
+                self.suspend_interim_cost_input.setText("200,000")
+            # 연장 견적 중간보고서 비용 필드
+            if hasattr(self, 'extend_interim_cost_label'):
+                self.extend_interim_cost_label.show()
+            if hasattr(self, 'extend_interim_cost_input'):
+                self.extend_interim_cost_input.show()
+                self.extend_interim_cost_input.setText("200,000")
         else:
+            # 1차 견적 중간보고서 비용 필드
             self.interim_cost_label.hide()
             self.interim_report_cost_input.hide()
+            # 중단 견적 중간보고서 비용 필드
+            if hasattr(self, 'suspend_interim_cost_label'):
+                self.suspend_interim_cost_label.hide()
+            if hasattr(self, 'suspend_interim_cost_input'):
+                self.suspend_interim_cost_input.hide()
+            # 연장 견적 중간보고서 비용 필드
+            if hasattr(self, 'extend_interim_cost_label'):
+                self.extend_interim_cost_label.hide()
+            if hasattr(self, 'extend_interim_cost_input'):
+                self.extend_interim_cost_input.hide()
 
         # 비용 재계산
         self.recalculate_costs()
@@ -5149,6 +5173,20 @@ class ScheduleManagementTab(QWidget):
         first_with_vat = first_cost_no_vat + first_vat
         if hasattr(self, 'first_cost_vat'):
             self.first_cost_vat.setText(f"{first_with_vat:,}원")
+
+        # 1차 견적 DB에 저장 (견적서 금액 일치 위해)
+        schedule_id = self.current_schedule.get('id')
+        if schedule_id and hasattr(self, 'item_cost_detail'):
+            try:
+                first_item_detail = self.item_cost_detail.text() if self.item_cost_detail.text() != '-' else '-'
+                from models.schedules import Schedule
+                Schedule.save_first_estimate(
+                    schedule_id, first_item_detail, cost_per_test, first_total_rounds,
+                    first_report_cost, first_interim_cost, first_formula,
+                    first_cost_no_vat, first_vat, first_with_vat
+                )
+            except Exception as e:
+                print(f"1차 견적 저장 오류 (recalculate_costs): {e}")
 
         # ========== 중단 견적 계산 (O/X 변경 시 항상 계산하여 저장) ==========
         schedule_status = self.current_schedule.get('status', '')
