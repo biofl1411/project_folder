@@ -468,119 +468,182 @@ class Schedule:
 
     @staticmethod
     def update_amounts(schedule_id, supply_amount, tax_amount, total_amount):
-        """스케줄 금액 업데이트 (내부망 전용)"""
-        if not is_internal_mode():
-            print("금액 업데이트는 내부망에서만 가능합니다.")
-            return False
-        try:
-            Schedule._ensure_columns()
-            conn = _get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE schedules
-                SET supply_amount = %s, tax_amount = %s, total_amount = %s
-                WHERE id = %s
-            """, (supply_amount, tax_amount, total_amount, schedule_id))
-            success = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
-            return success
-        except Exception as e:
-            print(f"스케줄 금액 업데이트 중 오류: {str(e)}")
-            return False
+        """스케줄 금액 업데이트"""
+        if is_internal_mode():
+            try:
+                Schedule._ensure_columns()
+                conn = _get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE schedules
+                    SET supply_amount = %s, tax_amount = %s, total_amount = %s
+                    WHERE id = %s
+                """, (supply_amount, tax_amount, total_amount, schedule_id))
+                success = cursor.rowcount > 0
+                conn.commit()
+                conn.close()
+                return success
+            except Exception as e:
+                print(f"스케줄 금액 업데이트 중 오류: {str(e)}")
+                return False
+        else:
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.update_schedule(schedule_id, {
+                    'supply_amount': supply_amount,
+                    'tax_amount': tax_amount,
+                    'total_amount': total_amount
+                })
+            except Exception as e:
+                print(f"스케줄 금액 업데이트 중 오류 (API): {str(e)}")
+                return False
 
     @staticmethod
     def save_first_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
                            report_cost, interim_cost, formula_text, supply_amount,
                            tax_amount, total_amount):
-        """1차 견적 저장 (최초 생성 시만 저장, 이후 고정) - 내부망 전용"""
-        if not is_internal_mode():
-            print("1차 견적 저장은 내부망에서만 가능합니다.")
-            return False
-        try:
-            Schedule._ensure_columns()
-            conn = _get_connection()
-            cursor = conn.cursor()
+        """1차 견적 저장 (최초 생성 시만 저장, 이후 고정)"""
+        if is_internal_mode():
+            try:
+                Schedule._ensure_columns()
+                conn = _get_connection()
+                cursor = conn.cursor()
 
-            # 이미 1차 견적이 저장되어 있는지 확인
-            cursor.execute("""
-                SELECT first_supply_amount FROM schedules WHERE id = %s
-            """, (schedule_id,))
-            result = cursor.fetchone()
+                # 이미 1차 견적이 저장되어 있는지 확인
+                cursor.execute("""
+                    SELECT first_supply_amount FROM schedules WHERE id = %s
+                """, (schedule_id,))
+                result = cursor.fetchone()
 
-            # 이미 저장된 값이 있으면 저장하지 않음 (고정)
-            if result and result.get('first_supply_amount', 0) > 0:
+                # 이미 저장된 값이 있으면 저장하지 않음 (고정)
+                if result and result.get('first_supply_amount', 0) > 0:
+                    conn.close()
+                    return False
+
+                cursor.execute("""
+                    UPDATE schedules
+                    SET first_item_detail = %s, first_cost_per_test = %s, first_rounds_cost = %s,
+                        first_report_cost = %s, first_interim_cost = %s, first_formula_text = %s,
+                        first_supply_amount = %s, first_tax_amount = %s, first_total_amount = %s
+                    WHERE id = %s
+                """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                      formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+                success = cursor.rowcount > 0
+                conn.commit()
                 conn.close()
+                return success
+            except Exception as e:
+                print(f"1차 견적 저장 중 오류: {str(e)}")
                 return False
+        else:
+            # 외부망: API 사용
+            try:
+                # 이미 저장된 값이 있는지 확인
+                schedule = Schedule.get_by_id(schedule_id)
+                if schedule and schedule.get('first_supply_amount', 0) > 0:
+                    return False
 
-            cursor.execute("""
-                UPDATE schedules
-                SET first_item_detail = %s, first_cost_per_test = %s, first_rounds_cost = %s,
-                    first_report_cost = %s, first_interim_cost = %s, first_formula_text = %s,
-                    first_supply_amount = %s, first_tax_amount = %s, first_total_amount = %s
-                WHERE id = %s
-            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
-                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
-            success = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
-            return success
-        except Exception as e:
-            print(f"1차 견적 저장 중 오류: {str(e)}")
-            return False
+                api = _get_api()
+                return api.update_schedule(schedule_id, {
+                    'first_item_detail': item_detail,
+                    'first_cost_per_test': cost_per_test,
+                    'first_rounds_cost': rounds_cost,
+                    'first_report_cost': report_cost,
+                    'first_interim_cost': interim_cost,
+                    'first_formula_text': formula_text,
+                    'first_supply_amount': supply_amount,
+                    'first_tax_amount': tax_amount,
+                    'first_total_amount': total_amount
+                })
+            except Exception as e:
+                print(f"1차 견적 저장 중 오류 (API): {str(e)}")
+                return False
 
     @staticmethod
     def save_suspend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
                              report_cost, interim_cost, formula_text, supply_amount,
                              tax_amount, total_amount):
-        """중단 견적 저장 (중단 시점에 저장) - 내부망 전용"""
-        if not is_internal_mode():
-            print("중단 견적 저장은 내부망에서만 가능합니다.")
-            return False
-        try:
-            Schedule._ensure_columns()
-            conn = _get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE schedules
-                SET suspend_item_detail = %s, suspend_cost_per_test = %s, suspend_rounds_cost = %s,
-                    suspend_report_cost = %s, suspend_interim_cost = %s, suspend_formula_text = %s,
-                    suspend_supply_amount = %s, suspend_tax_amount = %s, suspend_total_amount = %s
-                WHERE id = %s
-            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
-                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
-            success = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
-            return success
-        except Exception as e:
-            print(f"중단 견적 저장 중 오류: {str(e)}")
-            return False
+        """중단 견적 저장 (중단 시점에 저장)"""
+        if is_internal_mode():
+            try:
+                Schedule._ensure_columns()
+                conn = _get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE schedules
+                    SET suspend_item_detail = %s, suspend_cost_per_test = %s, suspend_rounds_cost = %s,
+                        suspend_report_cost = %s, suspend_interim_cost = %s, suspend_formula_text = %s,
+                        suspend_supply_amount = %s, suspend_tax_amount = %s, suspend_total_amount = %s
+                    WHERE id = %s
+                """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                      formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+                success = cursor.rowcount > 0
+                conn.commit()
+                conn.close()
+                return success
+            except Exception as e:
+                print(f"중단 견적 저장 중 오류: {str(e)}")
+                return False
+        else:
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.update_schedule(schedule_id, {
+                    'suspend_item_detail': item_detail,
+                    'suspend_cost_per_test': cost_per_test,
+                    'suspend_rounds_cost': rounds_cost,
+                    'suspend_report_cost': report_cost,
+                    'suspend_interim_cost': interim_cost,
+                    'suspend_formula_text': formula_text,
+                    'suspend_supply_amount': supply_amount,
+                    'suspend_tax_amount': tax_amount,
+                    'suspend_total_amount': total_amount
+                })
+            except Exception as e:
+                print(f"중단 견적 저장 중 오류 (API): {str(e)}")
+                return False
 
     @staticmethod
     def save_extend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
                             report_cost, interim_cost, formula_text, supply_amount,
                             tax_amount, total_amount):
-        """연장 견적 저장 (연장 설정 시 저장) - 내부망 전용"""
-        if not is_internal_mode():
-            print("연장 견적 저장은 내부망에서만 가능합니다.")
-            return False
-        try:
-            Schedule._ensure_columns()
-            conn = _get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE schedules
-                SET extend_item_detail = %s, extend_cost_per_test = %s, extend_rounds_cost = %s,
-                    extend_report_cost = %s, extend_interim_cost = %s, extend_formula_text = %s,
-                    extend_supply_amount = %s, extend_tax_amount = %s, extend_total_amount = %s
-                WHERE id = %s
-            """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
-                  formula_text, supply_amount, tax_amount, total_amount, schedule_id))
-            success = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
-            return success
-        except Exception as e:
-            print(f"연장 견적 저장 중 오류: {str(e)}")
-            return False
+        """연장 견적 저장 (연장 설정 시 저장)"""
+        if is_internal_mode():
+            try:
+                Schedule._ensure_columns()
+                conn = _get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE schedules
+                    SET extend_item_detail = %s, extend_cost_per_test = %s, extend_rounds_cost = %s,
+                        extend_report_cost = %s, extend_interim_cost = %s, extend_formula_text = %s,
+                        extend_supply_amount = %s, extend_tax_amount = %s, extend_total_amount = %s
+                    WHERE id = %s
+                """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                      formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+                success = cursor.rowcount > 0
+                conn.commit()
+                conn.close()
+                return success
+            except Exception as e:
+                print(f"연장 견적 저장 중 오류: {str(e)}")
+                return False
+        else:
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.update_schedule(schedule_id, {
+                    'extend_item_detail': item_detail,
+                    'extend_cost_per_test': cost_per_test,
+                    'extend_rounds_cost': rounds_cost,
+                    'extend_report_cost': report_cost,
+                    'extend_interim_cost': interim_cost,
+                    'extend_formula_text': formula_text,
+                    'extend_supply_amount': supply_amount,
+                    'extend_tax_amount': tax_amount,
+                    'extend_total_amount': total_amount
+                })
+            except Exception as e:
+                print(f"연장 견적 저장 중 오류 (API): {str(e)}")
+                return False

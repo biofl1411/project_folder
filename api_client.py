@@ -368,6 +368,35 @@ class ApiClient:
         result = self._request("GET", f"/api/schedules/{schedule_id}/attachments")
         return result.get("data", [])
 
+    def upload_attachment(self, schedule_id, file_path):
+        """첨부파일 업로드"""
+        import os
+        if not os.path.exists(file_path):
+            return False, "파일을 찾을 수 없습니다.", None
+        try:
+            file_name = os.path.basename(file_path)
+            with open(file_path, 'rb') as f:
+                files = {'file': (file_name, f)}
+                response = requests.post(
+                    f"{self.base_url}/api/schedules/{schedule_id}/attachments",
+                    files=files,
+                    timeout=self.timeout
+                )
+            if response.status_code == 200:
+                data = response.json()
+                return True, "파일이 업로드되었습니다.", data.get("attachment_id")
+            else:
+                return False, f"업로드 실패: {response.status_code}", None
+        except Exception as e:
+            return False, f"업로드 오류: {str(e)}", None
+
+    def delete_attachment(self, attachment_id):
+        """첨부파일 삭제"""
+        result = self._request("DELETE", f"/api/attachments/{attachment_id}")
+        if result.get("success"):
+            return True, "첨부파일이 삭제되었습니다."
+        return False, result.get("message", "삭제 실패")
+
     # ==================== Settings ====================
 
     def get_settings(self):
