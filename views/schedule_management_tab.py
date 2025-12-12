@@ -3619,19 +3619,28 @@ class ScheduleManagementTab(QWidget):
             # 1차 견적 중간보고서 비용 필드
             self.interim_cost_label.show()
             self.interim_report_cost_input.show()
-            self.interim_report_cost_input.setText("200,000")
+            # 기존 입력값이 있으면 유지, 없거나 비어있으면 기본값 설정
+            current_interim = self.interim_report_cost_input.text().replace(',', '').replace('원', '').strip()
+            if not current_interim or current_interim == '0':
+                self.interim_report_cost_input.setText("200,000")
             # 중단 견적 중간보고서 비용 필드
             if hasattr(self, 'suspend_interim_cost_label'):
                 self.suspend_interim_cost_label.show()
             if hasattr(self, 'suspend_interim_cost_input'):
                 self.suspend_interim_cost_input.show()
-                self.suspend_interim_cost_input.setText("200,000")
+                # 기존 입력값이 있으면 유지
+                current_suspend_interim = self.suspend_interim_cost_input.text().replace(',', '').replace('원', '').strip()
+                if not current_suspend_interim or current_suspend_interim == '0':
+                    self.suspend_interim_cost_input.setText("200,000")
             # 연장 견적 중간보고서 비용 필드
             if hasattr(self, 'extend_interim_cost_label'):
                 self.extend_interim_cost_label.show()
             if hasattr(self, 'extend_interim_cost_input'):
                 self.extend_interim_cost_input.show()
-                self.extend_interim_cost_input.setText("200,000")
+                # 기존 입력값이 있으면 유지
+                current_extend_interim = self.extend_interim_cost_input.text().replace(',', '').replace('원', '').strip()
+                if not current_extend_interim or current_extend_interim == '0':
+                    self.extend_interim_cost_input.setText("200,000")
         else:
             # 1차 견적 중간보고서 비용 필드
             self.interim_cost_label.hide()
@@ -5305,12 +5314,21 @@ class ScheduleManagementTab(QWidget):
             if hasattr(self, 'extend_cost_per_test'):
                 self.extend_cost_per_test.setText(f"1회:{cost_per_test:,}원")
 
-            # 연장 항목별 비용 내역
+            # 연장 항목별 비용 내역 (O/X 상태 반영)
             extend_detail_parts = []
+            # 연장 회차(sampling_count+1 ~ sampling_count+extend_rounds)에서 각 항목별 O 체크 수 계산
+            extend_item_o_counts = {}
+            for col_idx in range(sampling_count + 1, sampling_count + extend_rounds + 1):
+                for row_idx, test_item in enumerate(test_items):
+                    item = table.item(test_item_start_row + row_idx, col_idx)
+                    if item and item.text() == 'O':
+                        extend_item_o_counts[test_item] = extend_item_o_counts.get(test_item, 0) + 1
             for test_item in test_items:
-                unit_price = int(fees.get(test_item, 0))
-                extend_item_cost = unit_price * extend_rounds
-                extend_detail_parts.append(f"{test_item}({extend_rounds}회)={extend_item_cost:,}원")
+                o_count = extend_item_o_counts.get(test_item, 0)
+                if o_count > 0:
+                    unit_price = int(fees.get(test_item, 0))
+                    extend_item_cost = unit_price * o_count
+                    extend_detail_parts.append(f"{test_item}({o_count}회)={extend_item_cost:,}원")
             if hasattr(self, 'extend_item_cost_detail'):
                 self.extend_item_cost_detail.setText(" | ".join(extend_detail_parts))
 
