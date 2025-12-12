@@ -598,9 +598,10 @@ class Schedule:
                 return False
 
     @staticmethod
-    def force_update_first_estimate(schedule_id, report_cost, interim_cost, formula_text,
+    def force_update_first_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
+                                    report_cost, interim_cost, formula_text,
                                     supply_amount, tax_amount, total_amount):
-        """1차 견적 보고서/중간 비용 강제 업데이트 (비용 수동 변경 시)"""
+        """1차 견적 전체 강제 업데이트 (O/X 변경 또는 비용 수동 변경 시)"""
         if is_internal_mode():
             try:
                 Schedule._ensure_columns()
@@ -608,22 +609,27 @@ class Schedule:
                 cursor = conn.cursor()
                 cursor.execute("""
                     UPDATE schedules
-                    SET first_report_cost = %s, first_interim_cost = %s, first_formula_text = %s,
+                    SET first_item_detail = %s, first_cost_per_test = %s, first_rounds_cost = %s,
+                        first_report_cost = %s, first_interim_cost = %s, first_formula_text = %s,
                         first_supply_amount = %s, first_tax_amount = %s, first_total_amount = %s
                     WHERE id = %s
-                """, (report_cost, interim_cost, formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+                """, (item_detail, cost_per_test, rounds_cost, report_cost, interim_cost,
+                      formula_text, supply_amount, tax_amount, total_amount, schedule_id))
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
                 return success
             except Exception as e:
-                print(f"1차 견적 비용 강제 업데이트 중 오류: {str(e)}")
+                print(f"1차 견적 강제 업데이트 중 오류: {str(e)}")
                 return False
         else:
             # 외부망: API 사용
             try:
                 api = _get_api()
                 return api.update_schedule(schedule_id, {
+                    'first_item_detail': item_detail,
+                    'first_cost_per_test': cost_per_test,
+                    'first_rounds_cost': rounds_cost,
                     'first_report_cost': report_cost,
                     'first_interim_cost': interim_cost,
                     'first_formula_text': formula_text,
@@ -632,7 +638,7 @@ class Schedule:
                     'first_total_amount': total_amount
                 })
             except Exception as e:
-                print(f"1차 견적 비용 강제 업데이트 중 오류 (API): {str(e)}")
+                print(f"1차 견적 강제 업데이트 중 오류 (API): {str(e)}")
                 return False
 
     @staticmethod

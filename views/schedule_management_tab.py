@@ -5231,19 +5231,19 @@ class ScheduleManagementTab(QWidget):
         if hasattr(self, 'first_cost_vat'):
             self.first_cost_vat.setText(f"{first_with_vat:,}원")
 
-        # 1차 견적 DB에 저장 (견적서 금액 일치 위해)
+        # 1차 견적 DB에 강제 저장 (O/X 변경 시에도 반영)
         schedule_id = self.current_schedule.get('id')
         if schedule_id and hasattr(self, 'item_cost_detail'):
             try:
                 first_item_detail = self.item_cost_detail.text() if self.item_cost_detail.text() != '-' else '-'
                 from models.schedules import Schedule
-                Schedule.save_first_estimate(
+                Schedule.force_update_first_estimate(
                     schedule_id, first_item_detail, cost_per_test, first_total_rounds,
                     first_report_cost, first_interim_cost, first_formula,
                     first_cost_no_vat, first_vat, first_with_vat
                 )
             except Exception as e:
-                print(f"1차 견적 저장 오류 (recalculate_costs): {e}")
+                print(f"1차 견적 강제 저장 오류 (recalculate_costs): {e}")
 
         # ========== 중단 견적 계산 (O/X 변경 시 항상 계산하여 저장) ==========
         schedule_status = self.current_schedule.get('status', '')
@@ -5434,7 +5434,11 @@ class ScheduleManagementTab(QWidget):
         except (ValueError, TypeError, AttributeError):
             cost_per_test = 0
 
-        first_total_rounds = cost_per_test * sampling_count
+        # O/X 상태가 반영된 회차 비용 사용 (UI에서 이미 계산된 값)
+        try:
+            first_total_rounds = int(self.total_rounds_cost.text().replace('회차:', '').replace(',', '').replace('원', ''))
+        except (ValueError, TypeError, AttributeError):
+            first_total_rounds = cost_per_test * sampling_count
 
         try:
             first_report_cost = int(self.first_report_cost_input.text().replace(',', '').replace('원', ''))
@@ -5488,8 +5492,11 @@ class ScheduleManagementTab(QWidget):
                     self.current_schedule['first_interim_cost'] = first_interim_cost
 
                 from models.schedules import Schedule
+                # item_detail 가져오기
+                first_item_detail = self.item_cost_detail.text() if hasattr(self, 'item_cost_detail') and self.item_cost_detail.text() != '-' else '-'
                 Schedule.force_update_first_estimate(
-                    schedule_id, first_report_cost, first_interim_cost, first_formula,
+                    schedule_id, first_item_detail, cost_per_test, first_total_rounds,
+                    first_report_cost, first_interim_cost, first_formula,
                     first_cost_no_vat, first_vat, first_with_vat
                 )
             except Exception as e:
