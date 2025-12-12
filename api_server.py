@@ -22,6 +22,7 @@ from models.fees import Fee
 from models.product_types import ProductType
 from models.schedule_attachments import ScheduleAttachment
 from models.activity_log import ActivityLog, ACTION_TYPES
+from models.communications import Message, EmailLog
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -166,6 +167,30 @@ class ActivityLogFilter(BaseModel):
     date_to: Optional[str] = None
     target_type: Optional[str] = None
 
+class MessageCreate(BaseModel):
+    sender_id: int
+    receiver_id: int
+    content: str
+    message_type: str = 'chat'
+    subject: Optional[str] = None
+
+class EmailLogCreate(BaseModel):
+    schedule_id: Optional[int] = None
+    estimate_type: Optional[str] = None
+    sender_email: str
+    to_emails: str
+    cc_emails: Optional[str] = None
+    subject: str
+    body: str
+    attachment_name: Optional[str] = None
+    sent_by: Optional[int] = None
+    client_name: Optional[str] = None
+
+class EmailLogStatusUpdate(BaseModel):
+    status: Optional[str] = None
+    received: Optional[str] = None
+    received_at: Optional[str] = None
+
 class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
@@ -286,6 +311,36 @@ async def reset_user_password(user_id: int, user: dict = Depends(verify_token)):
     """비밀번호 초기화"""
     success = User.reset_password(user_id)
     return {"success": success}
+
+@app.post("/api/users/{user_id}/change-password")
+async def change_user_password(user_id: int, new_password: str, user: dict = Depends(verify_token)):
+    """비밀번호 변경"""
+    success = User.update_password(user_id, new_password)
+    return {"success": success}
+
+@app.post("/api/users/{user_id}/verify-password")
+async def verify_user_password(user_id: int, password: str, user: dict = Depends(verify_token)):
+    """비밀번호 확인"""
+    success = User.verify_password(user_id, password)
+    return {"success": success}
+
+@app.post("/api/users/{user_id}/toggle-view-all")
+async def toggle_user_view_all(user_id: int, can_view: bool = True, user: dict = Depends(verify_token)):
+    """사용자 열람권한 토글"""
+    success = User.toggle_view_all(user_id, can_view)
+    return {"success": success}
+
+@app.get("/api/users/{user_id}/active-status")
+async def get_user_active_status(user_id: int, user: dict = Depends(verify_token)):
+    """사용자 활성화 상태 조회"""
+    status = User.get_active_status(user_id)
+    return {"success": True, "data": status}
+
+@app.get("/api/users/{user_id}/view-all-status")
+async def get_user_view_all_status(user_id: int, user: dict = Depends(verify_token)):
+    """사용자 열람권한 상태 조회"""
+    status = User.get_view_all_status(user_id)
+    return {"success": True, "data": status}
 
 @app.get("/api/users/constants/departments")
 async def get_departments():
@@ -713,6 +768,158 @@ async def get_activity_logs_count(
 async def get_action_types(user: dict = Depends(verify_token)):
     """활동 유형 목록"""
     return {"success": True, "data": ACTION_TYPES}
+
+
+# ==================== Messages API ====================
+
+@app.post("/api/messages")
+async def send_message(request: MessageCreate, user: dict = Depends(verify_token)):
+    """메시지 전송"""
+    message_id = Message.send(
+        sender_id=request.sender_id,
+        receiver_id=request.receiver_id,
+        content=request.content,
+        message_type=request.message_type,
+        subject=request.subject
+    )
+    if message_id:
+        return {"success": True, "data": {"id": message_id}}
+    return {"success": False, "message": "메시지 전송 실패"}
+
+@app.get("/api/messages/conversation")
+async def get_conversation(
+    user1_id: int,
+    user2_id: int,
+    limit: int = 100,
+    user: dict = Depends(verify_token)
+):
+    """두 사용자 간 대화 내역 조회"""
+    messages = Message.get_conversation(user1_id, user2_id, limit)
+    return {"success": True, "data": messages}
+
+@app.get("/api/messages/partners/{target_user_id}")
+async def get_chat_partners(target_user_id: int, user: dict = Depends(verify_token)):
+    """대화 상대 목록 조회"""
+    partners = Message.get_chat_partners(target_user_id)
+    return {"success": True, "data": partners}
+
+@app.post("/api/messages/{message_id}/read")
+async def mark_message_read(message_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """메시지 읽음 처리"""
+    success = Message.mark_as_read(message_id, target_user_id)
+    return {"success": success}
+
+@app.post("/api/messages/conversation/read")
+async def mark_conversation_read(target_user_id: int, partner_id: int, user: dict = Depends(verify_token)):
+    """대화 전체 읽음 처리"""
+    count = Message.mark_conversation_as_read(target_user_id, partner_id)
+    return {"success": True, "data": count}
+
+@app.get("/api/messages/unread-count/{target_user_id}")
+async def get_unread_count(target_user_id: int, user: dict = Depends(verify_token)):
+    """읽지 않은 메시지 수"""
+    count = Message.get_unread_count(target_user_id)
+    return {"success": True, "data": count}
+
+@app.get("/api/messages/unread-by-partner/{target_user_id}")
+async def get_unread_by_partner(target_user_id: int, user: dict = Depends(verify_token)):
+    """상대별 읽지 않은 메시지 수"""
+    unread = Message.get_unread_by_partner(target_user_id)
+    return {"success": True, "data": unread}
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(message_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """메시지 삭제"""
+    success = Message.delete_message(message_id, target_user_id)
+    return {"success": success}
+
+@app.delete("/api/messages/conversation/{partner_id}")
+async def delete_conversation(partner_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """대화 전체 삭제"""
+    count = Message.delete_conversation(target_user_id, partner_id)
+    return {"success": True, "data": count}
+
+
+# ==================== Email Logs API ====================
+
+@app.post("/api/email-logs")
+async def create_email_log(request: EmailLogCreate, user: dict = Depends(verify_token)):
+    """이메일 로그 저장"""
+    log_id = EmailLog.save(
+        schedule_id=request.schedule_id,
+        estimate_type=request.estimate_type,
+        sender_email=request.sender_email,
+        to_emails=request.to_emails,
+        cc_emails=request.cc_emails,
+        subject=request.subject,
+        body=request.body,
+        attachment_name=request.attachment_name,
+        sent_by=request.sent_by,
+        client_name=request.client_name
+    )
+    if log_id:
+        return {"success": True, "data": {"id": log_id}}
+    return {"success": False, "message": "이메일 로그 저장 실패"}
+
+@app.get("/api/email-logs")
+async def get_email_logs(
+    limit: int = 100,
+    sent_by: Optional[int] = None,
+    user: dict = Depends(verify_token)
+):
+    """이메일 로그 목록 조회"""
+    logs = EmailLog.get_all(limit=limit, sent_by=sent_by)
+    return {"success": True, "data": logs}
+
+@app.get("/api/email-logs/{log_id}")
+async def get_email_log(log_id: int, user: dict = Depends(verify_token)):
+    """이메일 로그 상세 조회"""
+    log = EmailLog.get_by_id(log_id)
+    if log:
+        return {"success": True, "data": log}
+    return {"success": False, "message": "이메일 로그를 찾을 수 없습니다"}
+
+@app.get("/api/email-logs/schedule/{schedule_id}")
+async def get_email_logs_by_schedule(schedule_id: int, user: dict = Depends(verify_token)):
+    """스케줄별 이메일 로그 조회"""
+    logs = EmailLog.get_by_schedule(schedule_id)
+    return {"success": True, "data": logs}
+
+@app.get("/api/email-logs/search")
+async def search_email_logs(
+    keyword: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100,
+    sent_by: Optional[int] = None,
+    user: dict = Depends(verify_token)
+):
+    """이메일 로그 검색"""
+    logs = EmailLog.search(
+        keyword=keyword,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        sent_by=sent_by
+    )
+    return {"success": True, "data": logs}
+
+@app.delete("/api/email-logs/{log_id}")
+async def delete_email_log(log_id: int, target_user_id: Optional[int] = None, user: dict = Depends(verify_token)):
+    """이메일 로그 삭제"""
+    success = EmailLog.delete(log_id, target_user_id)
+    return {"success": success}
+
+@app.put("/api/email-logs/{log_id}/status")
+async def update_email_log_status(log_id: int, request: EmailLogStatusUpdate, user: dict = Depends(verify_token)):
+    """이메일 로그 상태 업데이트"""
+    success = EmailLog.update_status(
+        log_id,
+        status=request.status,
+        received=request.received,
+        received_at=request.received_at
+    )
+    return {"success": success}
 
 
 # ==================== Settings API ====================

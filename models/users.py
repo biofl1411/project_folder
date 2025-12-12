@@ -1,4 +1,8 @@
 # models/users.py
+"""
+사용자 모델
+- Dual-mode 지원: 내부망(MySQL 직접) / 외부망(API 호출)
+"""
 import datetime
 import json
 
@@ -16,6 +20,12 @@ def _get_connection():
     """DB 연결 반환 (내부망 전용)"""
     from database import get_connection
     return get_connection()
+
+
+def _get_api():
+    """외부망용 API 클라이언트"""
+    from api_client import api
+    return api
 
 # 부서 목록
 DEPARTMENTS = [
@@ -362,9 +372,15 @@ class User:
 
     @staticmethod
     def create(username, password, name, role='user', department='', permissions=None, email='', phone=''):
-        """새 사용자 생성 - 내부망 전용"""
-        if not _is_internal_mode():
-            return None  # 외부망에서는 사용자 생성 불가
+        """새 사용자 생성 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._create_to_db(username, password, name, role, department, permissions, email, phone)
+        else:
+            return User._create_to_api(username, password, name, role, department, permissions, email, phone)
+
+    @staticmethod
+    def _create_to_db(username, password, name, role, department, permissions, email, phone):
+        """내부망: DB에 사용자 생성"""
         try:
             User._ensure_columns()
             conn = _get_connection()
@@ -389,10 +405,35 @@ class User:
             return None
 
     @staticmethod
+    def _create_to_api(username, password, name, role, department, permissions, email, phone):
+        """외부망: API로 사용자 생성"""
+        try:
+            api = _get_api()
+            return api.create_user(
+                username=username,
+                password=password,
+                name=name,
+                role=role,
+                department=department,
+                permissions=permissions,
+                email=email,
+                phone=phone
+            )
+        except Exception as e:
+            print(f"사용자 생성 API 오류: {str(e)}")
+            return None
+
+    @staticmethod
     def update(user_id, name=None, department=None, permissions=None, email=None, phone=None):
-        """사용자 정보 업데이트 - 내부망 전용"""
-        if not _is_internal_mode():
-            return False  # 외부망에서는 사용자 수정 불가
+        """사용자 정보 업데이트 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._update_to_db(user_id, name, department, permissions, email, phone)
+        else:
+            return User._update_to_api(user_id, name, department, permissions, email, phone)
+
+    @staticmethod
+    def _update_to_db(user_id, name, department, permissions, email, phone):
+        """내부망: DB에서 사용자 수정"""
         try:
             User._ensure_columns()
             conn = _get_connection()
@@ -435,10 +476,33 @@ class User:
             return False
 
     @staticmethod
+    def _update_to_api(user_id, name, department, permissions, email, phone):
+        """외부망: API로 사용자 수정"""
+        try:
+            api = _get_api()
+            return api.update_user(
+                user_id,
+                name=name,
+                department=department,
+                permissions=permissions,
+                email=email,
+                phone=phone
+            )
+        except Exception as e:
+            print(f"사용자 수정 API 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def update_password(user_id, new_password):
-        """비밀번호 변경 - 내부망 전용"""
-        if not _is_internal_mode():
-            return False  # 외부망에서는 비밀번호 변경 불가
+        """비밀번호 변경 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._update_password_to_db(user_id, new_password)
+        else:
+            return User._update_password_to_api(user_id, new_password)
+
+    @staticmethod
+    def _update_password_to_db(user_id, new_password):
+        """내부망: DB에서 비밀번호 변경"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -454,10 +518,26 @@ class User:
             return False
 
     @staticmethod
+    def _update_password_to_api(user_id, new_password):
+        """외부망: API로 비밀번호 변경"""
+        try:
+            api = _get_api()
+            return api.change_user_password(user_id, new_password)
+        except Exception as e:
+            print(f"비밀번호 변경 API 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def verify_password(user_id, password):
-        """현재 비밀번호 확인 - 내부망 전용"""
-        if not _is_internal_mode():
-            return False  # 외부망에서는 비밀번호 확인 불가
+        """현재 비밀번호 확인 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._verify_password_from_db(user_id, password)
+        else:
+            return User._verify_password_from_api(user_id, password)
+
+    @staticmethod
+    def _verify_password_from_db(user_id, password):
+        """내부망: DB에서 비밀번호 확인"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -472,10 +552,26 @@ class User:
             return False
 
     @staticmethod
+    def _verify_password_from_api(user_id, password):
+        """외부망: API로 비밀번호 확인"""
+        try:
+            api = _get_api()
+            return api.verify_user_password(user_id, password)
+        except Exception as e:
+            print(f"비밀번호 확인 API 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def delete(user_id):
-        """사용자 삭제 - 내부망 전용"""
-        if not _is_internal_mode():
-            return False  # 외부망에서는 사용자 삭제 불가
+        """사용자 삭제 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._delete_from_db(user_id)
+        else:
+            return User._delete_from_api(user_id)
+
+    @staticmethod
+    def _delete_from_db(user_id):
+        """내부망: DB에서 사용자 삭제"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -486,6 +582,16 @@ class User:
             return success
         except Exception as e:
             print(f"사용자 삭제 중 오류: {str(e)}")
+            return False
+
+    @staticmethod
+    def _delete_from_api(user_id):
+        """외부망: API로 사용자 삭제"""
+        try:
+            api = _get_api()
+            return api.delete_user(user_id)
+        except Exception as e:
+            print(f"사용자 삭제 API 오류: {str(e)}")
             return False
 
     @staticmethod
@@ -508,7 +614,7 @@ class User:
 
     @staticmethod
     def toggle_active(user_id, activate=True):
-        """사용자 활성화/비활성화 토글 - 내부망 전용
+        """사용자 활성화/비활성화 토글 (Dual-mode)
 
         Args:
             user_id: 사용자 ID
@@ -517,8 +623,14 @@ class User:
         Returns:
             성공 여부
         """
-        if not _is_internal_mode():
-            return False  # 외부망에서는 활성화 토글 불가
+        if _is_internal_mode():
+            return User._toggle_active_to_db(user_id, activate)
+        else:
+            return User._toggle_active_to_api(user_id, activate)
+
+    @staticmethod
+    def _toggle_active_to_db(user_id, activate):
+        """내부망: DB에서 활성화 토글"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -543,10 +655,26 @@ class User:
             return False
 
     @staticmethod
+    def _toggle_active_to_api(user_id, activate):
+        """외부망: API로 활성화 토글"""
+        try:
+            api = _get_api()
+            return api.toggle_user_active(user_id, activate)
+        except Exception as e:
+            print(f"사용자 활성화 토글 API 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def get_active_status(user_id):
-        """사용자 활성화 상태 조회 - 내부망 전용"""
-        if not _is_internal_mode():
-            return 0  # 외부망에서는 기본값 반환
+        """사용자 활성화 상태 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._get_active_status_from_db(user_id)
+        else:
+            return User._get_active_status_from_api(user_id)
+
+    @staticmethod
+    def _get_active_status_from_db(user_id):
+        """내부망: DB에서 활성화 상태 조회"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -559,8 +687,18 @@ class User:
             return 0
 
     @staticmethod
+    def _get_active_status_from_api(user_id):
+        """외부망: API에서 활성화 상태 조회"""
+        try:
+            api = _get_api()
+            return api.get_user_active_status(user_id)
+        except Exception as e:
+            print(f"활성화 상태 조회 API 오류: {str(e)}")
+            return 0
+
+    @staticmethod
     def toggle_view_all(user_id, can_view=True):
-        """사용자 열람권한 토글 - 내부망 전용
+        """사용자 열람권한 토글 (Dual-mode)
 
         Args:
             user_id: 사용자 ID
@@ -569,8 +707,14 @@ class User:
         Returns:
             성공 여부
         """
-        if not _is_internal_mode():
-            return False  # 외부망에서는 열람권한 토글 불가
+        if _is_internal_mode():
+            return User._toggle_view_all_to_db(user_id, can_view)
+        else:
+            return User._toggle_view_all_to_api(user_id, can_view)
+
+    @staticmethod
+    def _toggle_view_all_to_db(user_id, can_view):
+        """내부망: DB에서 열람권한 토글"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -586,10 +730,26 @@ class User:
             return False
 
     @staticmethod
+    def _toggle_view_all_to_api(user_id, can_view):
+        """외부망: API로 열람권한 토글"""
+        try:
+            api = _get_api()
+            return api.toggle_user_view_all(user_id, can_view)
+        except Exception as e:
+            print(f"열람권한 토글 API 오류: {str(e)}")
+            return False
+
+    @staticmethod
     def get_view_all_status(user_id):
-        """사용자 열람권한 상태 조회 - 내부망 전용"""
-        if not _is_internal_mode():
-            return 0  # 외부망에서는 기본값 반환
+        """사용자 열람권한 상태 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return User._get_view_all_status_from_db(user_id)
+        else:
+            return User._get_view_all_status_from_api(user_id)
+
+    @staticmethod
+    def _get_view_all_status_from_db(user_id):
+        """내부망: DB에서 열람권한 상태 조회"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -599,4 +759,14 @@ class User:
             return result['can_view_all'] if result else 0
         except Exception as e:
             print(f"열람권한 상태 조회 중 오류: {str(e)}")
+            return 0
+
+    @staticmethod
+    def _get_view_all_status_from_api(user_id):
+        """외부망: API에서 열람권한 상태 조회"""
+        try:
+            api = _get_api()
+            return api.get_user_view_all_status(user_id)
+        except Exception as e:
+            print(f"열람권한 상태 조회 API 오류: {str(e)}")
             return 0

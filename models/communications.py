@@ -1,5 +1,8 @@
 # models/communications.py
-"""커뮤니케이션 모델 - 사용자 간 메시지 및 이메일 로그"""
+"""
+커뮤니케이션 모델 - 사용자 간 메시지 및 이메일 로그
+- Dual-mode 지원: 내부망(MySQL 직접) / 외부망(API 호출)
+"""
 
 from datetime import datetime
 
@@ -17,6 +20,12 @@ def _get_connection():
     """DB 연결 반환 (내부망 전용)"""
     from database import get_connection
     return get_connection()
+
+
+def _get_api():
+    """외부망용 API 클라이언트"""
+    from api_client import api
+    return api
 
 
 class Message:
@@ -105,9 +114,15 @@ class Message:
 
     @staticmethod
     def send(sender_id, receiver_id, content, message_type='chat', subject=None):
-        """메시지 전송 - 내부망 전용"""
-        if not _is_internal_mode():
-            return None  # 외부망에서는 메시지 전송 불가
+        """메시지 전송 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._send_to_db(sender_id, receiver_id, content, message_type, subject)
+        else:
+            return Message._send_to_api(sender_id, receiver_id, content, message_type, subject)
+
+    @staticmethod
+    def _send_to_db(sender_id, receiver_id, content, message_type, subject):
+        """내부망: DB에 메시지 저장"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -127,10 +142,26 @@ class Message:
             return None
 
     @staticmethod
+    def _send_to_api(sender_id, receiver_id, content, message_type, subject):
+        """외부망: API로 메시지 전송"""
+        try:
+            api = _get_api()
+            return api.send_message(sender_id, receiver_id, content, message_type, subject)
+        except Exception as e:
+            print(f"메시지 전송 API 오류: {e}")
+            return None
+
+    @staticmethod
     def get_conversation(user1_id, user2_id, limit=100):
-        """두 사용자 간의 대화 내역 조회 - 내부망 전용"""
-        if not _is_internal_mode():
-            return []  # 외부망에서는 빈 목록 반환
+        """두 사용자 간의 대화 내역 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._get_conversation_from_db(user1_id, user2_id, limit)
+        else:
+            return Message._get_conversation_from_api(user1_id, user2_id, limit)
+
+    @staticmethod
+    def _get_conversation_from_db(user1_id, user2_id, limit):
+        """내부망: DB에서 대화 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -157,10 +188,26 @@ class Message:
             return []
 
     @staticmethod
+    def _get_conversation_from_api(user1_id, user2_id, limit):
+        """외부망: API에서 대화 조회"""
+        try:
+            api = _get_api()
+            return api.get_conversation(user1_id, user2_id, limit)
+        except Exception as e:
+            print(f"대화 조회 API 오류: {e}")
+            return []
+
+    @staticmethod
     def get_chat_partners(user_id):
-        """대화 상대 목록 조회 (최근 메시지 순) - 내부망 전용"""
-        if not _is_internal_mode():
-            return []  # 외부망에서는 빈 목록 반환
+        """대화 상대 목록 조회 (최근 메시지 순, Dual-mode)"""
+        if _is_internal_mode():
+            return Message._get_chat_partners_from_db(user_id)
+        else:
+            return Message._get_chat_partners_from_api(user_id)
+
+    @staticmethod
+    def _get_chat_partners_from_db(user_id):
+        """내부망: DB에서 대화 상대 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -195,10 +242,26 @@ class Message:
             return []
 
     @staticmethod
+    def _get_chat_partners_from_api(user_id):
+        """외부망: API에서 대화 상대 조회"""
+        try:
+            api = _get_api()
+            return api.get_chat_partners(user_id)
+        except Exception as e:
+            print(f"대화 상대 목록 API 오류: {e}")
+            return []
+
+    @staticmethod
     def mark_as_read(message_id, user_id):
-        """메시지 읽음 처리 - 내부망 전용"""
-        if not _is_internal_mode():
-            return False
+        """메시지 읽음 처리 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._mark_as_read_to_db(message_id, user_id)
+        else:
+            return Message._mark_as_read_to_api(message_id, user_id)
+
+    @staticmethod
+    def _mark_as_read_to_db(message_id, user_id):
+        """내부망: DB에서 읽음 처리"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -217,10 +280,26 @@ class Message:
             return False
 
     @staticmethod
+    def _mark_as_read_to_api(message_id, user_id):
+        """외부망: API로 읽음 처리"""
+        try:
+            api = _get_api()
+            return api.mark_message_read(message_id, user_id)
+        except Exception as e:
+            print(f"읽음 처리 API 오류: {e}")
+            return False
+
+    @staticmethod
     def mark_conversation_as_read(user_id, partner_id):
-        """특정 대화의 모든 메시지 읽음 처리 - 내부망 전용"""
-        if not _is_internal_mode():
-            return 0
+        """특정 대화의 모든 메시지 읽음 처리 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._mark_conversation_as_read_to_db(user_id, partner_id)
+        else:
+            return Message._mark_conversation_as_read_to_api(user_id, partner_id)
+
+    @staticmethod
+    def _mark_conversation_as_read_to_db(user_id, partner_id):
+        """내부망: DB에서 대화 읽음 처리"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -250,10 +329,26 @@ class Message:
             return 0
 
     @staticmethod
-    def get_unread_count(user_id):
-        """읽지 않은 메시지 수 - 내부망 전용"""
-        if not _is_internal_mode():
+    def _mark_conversation_as_read_to_api(user_id, partner_id):
+        """외부망: API로 대화 읽음 처리"""
+        try:
+            api = _get_api()
+            return api.mark_conversation_read(user_id, partner_id)
+        except Exception as e:
+            print(f"대화 읽음 처리 API 오류: {e}")
             return 0
+
+    @staticmethod
+    def get_unread_count(user_id):
+        """읽지 않은 메시지 수 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._get_unread_count_from_db(user_id)
+        else:
+            return Message._get_unread_count_from_api(user_id)
+
+    @staticmethod
+    def _get_unread_count_from_db(user_id):
+        """내부망: DB에서 미읽음 수 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -274,10 +369,26 @@ class Message:
             return 0
 
     @staticmethod
+    def _get_unread_count_from_api(user_id):
+        """외부망: API에서 미읽음 수 조회"""
+        try:
+            api = _get_api()
+            return api.get_unread_count(user_id)
+        except Exception as e:
+            print(f"미읽음 수 API 오류: {e}")
+            return 0
+
+    @staticmethod
     def get_unread_by_partner(user_id):
-        """상대별 읽지 않은 메시지 수 - 내부망 전용"""
-        if not _is_internal_mode():
-            return {}
+        """상대별 읽지 않은 메시지 수 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._get_unread_by_partner_from_db(user_id)
+        else:
+            return Message._get_unread_by_partner_from_api(user_id)
+
+    @staticmethod
+    def _get_unread_by_partner_from_db(user_id):
+        """내부망: DB에서 상대별 미읽음 수 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -299,10 +410,26 @@ class Message:
             return {}
 
     @staticmethod
+    def _get_unread_by_partner_from_api(user_id):
+        """외부망: API에서 상대별 미읽음 수 조회"""
+        try:
+            api = _get_api()
+            return api.get_unread_by_partner(user_id)
+        except Exception as e:
+            print(f"상대별 미읽음 수 API 오류: {e}")
+            return {}
+
+    @staticmethod
     def delete_message(message_id, user_id):
-        """메시지 삭제 (본인이 보낸 메시지만) - 내부망 전용"""
-        if not _is_internal_mode():
-            return False
+        """메시지 삭제 (본인이 보낸 메시지만, Dual-mode)"""
+        if _is_internal_mode():
+            return Message._delete_message_from_db(message_id, user_id)
+        else:
+            return Message._delete_message_from_api(message_id, user_id)
+
+    @staticmethod
+    def _delete_message_from_db(message_id, user_id):
+        """내부망: DB에서 메시지 삭제"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -324,10 +451,26 @@ class Message:
             return False
 
     @staticmethod
+    def _delete_message_from_api(message_id, user_id):
+        """외부망: API로 메시지 삭제"""
+        try:
+            api = _get_api()
+            return api.delete_message(message_id, user_id)
+        except Exception as e:
+            print(f"메시지 삭제 API 오류: {e}")
+            return False
+
+    @staticmethod
     def delete_conversation(user_id, partner_id):
-        """두 사용자 간의 대화 전체 삭제 - 내부망 전용"""
-        if not _is_internal_mode():
-            return 0
+        """두 사용자 간의 대화 전체 삭제 (Dual-mode)"""
+        if _is_internal_mode():
+            return Message._delete_conversation_from_db(user_id, partner_id)
+        else:
+            return Message._delete_conversation_from_api(user_id, partner_id)
+
+    @staticmethod
+    def _delete_conversation_from_db(user_id, partner_id):
+        """내부망: DB에서 대화 삭제"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -357,6 +500,16 @@ class Message:
             print(f"대화 삭제 오류: {e}")
             return 0
 
+    @staticmethod
+    def _delete_conversation_from_api(user_id, partner_id):
+        """외부망: API로 대화 삭제"""
+        try:
+            api = _get_api()
+            return api.delete_conversation(user_id, partner_id)
+        except Exception as e:
+            print(f"대화 삭제 API 오류: {e}")
+            return 0
+
 
 class EmailLog:
     """이메일 발송 로그"""
@@ -364,9 +517,18 @@ class EmailLog:
     @staticmethod
     def save(schedule_id, estimate_type, sender_email, to_emails, cc_emails,
              subject, body, attachment_name, sent_by=None, client_name=None):
-        """이메일 발송 로그 저장 - 내부망 전용"""
-        if not _is_internal_mode():
-            return None  # 외부망에서는 로그 저장 불가
+        """이메일 발송 로그 저장 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._save_to_db(schedule_id, estimate_type, sender_email, to_emails,
+                                        cc_emails, subject, body, attachment_name, sent_by, client_name)
+        else:
+            return EmailLog._save_to_api(schedule_id, estimate_type, sender_email, to_emails,
+                                         cc_emails, subject, body, attachment_name, sent_by, client_name)
+
+    @staticmethod
+    def _save_to_db(schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+                    subject, body, attachment_name, sent_by, client_name):
+        """내부망: DB에 이메일 로그 저장"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -391,10 +553,28 @@ class EmailLog:
             return None
 
     @staticmethod
+    def _save_to_api(schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+                     subject, body, attachment_name, sent_by, client_name):
+        """외부망: API로 이메일 로그 저장"""
+        try:
+            api = _get_api()
+            return api.save_email_log(schedule_id, estimate_type, sender_email, to_emails,
+                                      cc_emails, subject, body, attachment_name, sent_by, client_name)
+        except Exception as e:
+            print(f"이메일 로그 API 저장 오류: {e}")
+            return None
+
+    @staticmethod
     def get_all(limit=100, sent_by=None):
-        """전체 이메일 로그 조회 (sent_by로 필터링 가능) - 내부망 전용"""
-        if not _is_internal_mode():
-            return []
+        """전체 이메일 로그 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._get_all_from_db(limit, sent_by)
+        else:
+            return EmailLog._get_all_from_api(limit, sent_by)
+
+    @staticmethod
+    def _get_all_from_db(limit, sent_by):
+        """내부망: DB에서 이메일 로그 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -426,10 +606,26 @@ class EmailLog:
             return []
 
     @staticmethod
-    def get_by_schedule(schedule_id):
-        """스케줄별 이메일 로그 조회 - 내부망 전용"""
-        if not _is_internal_mode():
+    def _get_all_from_api(limit, sent_by):
+        """외부망: API에서 이메일 로그 조회"""
+        try:
+            api = _get_api()
+            return api.get_email_logs(limit, sent_by)
+        except Exception as e:
+            print(f"이메일 로그 API 조회 오류: {e}")
             return []
+
+    @staticmethod
+    def get_by_schedule(schedule_id):
+        """스케줄별 이메일 로그 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._get_by_schedule_from_db(schedule_id)
+        else:
+            return EmailLog._get_by_schedule_from_api(schedule_id)
+
+    @staticmethod
+    def _get_by_schedule_from_db(schedule_id):
+        """내부망: DB에서 스케줄별 이메일 로그 조회"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -451,10 +647,26 @@ class EmailLog:
             return []
 
     @staticmethod
+    def _get_by_schedule_from_api(schedule_id):
+        """외부망: API에서 스케줄별 이메일 로그 조회"""
+        try:
+            api = _get_api()
+            return api.get_email_logs_by_schedule(schedule_id)
+        except Exception as e:
+            print(f"스케줄별 이메일 로그 API 조회 오류: {e}")
+            return []
+
+    @staticmethod
     def get_by_id(log_id):
-        """이메일 로그 상세 조회 - 내부망 전용"""
-        if not _is_internal_mode():
-            return None
+        """이메일 로그 상세 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._get_by_id_from_db(log_id)
+        else:
+            return EmailLog._get_by_id_from_api(log_id)
+
+    @staticmethod
+    def _get_by_id_from_db(log_id):
+        """내부망: DB에서 이메일 로그 상세 조회"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -474,10 +686,26 @@ class EmailLog:
             return None
 
     @staticmethod
+    def _get_by_id_from_api(log_id):
+        """외부망: API에서 이메일 로그 상세 조회"""
+        try:
+            api = _get_api()
+            return api.get_email_log(log_id)
+        except Exception as e:
+            print(f"이메일 로그 상세 API 조회 오류: {e}")
+            return None
+
+    @staticmethod
     def search(keyword=None, start_date=None, end_date=None, limit=100, sent_by=None):
-        """이메일 로그 검색 (sent_by로 필터링 가능) - 내부망 전용"""
-        if not _is_internal_mode():
-            return []
+        """이메일 로그 검색 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._search_from_db(keyword, start_date, end_date, limit, sent_by)
+        else:
+            return EmailLog._search_from_api(keyword, start_date, end_date, limit, sent_by)
+
+    @staticmethod
+    def _search_from_db(keyword, start_date, end_date, limit, sent_by):
+        """내부망: DB에서 이메일 로그 검색"""
         try:
             Message._ensure_tables()
             conn = _get_connection()
@@ -519,10 +747,26 @@ class EmailLog:
             return []
 
     @staticmethod
+    def _search_from_api(keyword, start_date, end_date, limit, sent_by):
+        """외부망: API에서 이메일 로그 검색"""
+        try:
+            api = _get_api()
+            return api.search_email_logs(keyword, start_date, end_date, limit, sent_by)
+        except Exception as e:
+            print(f"이메일 로그 API 검색 오류: {e}")
+            return []
+
+    @staticmethod
     def delete(log_id, user_id=None):
-        """이메일 로그 삭제 (본인 기록만 삭제 가능) - 내부망 전용"""
-        if not _is_internal_mode():
-            return False
+        """이메일 로그 삭제 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._delete_from_db(log_id, user_id)
+        else:
+            return EmailLog._delete_from_api(log_id, user_id)
+
+    @staticmethod
+    def _delete_from_db(log_id, user_id):
+        """내부망: DB에서 이메일 로그 삭제"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -546,10 +790,26 @@ class EmailLog:
             return False
 
     @staticmethod
-    def update_status(log_id, status=None, received=None, received_at=None):
-        """이메일 로그 상태 업데이트 - 내부망 전용"""
-        if not _is_internal_mode():
+    def _delete_from_api(log_id, user_id):
+        """외부망: API로 이메일 로그 삭제"""
+        try:
+            api = _get_api()
+            return api.delete_email_log(log_id, user_id)
+        except Exception as e:
+            print(f"이메일 로그 API 삭제 오류: {e}")
             return False
+
+    @staticmethod
+    def update_status(log_id, status=None, received=None, received_at=None):
+        """이메일 로그 상태 업데이트 (Dual-mode)"""
+        if _is_internal_mode():
+            return EmailLog._update_status_to_db(log_id, status, received, received_at)
+        else:
+            return EmailLog._update_status_to_api(log_id, status, received, received_at)
+
+    @staticmethod
+    def _update_status_to_db(log_id, status, received, received_at):
+        """내부망: DB에서 이메일 로그 상태 업데이트"""
         try:
             conn = _get_connection()
             cursor = conn.cursor()
@@ -581,4 +841,14 @@ class EmailLog:
             return True
         except Exception as e:
             print(f"이메일 로그 상태 업데이트 오류: {e}")
+            return False
+
+    @staticmethod
+    def _update_status_to_api(log_id, status, received, received_at):
+        """외부망: API로 이메일 로그 상태 업데이트"""
+        try:
+            api = _get_api()
+            return api.update_email_log_status(log_id, status, received, received_at)
+        except Exception as e:
+            print(f"이메일 로그 상태 API 업데이트 오류: {e}")
             return False

@@ -208,6 +208,34 @@ class ApiClient:
         result = self._request("POST", f"/api/users/{user_id}/reset-password")
         return result.get("success", False)
 
+    def change_user_password(self, user_id, new_password):
+        """비밀번호 변경"""
+        result = self._request("POST", f"/api/users/{user_id}/change-password",
+                              params={"new_password": new_password})
+        return result.get("success", False)
+
+    def verify_user_password(self, user_id, password):
+        """비밀번호 확인"""
+        result = self._request("POST", f"/api/users/{user_id}/verify-password",
+                              params={"password": password})
+        return result.get("success", False)
+
+    def toggle_user_view_all(self, user_id, can_view=True):
+        """사용자 열람권한 토글"""
+        result = self._request("POST", f"/api/users/{user_id}/toggle-view-all",
+                              params={"can_view": can_view})
+        return result.get("success", False)
+
+    def get_user_active_status(self, user_id):
+        """사용자 활성화 상태 조회"""
+        result = self._request("GET", f"/api/users/{user_id}/active-status")
+        return result.get("data", 0)
+
+    def get_user_view_all_status(self, user_id):
+        """사용자 열람권한 상태 조회"""
+        result = self._request("GET", f"/api/users/{user_id}/view-all-status")
+        return result.get("data", 0)
+
     def get_departments(self):
         """부서 목록"""
         result = self._request("GET", "/api/users/constants/departments")
@@ -524,6 +552,136 @@ class ApiClient:
         """활동 유형 목록"""
         result = self._request("GET", "/api/activity-logs/action-types")
         return result.get("data", {})
+
+    # ==================== Messages ====================
+
+    def send_message(self, sender_id, receiver_id, content, message_type='chat', subject=None):
+        """메시지 전송"""
+        result = self._request("POST", "/api/messages", {
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "content": content,
+            "message_type": message_type,
+            "subject": subject
+        })
+        if result.get("success"):
+            return result.get("data", {}).get("id")
+        return None
+
+    def get_conversation(self, user1_id, user2_id, limit=100):
+        """두 사용자 간 대화 내역 조회"""
+        result = self._request("GET", "/api/messages/conversation",
+                              params={"user1_id": user1_id, "user2_id": user2_id, "limit": limit})
+        return result.get("data", [])
+
+    def get_chat_partners(self, user_id):
+        """대화 상대 목록 조회"""
+        result = self._request("GET", f"/api/messages/partners/{user_id}")
+        return result.get("data", [])
+
+    def mark_message_read(self, message_id, user_id):
+        """메시지 읽음 처리"""
+        result = self._request("POST", f"/api/messages/{message_id}/read",
+                              params={"target_user_id": user_id})
+        return result.get("success", False)
+
+    def mark_conversation_read(self, user_id, partner_id):
+        """대화 전체 읽음 처리"""
+        result = self._request("POST", "/api/messages/conversation/read",
+                              params={"target_user_id": user_id, "partner_id": partner_id})
+        return result.get("data", 0)
+
+    def get_unread_count(self, user_id):
+        """읽지 않은 메시지 수"""
+        result = self._request("GET", f"/api/messages/unread-count/{user_id}")
+        return result.get("data", 0)
+
+    def get_unread_by_partner(self, user_id):
+        """상대별 읽지 않은 메시지 수"""
+        result = self._request("GET", f"/api/messages/unread-by-partner/{user_id}")
+        return result.get("data", {})
+
+    def delete_message(self, message_id, user_id):
+        """메시지 삭제"""
+        result = self._request("DELETE", f"/api/messages/{message_id}",
+                              params={"target_user_id": user_id})
+        return result.get("success", False)
+
+    def delete_conversation(self, user_id, partner_id):
+        """대화 전체 삭제"""
+        result = self._request("DELETE", f"/api/messages/conversation/{partner_id}",
+                              params={"target_user_id": user_id})
+        return result.get("data", 0)
+
+    # ==================== Email Logs ====================
+
+    def save_email_log(self, schedule_id, estimate_type, sender_email, to_emails, cc_emails,
+                      subject, body, attachment_name, sent_by=None, client_name=None):
+        """이메일 로그 저장"""
+        result = self._request("POST", "/api/email-logs", {
+            "schedule_id": schedule_id,
+            "estimate_type": estimate_type,
+            "sender_email": sender_email,
+            "to_emails": to_emails,
+            "cc_emails": cc_emails,
+            "subject": subject,
+            "body": body,
+            "attachment_name": attachment_name,
+            "sent_by": sent_by,
+            "client_name": client_name
+        })
+        if result.get("success"):
+            return result.get("data", {}).get("id")
+        return None
+
+    def get_email_logs(self, limit=100, sent_by=None):
+        """이메일 로그 목록 조회"""
+        params = {"limit": limit}
+        if sent_by:
+            params["sent_by"] = sent_by
+        result = self._request("GET", "/api/email-logs", params=params)
+        return result.get("data", [])
+
+    def get_email_log(self, log_id):
+        """이메일 로그 상세 조회"""
+        result = self._request("GET", f"/api/email-logs/{log_id}")
+        return result.get("data")
+
+    def get_email_logs_by_schedule(self, schedule_id):
+        """스케줄별 이메일 로그 조회"""
+        result = self._request("GET", f"/api/email-logs/schedule/{schedule_id}")
+        return result.get("data", [])
+
+    def search_email_logs(self, keyword=None, start_date=None, end_date=None, limit=100, sent_by=None):
+        """이메일 로그 검색"""
+        params = {"limit": limit}
+        if keyword:
+            params["keyword"] = keyword
+        if start_date:
+            params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
+        if sent_by:
+            params["sent_by"] = sent_by
+        result = self._request("GET", "/api/email-logs/search", params=params)
+        return result.get("data", [])
+
+    def delete_email_log(self, log_id, user_id=None):
+        """이메일 로그 삭제"""
+        params = {}
+        if user_id:
+            params["target_user_id"] = user_id
+        result = self._request("DELETE", f"/api/email-logs/{log_id}", params=params)
+        return result.get("success", False)
+
+    def update_email_log_status(self, log_id, status=None, received=None, received_at=None):
+        """이메일 로그 상태 업데이트"""
+        result = self._request("PUT", f"/api/email-logs/{log_id}/status", {
+            "status": status,
+            "received": received,
+            "received_at": received_at
+        })
+        return result.get("success", False)
 
     # ==================== Health Check ====================
 
