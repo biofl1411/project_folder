@@ -561,6 +561,43 @@ class Schedule:
                 return False
 
     @staticmethod
+    def update_first_estimate_interim(schedule_id, interim_cost, formula_text, supply_amount,
+                                      tax_amount, total_amount):
+        """1차 견적 중간보고서 비용 강제 업데이트 (중간보고서 상태 변경 시)"""
+        if is_internal_mode():
+            try:
+                Schedule._ensure_columns()
+                conn = _get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE schedules
+                    SET first_interim_cost = %s, first_formula_text = %s,
+                        first_supply_amount = %s, first_tax_amount = %s, first_total_amount = %s
+                    WHERE id = %s
+                """, (interim_cost, formula_text, supply_amount, tax_amount, total_amount, schedule_id))
+                success = cursor.rowcount > 0
+                conn.commit()
+                conn.close()
+                return success
+            except Exception as e:
+                print(f"1차 견적 중간비용 업데이트 중 오류: {str(e)}")
+                return False
+        else:
+            # 외부망: API 사용
+            try:
+                api = _get_api()
+                return api.update_schedule(schedule_id, {
+                    'first_interim_cost': interim_cost,
+                    'first_formula_text': formula_text,
+                    'first_supply_amount': supply_amount,
+                    'first_tax_amount': tax_amount,
+                    'first_total_amount': total_amount
+                })
+            except Exception as e:
+                print(f"1차 견적 중간비용 업데이트 중 오류 (API): {str(e)}")
+                return False
+
+    @staticmethod
     def save_suspend_estimate(schedule_id, item_detail, cost_per_test, rounds_cost,
                              report_cost, interim_cost, formula_text, supply_amount,
                              tax_amount, total_amount):
