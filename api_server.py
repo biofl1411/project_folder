@@ -6,7 +6,7 @@ FastAPI 서버
 외부 클라이언트용 REST API 제공
 '''
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -653,6 +653,69 @@ async def get_schedule_attachments(schedule_id: int, user: dict = Depends(verify
     return {"success": True, "data": attachments_list}
 
 
+@app.post("/api/schedules/{schedule_id}/attachments")
+async def upload_attachment(schedule_id: int, file: UploadFile = File(...), user: dict = Depends(verify_token)):
+    """첨부파일 업로드"""
+    import tempfile
+    import shutil
+
+    try:
+        # 임시 파일에 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+
+        # ScheduleAttachment.add() 사용
+        success, message, attachment_id = ScheduleAttachment.add(schedule_id, tmp_path)
+
+        # 임시 파일 삭제
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+        if success:
+            return {"success": True, "message": message, "attachment_id": attachment_id}
+        else:
+            return {"success": False, "message": message}
+
+    except Exception as e:
+        return {"success": False, "message": f"업로드 오류: {str(e)}"}
+
+
+@app.get("/api/attachments/{attachment_id}")
+async def get_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 정보 조회"""
+    attachment = ScheduleAttachment.get_by_id(attachment_id)
+    if attachment:
+        return {"success": True, "data": dict(attachment)}
+    return {"success": False, "message": "첨부파일을 찾을 수 없습니다."}
+
+
+@app.get("/api/attachments/{attachment_id}/download")
+async def download_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 다운로드"""
+    from fastapi.responses import FileResponse
+
+    file_path = ScheduleAttachment.get_file_path(attachment_id)
+    if file_path and os.path.exists(file_path):
+        attachment = ScheduleAttachment.get_by_id(attachment_id)
+        filename = attachment['file_name'] if attachment else os.path.basename(file_path)
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type='application/octet-stream'
+        )
+    return {"success": False, "message": "파일을 찾을 수 없습니다."}
+
+
+@app.delete("/api/attachments/{attachment_id}")
+async def delete_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 삭제"""
+    success, message = ScheduleAttachment.delete(attachment_id)
+    return {"success": success, "message": message}
+
+
 # ==================== Activity Logs API ====================
 
 @app.post("/api/activity-logs")
@@ -954,6 +1017,147 @@ async def get_setting(key: str, user: dict = Depends(verify_token)):
         return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
     except Exception as e:
         return {"success": False, "error": str(e), "data": None}
+
+
+@app.put("/api/settings/{key}")
+async def update_setting(key: str, value: str, user: dict = Depends(verify_token)):
+    """설정 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 먼저 업데이트 시도
+        cursor.execute("""
+            UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE `key` = %s
+        """, (value, key))
+
+        # 업데이트된 행이 없으면 새로 추가
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT INTO settings (`key`, value) VALUES (%s, %s)
+            """, (key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": "설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/settings/batch")
+async def update_settings_batch(settings: Dict[str, str], user: dict = Depends(verify_token)):
+    """여러 설정 일괄 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        for key, value in settings.items():
+            cursor.execute("""
+                UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE `key` = %s
+            """, (value, key))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (`key`, value) VALUES (%s, %s)
+                """, (key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"{len(settings)}개 설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== User Settings API ====================
+
+@app.get("/api/user-settings/{user_id}")
+async def get_user_settings(user_id: int, user: dict = Depends(verify_token)):
+    """사용자별 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT `key`, value FROM user_settings WHERE user_id = %s", (user_id,))
+        settings = cursor.fetchall()
+        conn.close()
+        settings_dict = {s['key']: s['value'] for s in settings}
+        return {"success": True, "data": settings_dict}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": {}}
+
+
+@app.get("/api/user-settings/{user_id}/{key}")
+async def get_user_setting(user_id: int, key: str, user: dict = Depends(verify_token)):
+    """사용자별 특정 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM user_settings WHERE user_id = %s AND `key` = %s", (user_id, key))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            return {"success": True, "data": result['value']}
+        return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": None}
+
+
+@app.put("/api/user-settings/{user_id}/{key}")
+async def update_user_setting(user_id: int, key: str, value: str, user: dict = Depends(verify_token)):
+    """사용자별 설정 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 먼저 업데이트 시도
+        cursor.execute("""
+            UPDATE user_settings SET value = %s
+            WHERE user_id = %s AND `key` = %s
+        """, (value, user_id, key))
+
+        # 업데이트된 행이 없으면 새로 추가
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT INTO user_settings (user_id, `key`, value) VALUES (%s, %s, %s)
+            """, (user_id, key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": "설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/user-settings/{user_id}/batch")
+async def update_user_settings_batch(user_id: int, settings: Dict[str, str], user: dict = Depends(verify_token)):
+    """사용자별 여러 설정 일괄 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        for key, value in settings.items():
+            cursor.execute("""
+                UPDATE user_settings SET value = %s
+                WHERE user_id = %s AND `key` = %s
+            """, (value, user_id, key))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO user_settings (user_id, `key`, value) VALUES (%s, %s, %s)
+                """, (user_id, key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"{len(settings)}개 설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ==================== Health Check ====================

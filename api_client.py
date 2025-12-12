@@ -461,6 +461,63 @@ class ApiClient:
             return True, "첨부파일이 삭제되었습니다."
         return False, result.get("message", "삭제 실패")
 
+    def get_attachment(self, attachment_id):
+        """첨부파일 정보 조회"""
+        result = self._request("GET", f"/api/attachments/{attachment_id}")
+        if result.get("success"):
+            return result.get("data")
+        return None
+
+    def download_attachment(self, attachment_id, save_path=None):
+        """첨부파일 다운로드
+
+        Args:
+            attachment_id: 첨부파일 ID
+            save_path: 저장할 경로 (없으면 임시 파일에 저장)
+
+        Returns:
+            (success, file_path or error_message)
+        """
+        import tempfile
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/attachments/{attachment_id}/download",
+                headers=self._get_headers(),
+                timeout=self.timeout,
+                stream=True
+            )
+
+            if response.status_code == 200:
+                # Content-Disposition 헤더에서 파일명 추출
+                content_disp = response.headers.get('content-disposition', '')
+                filename = None
+                if 'filename=' in content_disp:
+                    import re
+                    match = re.search(r'filename[*]?=(?:UTF-8\'\')?([^;\n]+)', content_disp)
+                    if match:
+                        filename = match.group(1).strip('"\'')
+
+                # 저장 경로 결정
+                if save_path:
+                    file_path = save_path
+                else:
+                    suffix = os.path.splitext(filename)[1] if filename else ''
+                    fd, file_path = tempfile.mkstemp(suffix=suffix)
+                    os.close(fd)
+
+                # 파일 저장
+                with open(file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                return True, file_path
+            else:
+                return False, f"다운로드 실패: {response.status_code}"
+
+        except Exception as e:
+            return False, f"다운로드 오류: {str(e)}"
+
     # ==================== Settings ====================
 
     def get_settings(self):
@@ -472,6 +529,38 @@ class ApiClient:
         """특정 설정 조회"""
         result = self._request("GET", f"/api/settings/{key}")
         return result.get("data")
+
+    def update_setting(self, key, value):
+        """설정 업데이트"""
+        result = self._request("PUT", f"/api/settings/{key}", params={"value": value})
+        return result.get("success", False)
+
+    def update_settings_batch(self, settings_dict):
+        """여러 설정 일괄 업데이트"""
+        result = self._request("POST", "/api/settings/batch", settings_dict)
+        return result.get("success", False)
+
+    # ==================== User Settings ====================
+
+    def get_user_settings(self, user_id):
+        """사용자별 설정 조회"""
+        result = self._request("GET", f"/api/user-settings/{user_id}")
+        return result.get("data", {})
+
+    def get_user_setting(self, user_id, key):
+        """사용자별 특정 설정 조회"""
+        result = self._request("GET", f"/api/user-settings/{user_id}/{key}")
+        return result.get("data")
+
+    def update_user_setting(self, user_id, key, value):
+        """사용자별 설정 업데이트"""
+        result = self._request("PUT", f"/api/user-settings/{user_id}/{key}", params={"value": value})
+        return result.get("success", False)
+
+    def update_user_settings_batch(self, user_id, settings_dict):
+        """사용자별 여러 설정 일괄 업데이트"""
+        result = self._request("POST", f"/api/user-settings/{user_id}/batch", settings_dict)
+        return result.get("success", False)
 
     # ==================== Activity Logs ====================
 

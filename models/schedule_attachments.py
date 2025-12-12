@@ -227,7 +227,10 @@ class ScheduleAttachment:
 
     @staticmethod
     def get_file_path(attachment_id):
-        """첨부파일의 실제 경로 반환
+        """첨부파일의 실제 경로 반환 (Dual-mode)
+
+        내부망: DB에서 경로 조회 후 절대 경로 반환
+        외부망: API로 파일 다운로드 후 임시 파일 경로 반환
 
         Args:
             attachment_id: 첨부파일 ID
@@ -235,8 +238,14 @@ class ScheduleAttachment:
         Returns:
             절대 경로 또는 None
         """
-        if not _is_internal_mode():
-            return None  # 외부망에서는 파일 경로 조회 불가
+        if _is_internal_mode():
+            return ScheduleAttachment._get_file_path_from_db(attachment_id)
+        else:
+            return ScheduleAttachment._get_file_path_from_api(attachment_id)
+
+    @staticmethod
+    def _get_file_path_from_db(attachment_id):
+        """내부망: DB에서 파일 경로 조회"""
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -264,10 +273,31 @@ class ScheduleAttachment:
             return None
 
     @staticmethod
+    def _get_file_path_from_api(attachment_id):
+        """외부망: API로 파일 다운로드"""
+        try:
+            api = _get_api()
+            success, result = api.download_attachment(attachment_id)
+            if success:
+                return result  # 다운로드된 파일 경로 반환
+            else:
+                print(f"첨부파일 다운로드 실패: {result}")
+                return None
+        except Exception as e:
+            print(f"첨부파일 다운로드 오류: {str(e)}")
+            return None
+
+    @staticmethod
     def get_by_id(attachment_id):
-        """ID로 첨부파일 정보 조회"""
-        if not _is_internal_mode():
-            return None  # 외부망에서는 첨부파일 정보 조회 불가
+        """ID로 첨부파일 정보 조회 (Dual-mode)"""
+        if _is_internal_mode():
+            return ScheduleAttachment._get_by_id_from_db(attachment_id)
+        else:
+            return ScheduleAttachment._get_by_id_from_api(attachment_id)
+
+    @staticmethod
+    def _get_by_id_from_db(attachment_id):
+        """내부망: DB에서 첨부파일 정보 조회"""
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -277,6 +307,16 @@ class ScheduleAttachment:
             return result
         except Exception as e:
             print(f"첨부파일 조회 오류: {str(e)}")
+            return None
+
+    @staticmethod
+    def _get_by_id_from_api(attachment_id):
+        """외부망: API에서 첨부파일 정보 조회"""
+        try:
+            api = _get_api()
+            return api.get_attachment(attachment_id)
+        except Exception as e:
+            print(f"첨부파일 정보 조회 오류 (API): {str(e)}")
             return None
 
     @staticmethod
