@@ -3644,6 +3644,39 @@ class ScheduleManagementTab(QWidget):
         # 비용 재계산
         self.recalculate_costs()
 
+        # 1차 견적 중간보고서 비용 강제 업데이트 (기존 견적 덮어쓰기)
+        schedule_id = self.current_schedule.get('id')
+        if schedule_id:
+            try:
+                # UI에서 현재 계산된 값 읽기
+                first_interim_cost = 0
+                if self.first_interim_cost_input.isVisible():
+                    try:
+                        first_interim_cost = int(self.first_interim_cost_input.text().replace(',', '').replace('원', ''))
+                    except (ValueError, TypeError):
+                        first_interim_cost = 200000 if report_interim else 0
+
+                first_formula = self.first_cost_formula.text() if hasattr(self, 'first_cost_formula') else ''
+
+                # 부가세 미포함 금액에서 부가세 계산
+                try:
+                    # 수식에서 최종 금액 추출 (예: "100,000×1+200,000+200,000=500,000원")
+                    supply_text = first_formula.split('=')[-1].replace('원', '').replace(',', '')
+                    first_supply = int(supply_text)
+                except (ValueError, IndexError):
+                    first_supply = 0
+
+                first_vat = int(first_supply * 0.1)
+                first_total = first_supply + first_vat
+
+                from models.schedules import Schedule
+                Schedule.update_first_estimate_interim(
+                    schedule_id, first_interim_cost, first_formula,
+                    first_supply, first_vat, first_total
+                )
+            except Exception as e:
+                print(f"1차 견적 중간비용 업데이트 오류: {e}")
+
     def toggle_extension_test(self):
         """연장실험 진행/미진행 토글"""
         # 수정 가능 여부 확인
