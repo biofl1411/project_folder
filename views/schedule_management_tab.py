@@ -1016,6 +1016,7 @@ class ScheduleManagementTab(QWidget):
         super().__init__(parent)
         self.current_schedule = None
         self.current_user = None  # 현재 로그인한 사용자
+        self._loading = False  # 로드 중 플래그 (on_cost_input_changed 저장 방지)
 
         # 버튼 참조 저장 (권한 체크용)
         self.estimate_btn = None
@@ -2128,16 +2129,20 @@ class ScheduleManagementTab(QWidget):
         """ID로 스케줄 선택"""
         schedule = Schedule.get_by_id(schedule_id)
         if schedule:
-            self.current_schedule = schedule
-            # 저장된 추가/삭제 항목 및 사용자 수정 날짜 불러오기
-            self._load_saved_test_items(schedule)
-            client_name = schedule.get('client_name', '-') or '-'
-            product_name = schedule.get('product_name', '-') or '-'
-            self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
-            self.update_info_panel(schedule)
-            self.update_experiment_schedule(schedule)
-            # 첨부파일 목록 새로고침
-            self.refresh_attachment_list()
+            self._loading = True  # 로드 중 플래그 설정 (자동 저장 방지)
+            try:
+                self.current_schedule = schedule
+                # 저장된 추가/삭제 항목 및 사용자 수정 날짜 불러오기
+                self._load_saved_test_items(schedule)
+                client_name = schedule.get('client_name', '-') or '-'
+                product_name = schedule.get('product_name', '-') or '-'
+                self.selected_schedule_label.setText(f"선택: {client_name} - {product_name}")
+                self.update_info_panel(schedule)
+                self.update_experiment_schedule(schedule)
+                # 첨부파일 목록 새로고침
+                self.refresh_attachment_list()
+            finally:
+                self._loading = False  # 로드 완료
 
     def _load_saved_test_items(self, schedule):
         """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""
@@ -5448,6 +5453,10 @@ class ScheduleManagementTab(QWidget):
     def on_cost_input_changed(self):
         """보고서 비용 입력 변경 시 총비용 재계산 (1차/중단/연장 개별 처리)"""
         if not self.current_schedule:
+            return
+
+        # 로드 중에는 저장하지 않음 (값이 덮어써지는 것 방지)
+        if getattr(self, '_loading', False):
             return
 
         # 실험 방법에 따른 구간 수 결정
