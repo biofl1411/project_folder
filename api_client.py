@@ -442,9 +442,10 @@ class ApiClient:
             with open(file_path, 'rb') as f:
                 files = {'file': (file_name, f)}
                 response = requests.post(
-                    f"{self.base_url}/api/schedules/{schedule_id}/attachments",
+                    f"{self._base_url}/api/schedules/{schedule_id}/attachments",
+                    headers=self._get_headers(),
                     files=files,
-                    timeout=self.timeout
+                    timeout=(5, 30)
                 )
             if response.status_code == 200:
                 data = response.json()
@@ -482,9 +483,9 @@ class ApiClient:
 
         try:
             response = requests.get(
-                f"{self.base_url}/api/attachments/{attachment_id}/download",
+                f"{self._base_url}/api/attachments/{attachment_id}/download",
                 headers=self._get_headers(),
-                timeout=self.timeout,
+                timeout=(5, 60),  # 다운로드는 더 긴 타임아웃
                 stream=True
             )
 

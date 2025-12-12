@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any
 import uvicorn
 import json
 import secrets
+import os
 
 # 기존 모델 import
 from models.users import User, DEPARTMENTS, PERMISSION_LABELS, PERMISSION_BY_CATEGORY
