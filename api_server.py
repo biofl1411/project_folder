@@ -21,6 +21,7 @@ from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
 from models.schedule_attachments import ScheduleAttachment
+from models.activity_log import ActivityLog, ACTION_TYPES
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -145,6 +146,25 @@ class ProductTypeCreate(BaseModel):
 
 class ProductTypeUpdate(ProductTypeCreate):
     pass
+
+class ActivityLogCreate(BaseModel):
+    user_id: int
+    username: str
+    user_name: str
+    department: Optional[str] = None
+    action_type: str
+    target_type: Optional[str] = None
+    target_id: Optional[int] = None
+    target_name: Optional[str] = None
+    details: Optional[str] = None
+
+class ActivityLogFilter(BaseModel):
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    action_type: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    target_type: Optional[str] = None
 
 class ApiResponse(BaseModel):
     success: bool
@@ -576,6 +596,123 @@ async def get_schedule_attachments(schedule_id: int, user: dict = Depends(verify
     attachments = ScheduleAttachment.get_by_schedule(schedule_id)
     attachments_list = [dict(a) for a in attachments] if attachments else []
     return {"success": True, "data": attachments_list}
+
+
+# ==================== Activity Logs API ====================
+
+@app.post("/api/activity-logs")
+async def create_activity_log(request: ActivityLogCreate, user: dict = Depends(verify_token)):
+    """활동 로그 생성"""
+    try:
+        # ACTION_TYPES에서 action_name 가져오기
+        action_name = ACTION_TYPES.get(request.action_type, request.action_type)
+
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO activity_logs
+            (user_id, username, user_name, department, action_type, action_name,
+             target_type, target_id, target_name, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            request.user_id,
+            request.username,
+            request.user_name,
+            request.department or '',
+            request.action_type,
+            action_name,
+            request.target_type,
+            request.target_id,
+            request.target_name,
+            request.details
+        ))
+
+        log_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return {"success": True, "data": {"id": log_id}}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/activity-logs")
+async def get_activity_logs(
+    user_id: Optional[int] = None,
+    username: Optional[str] = None,
+    action_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    target_type: Optional[str] = None,
+    limit: int = 500,
+    offset: int = 0,
+    user: dict = Depends(verify_token)
+):
+    """활동 로그 목록 조회 (필터링)"""
+    filters = {}
+    if user_id:
+        filters['user_id'] = user_id
+    if username:
+        filters['username'] = username
+    if action_type:
+        filters['action_type'] = action_type
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+    if target_type:
+        filters['target_type'] = target_type
+
+    logs = ActivityLog.get_all(limit=limit, offset=offset, filters=filters if filters else None)
+    return {"success": True, "data": logs}
+
+@app.get("/api/activity-logs/user/{target_user_id}")
+async def get_user_activity_logs(
+    target_user_id: int,
+    limit: int = 100,
+    offset: int = 0,
+    user: dict = Depends(verify_token)
+):
+    """특정 사용자의 활동 로그 조회"""
+    logs = ActivityLog.get_by_user(target_user_id, limit=limit, offset=offset)
+    return {"success": True, "data": logs}
+
+@app.get("/api/activity-logs/summary")
+async def get_activity_logs_summary(user: dict = Depends(verify_token)):
+    """사용자별 활동 요약"""
+    summary = ActivityLog.get_user_summary()
+    return {"success": True, "data": summary}
+
+@app.get("/api/activity-logs/count")
+async def get_activity_logs_count(
+    user_id: Optional[int] = None,
+    username: Optional[str] = None,
+    action_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user: dict = Depends(verify_token)
+):
+    """활동 로그 개수 조회"""
+    filters = {}
+    if user_id:
+        filters['user_id'] = user_id
+    if username:
+        filters['username'] = username
+    if action_type:
+        filters['action_type'] = action_type
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+
+    count = ActivityLog.get_count(filters if filters else None)
+    return {"success": True, "data": count}
+
+@app.get("/api/activity-logs/action-types")
+async def get_action_types(user: dict = Depends(verify_token)):
+    """활동 유형 목록"""
+    return {"success": True, "data": ACTION_TYPES}
 
 
 # ==================== Settings API ====================

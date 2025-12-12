@@ -409,6 +409,86 @@ class ApiClient:
         result = self._request("GET", f"/api/settings/{key}")
         return result.get("data")
 
+    # ==================== Activity Logs ====================
+
+    def create_activity_log(self, user_id, username, user_name, action_type,
+                           department=None, target_type=None, target_id=None,
+                           target_name=None, details=None):
+        """활동 로그 생성"""
+        try:
+            result = self._request("POST", "/api/activity-logs", {
+                "user_id": user_id,
+                "username": username,
+                "user_name": user_name,
+                "department": department or "",
+                "action_type": action_type,
+                "target_type": target_type,
+                "target_id": target_id,
+                "target_name": target_name,
+                "details": details
+            })
+            if result.get("success"):
+                return result.get("data", {}).get("id")
+            return None
+        except Exception as e:
+            print(f"활동 로그 API 기록 실패: {str(e)}")
+            return None
+
+    def get_activity_logs(self, user_id=None, username=None, action_type=None,
+                         date_from=None, date_to=None, target_type=None,
+                         limit=500, offset=0):
+        """활동 로그 목록 조회"""
+        params = {"limit": limit, "offset": offset}
+        if user_id:
+            params["user_id"] = user_id
+        if username:
+            params["username"] = username
+        if action_type:
+            params["action_type"] = action_type
+        if date_from:
+            params["date_from"] = date_from
+        if date_to:
+            params["date_to"] = date_to
+        if target_type:
+            params["target_type"] = target_type
+
+        result = self._request("GET", "/api/activity-logs", params=params)
+        return result.get("data", [])
+
+    def get_user_activity_logs(self, user_id, limit=100, offset=0):
+        """특정 사용자의 활동 로그 조회"""
+        result = self._request("GET", f"/api/activity-logs/user/{user_id}",
+                              params={"limit": limit, "offset": offset})
+        return result.get("data", [])
+
+    def get_activity_logs_summary(self):
+        """사용자별 활동 요약"""
+        result = self._request("GET", "/api/activity-logs/summary")
+        return result.get("data", [])
+
+    def get_activity_logs_count(self, user_id=None, username=None, action_type=None,
+                                date_from=None, date_to=None):
+        """활동 로그 개수 조회"""
+        params = {}
+        if user_id:
+            params["user_id"] = user_id
+        if username:
+            params["username"] = username
+        if action_type:
+            params["action_type"] = action_type
+        if date_from:
+            params["date_from"] = date_from
+        if date_to:
+            params["date_to"] = date_to
+
+        result = self._request("GET", "/api/activity-logs/count", params=params)
+        return result.get("data", 0)
+
+    def get_action_types(self):
+        """활동 유형 목록"""
+        result = self._request("GET", "/api/activity-logs/action-types")
+        return result.get("data", {})
+
     # ==================== Health Check ====================
 
     def health_check(self):
