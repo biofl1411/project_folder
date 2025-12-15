@@ -323,12 +323,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(estimate_frame)
 
     def on_tab_changed(self, index):
-        """탭 변경 시 호출 - 대시보드 탭이면 데이터 새로고침"""
+        """탭 변경 시 호출 - 해당 탭 데이터 로드 (Lazy Loading)"""
         current_widget = self.tab_widget.widget(index)
         dashboard_widget = self.tab_widgets.get('dashboard')
+        schedule_widget = self.tab_widgets.get('schedule')
 
         if current_widget == dashboard_widget:
             self.load_dashboard_data()
+        elif current_widget == schedule_widget:
+            # 스케줄 작성 탭 활성화 시 데이터 로드
+            if hasattr(self.schedule_tab, 'on_tab_activated'):
+                self.schedule_tab.on_tab_activated()
 
     def load_dashboard_data(self):
         """대시보드 데이터 로드 및 카드 업데이트"""
@@ -678,7 +683,7 @@ class MainWindow(QMainWindow):
         department = user_data.get('department', '')
         self.user_label.setText(f"사용자: {user_data['name']} ({department or user_data['role']})")
 
-        # 각 탭에 현재 사용자 설정 (권한 적용)
+        # 각 탭에 현재 사용자 설정 (권한 적용) - 데이터 로드는 지연 (Lazy Loading)
         if hasattr(self, 'schedule_tab') and self.schedule_tab:
             self.schedule_tab.set_current_user(user_data)
         if hasattr(self, 'client_tab') and self.client_tab:
@@ -699,11 +704,11 @@ class MainWindow(QMainWindow):
         # 권한 기반 탭 활성화/비활성화
         self.apply_tab_permissions(user_data)
 
-        # 대시보드 데이터 로드
-        self.load_dashboard_data()
-
         self.status_label.setText(f"{user_data['name']}님으로 로그인됨")
         self.show()
+
+        # 대시보드 데이터 지연 로드 (UI 먼저 표시 후 데이터 로드)
+        QTimer.singleShot(100, self.load_dashboard_data)
 
     def on_unread_changed(self, unread_count):
         """미읽은 메시지 수 변경 시 탭 이름 업데이트"""

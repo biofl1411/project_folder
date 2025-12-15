@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QScrollArea, QTabWidget, QListWidget, QListWidgetItem,
                              QDialogButtonBox, QCalendarWidget, QMenu, QAction,
                              QSizePolicy)
-from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal
+from PyQt5.QtCore import Qt, QDate, QDateTime, pyqtSignal, QThread, QTimer
 from PyQt5.QtGui import QColor, QFont, QBrush, QCursor
 import pandas as pd
 import os
@@ -26,6 +26,23 @@ from models.activity_log import ActivityLog
 from models.schedule_attachments import ScheduleAttachment
 from utils.logger import log_message, log_error, log_exception, safe_get
 from .settings_dialog import get_status_settings, get_status_map, get_status_colors, get_status_names, get_status_code_by_name
+
+
+class ScheduleLoaderThread(QThread):
+    """스케줄 데이터를 백그라운드에서 로드하는 스레드"""
+    finished = pyqtSignal(object)  # 로드 완료 시 스케줄 데이터 전달
+    error = pyqtSignal(str)  # 에러 발생 시 메시지 전달
+
+    def __init__(self, schedule_id):
+        super().__init__()
+        self.schedule_id = schedule_id
+
+    def run(self):
+        try:
+            schedule = Schedule.get_by_id(self.schedule_id)
+            self.finished.emit(schedule)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 def get_korean_holidays(year):
@@ -2126,10 +2143,20 @@ class ScheduleManagementTab(QWidget):
             self.clear_schedule_selection()
 
     def select_schedule_by_id(self, schedule_id):
-        """ID로 스케줄 선택"""
-        schedule = Schedule.get_by_id(schedule_id)
+        """ID로 스케줄 선택 (비동기 로딩)"""
+        # 로딩 중 표시
+        self.selected_schedule_label.setText("스케줄 로딩 중...")
+        self._loading = True
+
+        # 백그라운드 스레드에서 데이터 로드
+        self._loader_thread = ScheduleLoaderThread(schedule_id)
+        self._loader_thread.finished.connect(self._on_schedule_loaded)
+        self._loader_thread.error.connect(self._on_schedule_load_error)
+        self._loader_thread.start()
+
+    def _on_schedule_loaded(self, schedule):
+        """스케줄 로드 완료 시 호출 (비동기 콜백)"""
         if schedule:
-            self._loading = True  # 로드 중 플래그 설정 (자동 저장 방지)
             try:
                 self.current_schedule = schedule
                 # 저장된 추가/삭제 항목 및 사용자 수정 날짜 불러오기
@@ -2143,6 +2170,15 @@ class ScheduleManagementTab(QWidget):
                 self.refresh_attachment_list()
             finally:
                 self._loading = False  # 로드 완료
+        else:
+            self.selected_schedule_label.setText("스케줄을 찾을 수 없습니다")
+            self._loading = False
+
+    def _on_schedule_load_error(self, error_msg):
+        """스케줄 로드 오류 시 호출"""
+        self.selected_schedule_label.setText(f"로드 오류: {error_msg}")
+        self._loading = False
+        log_error('ScheduleManagementTab', f'스케줄 로드 오류: {error_msg}')
 
     def _load_saved_test_items(self, schedule):
         """저장된 추가/삭제 검사항목, O/X 상태 및 사용자 수정 날짜 불러오기"""
