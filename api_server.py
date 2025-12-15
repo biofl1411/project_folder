@@ -6,13 +6,14 @@ FastAPI 서버
 외부 클라이언트용 REST API 제공
 '''
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
 import json
 import secrets
+import os
 
 # 기존 모델 import
 from models.users import User, DEPARTMENTS, PERMISSION_LABELS, PERMISSION_BY_CATEGORY
@@ -21,6 +22,8 @@ from models.schedules import Schedule
 from models.fees import Fee
 from models.product_types import ProductType
 from models.schedule_attachments import ScheduleAttachment
+from models.activity_log import ActivityLog, ACTION_TYPES
+from models.communications import Message, EmailLog
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -146,6 +149,49 @@ class ProductTypeCreate(BaseModel):
 class ProductTypeUpdate(ProductTypeCreate):
     pass
 
+class ActivityLogCreate(BaseModel):
+    user_id: int
+    username: str
+    user_name: str
+    department: Optional[str] = None
+    action_type: str
+    target_type: Optional[str] = None
+    target_id: Optional[int] = None
+    target_name: Optional[str] = None
+    details: Optional[str] = None
+
+class ActivityLogFilter(BaseModel):
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    action_type: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    target_type: Optional[str] = None
+
+class MessageCreate(BaseModel):
+    sender_id: int
+    receiver_id: int
+    content: str
+    message_type: str = 'chat'
+    subject: Optional[str] = None
+
+class EmailLogCreate(BaseModel):
+    schedule_id: Optional[int] = None
+    estimate_type: Optional[str] = None
+    sender_email: str
+    to_emails: str
+    cc_emails: Optional[str] = None
+    subject: str
+    body: str
+    attachment_name: Optional[str] = None
+    sent_by: Optional[int] = None
+    client_name: Optional[str] = None
+
+class EmailLogStatusUpdate(BaseModel):
+    status: Optional[str] = None
+    received: Optional[str] = None
+    received_at: Optional[str] = None
+
 class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
@@ -266,6 +312,36 @@ async def reset_user_password(user_id: int, user: dict = Depends(verify_token)):
     """비밀번호 초기화"""
     success = User.reset_password(user_id)
     return {"success": success}
+
+@app.post("/api/users/{user_id}/change-password")
+async def change_user_password(user_id: int, new_password: str, user: dict = Depends(verify_token)):
+    """비밀번호 변경"""
+    success = User.update_password(user_id, new_password)
+    return {"success": success}
+
+@app.post("/api/users/{user_id}/verify-password")
+async def verify_user_password(user_id: int, password: str, user: dict = Depends(verify_token)):
+    """비밀번호 확인"""
+    success = User.verify_password(user_id, password)
+    return {"success": success}
+
+@app.post("/api/users/{user_id}/toggle-view-all")
+async def toggle_user_view_all(user_id: int, can_view: bool = True, user: dict = Depends(verify_token)):
+    """사용자 열람권한 토글"""
+    success = User.toggle_view_all(user_id, can_view)
+    return {"success": success}
+
+@app.get("/api/users/{user_id}/active-status")
+async def get_user_active_status(user_id: int, user: dict = Depends(verify_token)):
+    """사용자 활성화 상태 조회"""
+    status = User.get_active_status(user_id)
+    return {"success": True, "data": status}
+
+@app.get("/api/users/{user_id}/view-all-status")
+async def get_user_view_all_status(user_id: int, user: dict = Depends(verify_token)):
+    """사용자 열람권한 상태 조회"""
+    status = User.get_view_all_status(user_id)
+    return {"success": True, "data": status}
 
 @app.get("/api/users/constants/departments")
 async def get_departments():
@@ -578,6 +654,338 @@ async def get_schedule_attachments(schedule_id: int, user: dict = Depends(verify
     return {"success": True, "data": attachments_list}
 
 
+@app.post("/api/schedules/{schedule_id}/attachments")
+async def upload_attachment(schedule_id: int, file: UploadFile = File(...), user: dict = Depends(verify_token)):
+    """첨부파일 업로드"""
+    import tempfile
+    import shutil
+
+    try:
+        # 임시 파일에 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+
+        # ScheduleAttachment.add() 사용
+        success, message, attachment_id = ScheduleAttachment.add(schedule_id, tmp_path)
+
+        # 임시 파일 삭제
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+        if success:
+            return {"success": True, "message": message, "attachment_id": attachment_id}
+        else:
+            return {"success": False, "message": message}
+
+    except Exception as e:
+        return {"success": False, "message": f"업로드 오류: {str(e)}"}
+
+
+@app.get("/api/attachments/{attachment_id}")
+async def get_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 정보 조회"""
+    attachment = ScheduleAttachment.get_by_id(attachment_id)
+    if attachment:
+        return {"success": True, "data": dict(attachment)}
+    return {"success": False, "message": "첨부파일을 찾을 수 없습니다."}
+
+
+@app.get("/api/attachments/{attachment_id}/download")
+async def download_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 다운로드"""
+    from fastapi.responses import FileResponse
+
+    file_path = ScheduleAttachment.get_file_path(attachment_id)
+    if file_path and os.path.exists(file_path):
+        attachment = ScheduleAttachment.get_by_id(attachment_id)
+        filename = attachment['file_name'] if attachment else os.path.basename(file_path)
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type='application/octet-stream'
+        )
+    return {"success": False, "message": "파일을 찾을 수 없습니다."}
+
+
+@app.delete("/api/attachments/{attachment_id}")
+async def delete_attachment(attachment_id: int, user: dict = Depends(verify_token)):
+    """첨부파일 삭제"""
+    success, message = ScheduleAttachment.delete(attachment_id)
+    return {"success": success, "message": message}
+
+
+# ==================== Activity Logs API ====================
+
+@app.post("/api/activity-logs")
+async def create_activity_log(request: ActivityLogCreate, user: dict = Depends(verify_token)):
+    """활동 로그 생성"""
+    try:
+        # ACTION_TYPES에서 action_name 가져오기
+        action_name = ACTION_TYPES.get(request.action_type, request.action_type)
+
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO activity_logs
+            (user_id, username, user_name, department, action_type, action_name,
+             target_type, target_id, target_name, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            request.user_id,
+            request.username,
+            request.user_name,
+            request.department or '',
+            request.action_type,
+            action_name,
+            request.target_type,
+            request.target_id,
+            request.target_name,
+            request.details
+        ))
+
+        log_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return {"success": True, "data": {"id": log_id}}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/activity-logs")
+async def get_activity_logs(
+    user_id: Optional[int] = None,
+    username: Optional[str] = None,
+    action_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    target_type: Optional[str] = None,
+    limit: int = 500,
+    offset: int = 0,
+    user: dict = Depends(verify_token)
+):
+    """활동 로그 목록 조회 (필터링)"""
+    filters = {}
+    if user_id:
+        filters['user_id'] = user_id
+    if username:
+        filters['username'] = username
+    if action_type:
+        filters['action_type'] = action_type
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+    if target_type:
+        filters['target_type'] = target_type
+
+    logs = ActivityLog.get_all(limit=limit, offset=offset, filters=filters if filters else None)
+    return {"success": True, "data": logs}
+
+@app.get("/api/activity-logs/user/{target_user_id}")
+async def get_user_activity_logs(
+    target_user_id: int,
+    limit: int = 100,
+    offset: int = 0,
+    user: dict = Depends(verify_token)
+):
+    """특정 사용자의 활동 로그 조회"""
+    logs = ActivityLog.get_by_user(target_user_id, limit=limit, offset=offset)
+    return {"success": True, "data": logs}
+
+@app.get("/api/activity-logs/summary")
+async def get_activity_logs_summary(user: dict = Depends(verify_token)):
+    """사용자별 활동 요약"""
+    summary = ActivityLog.get_user_summary()
+    return {"success": True, "data": summary}
+
+@app.get("/api/activity-logs/count")
+async def get_activity_logs_count(
+    user_id: Optional[int] = None,
+    username: Optional[str] = None,
+    action_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user: dict = Depends(verify_token)
+):
+    """활동 로그 개수 조회"""
+    filters = {}
+    if user_id:
+        filters['user_id'] = user_id
+    if username:
+        filters['username'] = username
+    if action_type:
+        filters['action_type'] = action_type
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+
+    count = ActivityLog.get_count(filters if filters else None)
+    return {"success": True, "data": count}
+
+@app.get("/api/activity-logs/action-types")
+async def get_action_types(user: dict = Depends(verify_token)):
+    """활동 유형 목록"""
+    return {"success": True, "data": ACTION_TYPES}
+
+
+# ==================== Messages API ====================
+
+@app.post("/api/messages")
+async def send_message(request: MessageCreate, user: dict = Depends(verify_token)):
+    """메시지 전송"""
+    message_id = Message.send(
+        sender_id=request.sender_id,
+        receiver_id=request.receiver_id,
+        content=request.content,
+        message_type=request.message_type,
+        subject=request.subject
+    )
+    if message_id:
+        return {"success": True, "data": {"id": message_id}}
+    return {"success": False, "message": "메시지 전송 실패"}
+
+@app.get("/api/messages/conversation")
+async def get_conversation(
+    user1_id: int,
+    user2_id: int,
+    limit: int = 100,
+    user: dict = Depends(verify_token)
+):
+    """두 사용자 간 대화 내역 조회"""
+    messages = Message.get_conversation(user1_id, user2_id, limit)
+    return {"success": True, "data": messages}
+
+@app.get("/api/messages/partners/{target_user_id}")
+async def get_chat_partners(target_user_id: int, user: dict = Depends(verify_token)):
+    """대화 상대 목록 조회"""
+    partners = Message.get_chat_partners(target_user_id)
+    return {"success": True, "data": partners}
+
+@app.post("/api/messages/{message_id}/read")
+async def mark_message_read(message_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """메시지 읽음 처리"""
+    success = Message.mark_as_read(message_id, target_user_id)
+    return {"success": success}
+
+@app.post("/api/messages/conversation/read")
+async def mark_conversation_read(target_user_id: int, partner_id: int, user: dict = Depends(verify_token)):
+    """대화 전체 읽음 처리"""
+    count = Message.mark_conversation_as_read(target_user_id, partner_id)
+    return {"success": True, "data": count}
+
+@app.get("/api/messages/unread-count/{target_user_id}")
+async def get_unread_count(target_user_id: int, user: dict = Depends(verify_token)):
+    """읽지 않은 메시지 수"""
+    count = Message.get_unread_count(target_user_id)
+    return {"success": True, "data": count}
+
+@app.get("/api/messages/unread-by-partner/{target_user_id}")
+async def get_unread_by_partner(target_user_id: int, user: dict = Depends(verify_token)):
+    """상대별 읽지 않은 메시지 수"""
+    unread = Message.get_unread_by_partner(target_user_id)
+    return {"success": True, "data": unread}
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(message_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """메시지 삭제"""
+    success = Message.delete_message(message_id, target_user_id)
+    return {"success": success}
+
+@app.delete("/api/messages/conversation/{partner_id}")
+async def delete_conversation(partner_id: int, target_user_id: int, user: dict = Depends(verify_token)):
+    """대화 전체 삭제"""
+    count = Message.delete_conversation(target_user_id, partner_id)
+    return {"success": True, "data": count}
+
+
+# ==================== Email Logs API ====================
+
+@app.post("/api/email-logs")
+async def create_email_log(request: EmailLogCreate, user: dict = Depends(verify_token)):
+    """이메일 로그 저장"""
+    log_id = EmailLog.save(
+        schedule_id=request.schedule_id,
+        estimate_type=request.estimate_type,
+        sender_email=request.sender_email,
+        to_emails=request.to_emails,
+        cc_emails=request.cc_emails,
+        subject=request.subject,
+        body=request.body,
+        attachment_name=request.attachment_name,
+        sent_by=request.sent_by,
+        client_name=request.client_name
+    )
+    if log_id:
+        return {"success": True, "data": {"id": log_id}}
+    return {"success": False, "message": "이메일 로그 저장 실패"}
+
+@app.get("/api/email-logs")
+async def get_email_logs(
+    limit: int = 100,
+    sent_by: Optional[int] = None,
+    user: dict = Depends(verify_token)
+):
+    """이메일 로그 목록 조회"""
+    logs = EmailLog.get_all(limit=limit, sent_by=sent_by)
+    return {"success": True, "data": logs}
+
+@app.get("/api/email-logs/{log_id}")
+async def get_email_log(log_id: int, user: dict = Depends(verify_token)):
+    """이메일 로그 상세 조회"""
+    log = EmailLog.get_by_id(log_id)
+    if log:
+        return {"success": True, "data": log}
+    return {"success": False, "message": "이메일 로그를 찾을 수 없습니다"}
+
+@app.get("/api/email-logs/schedule/{schedule_id}")
+async def get_email_logs_by_schedule(schedule_id: int, user: dict = Depends(verify_token)):
+    """스케줄별 이메일 로그 조회"""
+    logs = EmailLog.get_by_schedule(schedule_id)
+    return {"success": True, "data": logs}
+
+@app.get("/api/email-logs/search")
+async def search_email_logs(
+    keyword: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100,
+    sent_by: Optional[int] = None,
+    user: dict = Depends(verify_token)
+):
+    """이메일 로그 검색"""
+    logs = EmailLog.search(
+        keyword=keyword,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        sent_by=sent_by
+    )
+    return {"success": True, "data": logs}
+
+@app.delete("/api/email-logs/{log_id}")
+async def delete_email_log(log_id: int, target_user_id: Optional[int] = None, user: dict = Depends(verify_token)):
+    """이메일 로그 삭제"""
+    success = EmailLog.delete(log_id, target_user_id)
+    return {"success": success}
+
+@app.put("/api/email-logs/{log_id}/status")
+async def update_email_log_status(log_id: int, request: EmailLogStatusUpdate, user: dict = Depends(verify_token)):
+    """이메일 로그 상태 업데이트"""
+    success = EmailLog.update_status(
+        log_id,
+        status=request.status,
+        received=request.received,
+        received_at=request.received_at
+    )
+    return {"success": success}
+
+
 # ==================== Settings API ====================
 
 @app.get("/api/settings")
@@ -610,6 +1018,147 @@ async def get_setting(key: str, user: dict = Depends(verify_token)):
         return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
     except Exception as e:
         return {"success": False, "error": str(e), "data": None}
+
+
+@app.put("/api/settings/{key}")
+async def update_setting(key: str, value: str, user: dict = Depends(verify_token)):
+    """설정 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 먼저 업데이트 시도
+        cursor.execute("""
+            UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE `key` = %s
+        """, (value, key))
+
+        # 업데이트된 행이 없으면 새로 추가
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT INTO settings (`key`, value) VALUES (%s, %s)
+            """, (key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": "설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/settings/batch")
+async def update_settings_batch(settings: Dict[str, str], user: dict = Depends(verify_token)):
+    """여러 설정 일괄 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        for key, value in settings.items():
+            cursor.execute("""
+                UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE `key` = %s
+            """, (value, key))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO settings (`key`, value) VALUES (%s, %s)
+                """, (key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"{len(settings)}개 설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== User Settings API ====================
+
+@app.get("/api/user-settings/{user_id}")
+async def get_user_settings(user_id: int, user: dict = Depends(verify_token)):
+    """사용자별 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT `key`, value FROM user_settings WHERE user_id = %s", (user_id,))
+        settings = cursor.fetchall()
+        conn.close()
+        settings_dict = {s['key']: s['value'] for s in settings}
+        return {"success": True, "data": settings_dict}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": {}}
+
+
+@app.get("/api/user-settings/{user_id}/{key}")
+async def get_user_setting(user_id: int, key: str, user: dict = Depends(verify_token)):
+    """사용자별 특정 설정 조회"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM user_settings WHERE user_id = %s AND `key` = %s", (user_id, key))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            return {"success": True, "data": result['value']}
+        return {"success": False, "data": None, "message": "설정을 찾을 수 없습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": None}
+
+
+@app.put("/api/user-settings/{user_id}/{key}")
+async def update_user_setting(user_id: int, key: str, value: str, user: dict = Depends(verify_token)):
+    """사용자별 설정 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 먼저 업데이트 시도
+        cursor.execute("""
+            UPDATE user_settings SET value = %s
+            WHERE user_id = %s AND `key` = %s
+        """, (value, user_id, key))
+
+        # 업데이트된 행이 없으면 새로 추가
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT INTO user_settings (user_id, `key`, value) VALUES (%s, %s, %s)
+            """, (user_id, key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": "설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/user-settings/{user_id}/batch")
+async def update_user_settings_batch(user_id: int, settings: Dict[str, str], user: dict = Depends(verify_token)):
+    """사용자별 여러 설정 일괄 업데이트"""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        for key, value in settings.items():
+            cursor.execute("""
+                UPDATE user_settings SET value = %s
+                WHERE user_id = %s AND `key` = %s
+            """, (value, user_id, key))
+
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO user_settings (user_id, `key`, value) VALUES (%s, %s, %s)
+                """, (user_id, key, value))
+
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"{len(settings)}개 설정이 저장되었습니다"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ==================== Health Check ====================
