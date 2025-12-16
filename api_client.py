@@ -351,6 +351,11 @@ class ApiClient:
         result = self._request("PATCH", f"/api/schedules/{schedule_id}/memo", params={"memo": memo})
         return result.get("success", False)
 
+    def update_schedule_experiment_data(self, schedule_id, data):
+        """스케줄 실험 데이터 수정 (experiment_schedule_data, additional_test_items 등)"""
+        result = self._request("PATCH", f"/api/schedules/{schedule_id}/experiment-data", {"data": data})
+        return result.get("success", False)
+
     def delete_schedule(self, schedule_id):
         """스케줄 삭제"""
         result = self._request("DELETE", f"/api/schedules/{schedule_id}")

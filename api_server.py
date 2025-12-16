@@ -506,6 +506,12 @@ async def update_schedule_memo(schedule_id: int, memo: str, user: dict = Depends
     success = Schedule.update_memo(schedule_id, memo)
     return {"success": success}
 
+@app.patch("/api/schedules/{schedule_id}/experiment-data")
+async def update_schedule_experiment_data(schedule_id: int, request: ScheduleUpdate, user: dict = Depends(verify_token)):
+    """스케줄 실험 데이터 수정 (experiment_schedule_data, additional_test_items 등)"""
+    success = Schedule.update_experiment_schedule_data(schedule_id, request.data)
+    return {"success": success}
+
 @app.delete("/api/schedules/{schedule_id}")
 async def delete_schedule(schedule_id: int, user: dict = Depends(verify_token)):
     """스케줄 삭제"""
