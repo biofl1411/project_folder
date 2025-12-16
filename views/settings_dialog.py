@@ -936,36 +936,26 @@ class SettingsDialog(QDialog):
             QMessageBox.information(self, "복원 완료", "기본값으로 복원되었습니다.")
 
     def load_settings(self):
-        """데이터베이스에서 설정 불러오기"""
+        """설정 불러오기 (Dual-mode 지원)"""
         try:
-            from database import get_connection
+            from models.settings import Settings, UserSettings
 
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT `key`, value FROM settings")
-            settings = cursor.fetchall()
+            # 공용 설정 조회 (Dual-mode)
+            settings_dict = Settings.get_all()
 
-            settings_dict = {s['key']: s['value'] for s in settings}
+            # 담당자: 로그인한 사용자 이름 또는 설정값 사용
+            if self.current_user and self.current_user.get('name'):
+                self.company_manager_input.setText(self.current_user['name'])
+            elif 'company_manager' in settings_dict:
+                self.company_manager_input.setText(settings_dict['company_manager'])
 
-            # 담당자: 로그인한 사용자 이름 가져오기
-            try:
-                cursor.execute("SELECT name FROM users ORDER BY last_login DESC LIMIT 1")
-                user = cursor.fetchone()
-                if user and user['name']:
-                    self.company_manager_input.setText(user['name'])
-                elif 'company_manager' in settings_dict:
-                    self.company_manager_input.setText(settings_dict['company_manager'])
-            except Exception:
-                if 'company_manager' in settings_dict:
-                    self.company_manager_input.setText(settings_dict['company_manager'])
-
-            # 연락처, 핸드폰 (입력 가능 필드만 DB에서 로드)
+            # 연락처, 핸드폰 (입력 가능 필드만 로드)
             if 'company_phone' in settings_dict:
                 self.company_phone_input.setText(settings_dict['company_phone'])
             if 'company_mobile' in settings_dict:
                 self.company_mobile_input.setText(settings_dict['company_mobile'])
 
-            # 기본 샘플링 횟수 (DB에 값이 없으면 기본값 13 사용)
+            # 기본 샘플링 횟수 (값이 없으면 기본값 13 사용)
             if 'default_sampling_count' in settings_dict:
                 self.default_sampling_spin.setValue(int(settings_dict['default_sampling_count']))
             else:
@@ -991,13 +981,9 @@ class SettingsDialog(QDialog):
             if 'company_email' in settings_dict:
                 self.company_email_input.setText(settings_dict['company_email'])
 
-            # 이메일 계정 설정 (사용자별로 로드)
+            # 이메일 계정 설정 (사용자별로 로드, Dual-mode)
             if self.current_user:
-                cursor.execute("""
-                    SELECT `key`, value FROM user_settings WHERE user_id = %s
-                """, (self.current_user['id'],))
-                user_settings = cursor.fetchall()
-                user_settings_dict = {s['key']: s['value'] for s in user_settings}
+                user_settings_dict = UserSettings.get_all(self.current_user['id'])
 
                 if 'smtp_email' in user_settings_dict:
                     self.smtp_email_input.setText(user_settings_dict['smtp_email'] or '')
@@ -1019,8 +1005,6 @@ class SettingsDialog(QDialog):
                 except (ValueError, TypeError):
                     self.interim_report_offset_spin.setValue(0)
 
-            conn.close()
-
             # 상태 목록 로드
             self.load_status_list()
 
@@ -1030,72 +1014,54 @@ class SettingsDialog(QDialog):
             traceback.print_exc()
 
     def save_settings(self):
-        """설정 저장"""
+        """설정 저장 (Dual-mode 지원)"""
         try:
-            from database import get_connection
+            from models.settings import Settings, UserSettings
+            import json
 
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            # 설정 값 업데이트
-            settings = [
+            # 공용 설정 딕셔너리 구성
+            settings_dict = {
                 # 회사 정보
-                ('company_name', self.company_name_input.text()),
-                ('company_ceo', self.company_ceo_input.text()),
-                ('company_manager', self.company_manager_input.text()),
-                ('company_phone', self.company_phone_input.text()),
-                ('company_mobile', self.company_mobile_input.text()),
-                ('company_fax', self.company_fax_input.text()),
-                ('company_address', self.company_address_input.text()),
-                ('company_email', self.company_email_input.text()),
+                'company_name': self.company_name_input.text(),
+                'company_ceo': self.company_ceo_input.text(),
+                'company_manager': self.company_manager_input.text(),
+                'company_phone': self.company_phone_input.text(),
+                'company_mobile': self.company_mobile_input.text(),
+                'company_fax': self.company_fax_input.text(),
+                'company_address': self.company_address_input.text(),
+                'company_email': self.company_email_input.text(),
                 # 기본 설정
-                ('default_sampling_count', str(self.default_sampling_spin.value())),
-                ('tax_rate', str(self.tax_rate_spin.value())),
-                ('default_discount', str(self.default_discount_spin.value())),
-                ('output_path', self.output_path_input.text()),
-                ('template_path', self.template_path_input.text()),
+                'default_sampling_count': str(self.default_sampling_spin.value()),
+                'tax_rate': str(self.tax_rate_spin.value()),
+                'default_discount': str(self.default_discount_spin.value()),
+                'output_path': self.output_path_input.text(),
+                'template_path': self.template_path_input.text(),
                 # 로고/직인 경로 (공용 설정)
-                ('logo_path', self.logo_path_input.text()),
-                ('stamp_path', self.stamp_path_input.text()),
+                'logo_path': self.logo_path_input.text(),
+                'stamp_path': self.stamp_path_input.text(),
                 # 스케줄 설정
-                ('interim_report_offset', str(self.interim_report_offset_spin.value())),
-            ]
+                'interim_report_offset': str(self.interim_report_offset_spin.value()),
+            }
 
             # 상태 설정 추가 (JSON으로 저장)
-            import json
             if self.custom_statuses:
-                settings.append(('custom_statuses', json.dumps(self.custom_statuses, ensure_ascii=False)))
+                settings_dict['custom_statuses'] = json.dumps(self.custom_statuses, ensure_ascii=False)
 
-            # 공용 설정 저장
-            for key, value in settings:
-                cursor.execute("""
-                    UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE `key` = %s
-                """, (value, key))
-
-                # 없으면 새로 추가
-                if cursor.rowcount == 0:
-                    cursor.execute("""
-                        INSERT INTO settings (`key`, value) VALUES (%s, %s)
-                    """, (key, value))
+            # 공용 설정 일괄 저장 (Dual-mode)
+            if not Settings.set_batch(settings_dict):
+                raise Exception("공용 설정 저장에 실패했습니다.")
 
             # 이메일 계정 설정 (사용자별 저장)
             if self.current_user:
-                user_settings = [
-                    ('smtp_email', self.smtp_email_input.text()),
-                    ('smtp_password', self.smtp_password_input.text()),
-                    ('smtp_sender_name', self.smtp_sender_name_input.text()),
-                ]
+                user_settings_dict = {
+                    'smtp_email': self.smtp_email_input.text(),
+                    'smtp_password': self.smtp_password_input.text(),
+                    'smtp_sender_name': self.smtp_sender_name_input.text(),
+                }
 
-                for key, value in user_settings:
-                    cursor.execute("""
-                        INSERT INTO user_settings (user_id, `key`, value)
-                        VALUES (%s, %s, %s)
-                        ON DUPLICATE KEY UPDATE value = %s, updated_at = CURRENT_TIMESTAMP
-                    """, (self.current_user['id'], key, value, value))
-
-            conn.commit()
-            conn.close()
+                # 사용자 설정 일괄 저장 (Dual-mode)
+                if not UserSettings.set_batch(self.current_user['id'], user_settings_dict):
+                    raise Exception("사용자 설정 저장에 실패했습니다.")
 
             QMessageBox.information(self, "저장 완료", "설정이 저장되었습니다.")
             self.accept()

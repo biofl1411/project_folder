@@ -6,6 +6,10 @@ FastAPI 서버
 외부 클라이언트용 REST API 제공
 '''
 
+import os
+# API 서버 환경변수 설정 (첨부파일 모델에서 DB 직접 접근하도록)
+os.environ['FOODLAB_API_SERVER'] = 'true'
+
 from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,7 +17,6 @@ from typing import Optional, List, Dict, Any
 import uvicorn
 import json
 import secrets
-import os
 
 # 기존 모델 import
 from models.users import User, DEPARTMENTS, PERMISSION_LABELS, PERMISSION_BY_CATEGORY

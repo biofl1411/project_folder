@@ -14,10 +14,28 @@ def _is_internal_mode():
         return True
 
 
+def _is_api_server():
+    """API 서버 환경인지 확인 (환경변수로 판단)"""
+    return os.environ.get('FOODLAB_API_SERVER', '').lower() == 'true'
+
+
 def _get_api():
     """API 클라이언트 반환"""
     from api_client import get_api_client
     return get_api_client()
+
+
+def _should_use_api_for_files():
+    """첨부파일 작업에 API를 사용해야 하는지 확인
+
+    API 서버 자체가 아닌 경우, 첨부파일은 항상 API를 통해 처리
+    (내부/외부 서버 간 파일 동기화 문제 해결)
+    """
+    # API 서버 자체에서 실행 중이면 DB 직접 사용
+    if _is_api_server():
+        return False
+    # 클라이언트에서는 항상 API 사용 (내부 모드여도)
+    return True
 
 
 class ScheduleAttachment:
@@ -76,7 +94,12 @@ class ScheduleAttachment:
     def get_by_schedule(schedule_id):
         """스케줄 ID로 첨부파일 목록 조회"""
         try:
-            if _is_internal_mode():
+            if _should_use_api_for_files():
+                # 클라이언트: 항상 API 사용 (내부/외부 모두)
+                api = _get_api()
+                return api.get_schedule_attachments(schedule_id)
+            else:
+                # API 서버: DB 직접 접근
                 ScheduleAttachment._ensure_table()
                 conn = get_connection()
                 cursor = conn.cursor()
@@ -88,10 +111,6 @@ class ScheduleAttachment:
                 result = cursor.fetchall()
                 conn.close()
                 return result
-            else:
-                # 외부망: API 사용
-                api = _get_api()
-                return api.get_schedule_attachments(schedule_id)
         except Exception as e:
             print(f"첨부파일 조회 오류: {str(e)}")
             return []
@@ -107,13 +126,15 @@ class ScheduleAttachment:
         Returns:
             (success, message, attachment_id)
         """
-        if not _is_internal_mode():
-            # 외부망: API 사용
+        if _should_use_api_for_files():
+            # 클라이언트: 항상 API 사용 (내부/외부 모두)
             try:
                 api = _get_api()
                 return api.upload_attachment(schedule_id, source_file_path)
             except Exception as e:
                 return False, f"첨부파일 업로드 오류 (API): {str(e)}", None
+
+        # API 서버: DB 직접 접근
         ScheduleAttachment._ensure_table()
 
         try:
@@ -185,13 +206,15 @@ class ScheduleAttachment:
         Returns:
             (success, message)
         """
-        if not _is_internal_mode():
-            # 외부망: API 사용
+        if _should_use_api_for_files():
+            # 클라이언트: 항상 API 사용 (내부/외부 모두)
             try:
                 api = _get_api()
                 return api.delete_attachment(attachment_id)
             except Exception as e:
                 return False, f"첨부파일 삭제 오류 (API): {str(e)}"
+
+        # API 서버: DB 직접 접근
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -227,10 +250,10 @@ class ScheduleAttachment:
 
     @staticmethod
     def get_file_path(attachment_id):
-        """첨부파일의 실제 경로 반환 (Dual-mode)
+        """첨부파일의 실제 경로 반환
 
-        내부망: DB에서 경로 조회 후 절대 경로 반환
-        외부망: API로 파일 다운로드 후 임시 파일 경로 반환
+        클라이언트: API로 파일 다운로드 후 임시 파일 경로 반환
+        API 서버: DB에서 경로 조회 후 절대 경로 반환
 
         Args:
             attachment_id: 첨부파일 ID
@@ -238,10 +261,12 @@ class ScheduleAttachment:
         Returns:
             절대 경로 또는 None
         """
-        if _is_internal_mode():
-            return ScheduleAttachment._get_file_path_from_db(attachment_id)
-        else:
+        if _should_use_api_for_files():
+            # 클라이언트: 항상 API 사용 (내부/외부 모두)
             return ScheduleAttachment._get_file_path_from_api(attachment_id)
+        else:
+            # API 서버: DB 직접 접근
+            return ScheduleAttachment._get_file_path_from_db(attachment_id)
 
     @staticmethod
     def _get_file_path_from_db(attachment_id):
@@ -289,11 +314,13 @@ class ScheduleAttachment:
 
     @staticmethod
     def get_by_id(attachment_id):
-        """ID로 첨부파일 정보 조회 (Dual-mode)"""
-        if _is_internal_mode():
-            return ScheduleAttachment._get_by_id_from_db(attachment_id)
-        else:
+        """ID로 첨부파일 정보 조회"""
+        if _should_use_api_for_files():
+            # 클라이언트: 항상 API 사용 (내부/외부 모두)
             return ScheduleAttachment._get_by_id_from_api(attachment_id)
+        else:
+            # API 서버: DB 직접 접근
+            return ScheduleAttachment._get_by_id_from_db(attachment_id)
 
     @staticmethod
     def _get_by_id_from_db(attachment_id):
