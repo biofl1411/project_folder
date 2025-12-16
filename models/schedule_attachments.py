@@ -28,13 +28,17 @@ def _get_api():
 def _should_use_api_for_files():
     """첨부파일 작업에 API를 사용해야 하는지 확인
 
-    API 서버 자체가 아닌 경우, 첨부파일은 항상 API를 통해 처리
-    (내부/외부 서버 간 파일 동기화 문제 해결)
+    - API 서버 자체: DB 직접 사용
+    - 내부망 클라이언트: DB 직접 사용 (파일은 서버 공유 폴더)
+    - 외부망 클라이언트: API 사용
     """
     # API 서버 자체에서 실행 중이면 DB 직접 사용
     if _is_api_server():
         return False
-    # 클라이언트에서는 항상 API 사용 (내부 모드여도)
+    # 내부망이면 DB 직접 사용
+    if _is_internal_mode():
+        return False
+    # 외부망에서만 API 사용
     return True
 
 
