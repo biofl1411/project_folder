@@ -49,8 +49,16 @@ class ApiClient:
                 config = json.load(f)
                 self._base_url = config.get('api_url', API_BASE_URL)
         else:
-            # 기본값: 내부망 시도, 실패시 외부망
-            self._base_url = API_BASE_URL
+            # ConnectionManager의 모드에 따라 URL 설정
+            try:
+                from connection_manager import is_external_mode
+                if is_external_mode():
+                    self._base_url = API_EXTERNAL_URL
+                    print(f"[API] 외부망 모드 - {API_EXTERNAL_URL} 사용")
+                else:
+                    self._base_url = API_BASE_URL
+            except:
+                self._base_url = API_BASE_URL
 
     def _get_headers(self):
         """요청 헤더 생성"""
@@ -72,8 +80,8 @@ class ApiClient:
         """
         url = f"{self._base_url}{endpoint}"
         # 타임아웃 설정: (연결 타임아웃, 읽기 타임아웃)
-        # 외부망에서 큰 데이터(수수료 목록 등) 로드 시 충분한 시간 확보
-        timeout = (5, 30)  # 연결 5초, 읽기 30초
+        # 연결 타임아웃 단축으로 빠른 응답
+        timeout = (3, 15)  # 연결 3초, 읽기 15초
 
         last_exception = None
 
@@ -102,14 +110,15 @@ class ApiClient:
                 return response.json()
 
             except requests.exceptions.ConnectionError as e:
-                # 내부망 실패시 외부망 시도
+                # 내부망 실패시 외부망 시도 (한 번만)
                 if self._base_url == API_BASE_URL:
+                    print(f"[API] 내부망 연결 실패, 외부망으로 전환: {API_EXTERNAL_URL}")
                     self._base_url = API_EXTERNAL_URL
                     return self._request(method, endpoint, data, params, retry_count)
                 last_exception = e
-                # 재시도 전 대기 (지수 백오프: 1초, 2초, 4초)
+                # 외부망에서도 실패시 재시도 (횟수 축소)
                 if attempt < retry_count - 1:
-                    wait_time = 2 ** attempt
+                    wait_time = 1  # 대기 시간 축소 (1초 고정)
                     print(f"[API] 연결 실패, {wait_time}초 후 재시도... ({attempt + 1}/{retry_count})")
                     time.sleep(wait_time)
                     continue
