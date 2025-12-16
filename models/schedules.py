@@ -415,14 +415,12 @@ class Schedule:
 
                 query = f"UPDATE schedules SET {', '.join(set_clauses)} WHERE id = %s"
                 cursor.execute(query, values)
-
-                success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
 
-                if success:
-                    invalidate_schedule_cache()  # 캐시 무효화
-                return success
+                # rowcount가 0이어도 성공 (값이 동일하면 변경 없음)
+                invalidate_schedule_cache()  # 캐시 무효화
+                return True
             else:
                 api = _get_api()
                 result = api.update_schedule_experiment_data(schedule_id, data)
