@@ -3,12 +3,13 @@
 
 '''
 데이터베이스 연결 및 기본 함수
-MySQL 서버 연결 버전
+MySQL 서버 연결 버전 (연결 풀링 지원)
 '''
 
 import os
 import json
 import datetime
+import threading
 
 # MySQL 연결 라이브러리
 try:
@@ -19,8 +20,21 @@ except ImportError:
     MYSQL_AVAILABLE = False
     print("pymysql이 설치되지 않았습니다. pip install pymysql 명령으로 설치하세요.")
 
+# 연결 풀링 라이브러리
+try:
+    from dbutils.pooled_db import PooledDB
+    POOL_AVAILABLE = True
+except ImportError:
+    POOL_AVAILABLE = False
+    print("[DB] dbutils 미설치 - 연결 풀링 비활성화 (pip install dbutils)")
+
 # 설정 파일 경로
 CONFIG_PATH = 'config/db_config.json'
+
+# 연결 풀 (싱글톤)
+_connection_pool = None
+_pool_lock = threading.Lock()
+
 
 def load_db_config():
     '''데이터베이스 설정 로드'''
@@ -53,11 +67,65 @@ def load_db_config():
             "charset": "utf8mb4"
         }
 
+
+def _get_pool():
+    '''연결 풀 반환 (싱글톤, 스레드 안전)'''
+    global _connection_pool
+
+    if _connection_pool is not None:
+        return _connection_pool
+
+    with _pool_lock:
+        # 더블 체크 락킹
+        if _connection_pool is not None:
+            return _connection_pool
+
+        if not POOL_AVAILABLE:
+            return None
+
+        config = load_db_config()
+
+        try:
+            _connection_pool = PooledDB(
+                creator=pymysql,
+                maxconnections=20,  # 최대 연결 수
+                mincached=3,        # 최소 유휴 연결 수
+                maxcached=10,       # 최대 유휴 연결 수
+                maxusage=None,      # 연결 재사용 횟수 (None=무제한)
+                blocking=True,      # 풀이 가득 찼을 때 대기
+                setsession=[],      # 세션 시작 시 실행할 SQL
+                ping=1,             # 연결 상태 확인 (0=없음, 1=요청시, 2=커서생성시)
+                host=config['host'],
+                port=config['port'],
+                user=config['user'],
+                password=config['password'],
+                database=config['database'],
+                charset=config['charset'],
+                cursorclass=pymysql.cursors.DictCursor,
+                autocommit=False
+            )
+            print(f"[DB] 연결 풀 초기화 완료 (최대 {20}개 연결)")
+        except Exception as e:
+            print(f"[DB] 연결 풀 초기화 실패: {e}")
+            _connection_pool = None
+
+        return _connection_pool
+
+
 def get_connection():
-    '''데이터베이스 연결 객체 반환'''
+    '''데이터베이스 연결 객체 반환 (풀링 지원)'''
     if not MYSQL_AVAILABLE:
         raise Exception("pymysql이 설치되지 않았습니다.")
 
+    # 연결 풀 사용 시도
+    pool = _get_pool()
+    if pool is not None:
+        try:
+            return pool.connection()
+        except Exception as e:
+            print(f"[DB] 풀에서 연결 가져오기 실패: {e}, 직접 연결 시도...")
+
+    # 풀 사용 불가 시 직접 연결 (폴백)
     config = load_db_config()
 
     conn = pymysql.connect(
