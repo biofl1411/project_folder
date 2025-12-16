@@ -590,11 +590,16 @@ class ApiClient:
             return False, "파일을 찾을 수 없습니다.", None
         try:
             file_name = os.path.basename(file_path)
+            # 파일 업로드 시 Content-Type 헤더 제외 (multipart/form-data 자동 설정)
+            headers = {}
+            if self._token:
+                headers["Authorization"] = f"Bearer {self._token}"
+
             with open(file_path, 'rb') as f:
                 files = {'file': (file_name, f)}
-                response = requests.post(
+                response = self._session.post(
                     f"{self._base_url}/api/schedules/{schedule_id}/attachments",
-                    headers=self._get_headers(),
+                    headers=headers,
                     files=files,
                     timeout=(5, 30)
                 )

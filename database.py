@@ -68,6 +68,20 @@ def load_db_config():
         }
 
 
+def _is_external_client():
+    '''외부망 클라이언트인지 확인 (API 서버가 아닌 외부망 클라이언트)'''
+    import os
+    # API 서버에서 실행 중이면 False (DB 접근 필요)
+    if os.environ.get('FOODLAB_API_SERVER', '').lower() == 'true':
+        return False
+    # 외부망 클라이언트인지 확인
+    try:
+        from connection_manager import is_external_mode
+        return is_external_mode()
+    except:
+        return False
+
+
 def _get_pool():
     '''연결 풀 반환 (싱글톤, 스레드 안전)'''
     global _connection_pool
@@ -81,6 +95,11 @@ def _get_pool():
             return _connection_pool
 
         if not POOL_AVAILABLE:
+            return None
+
+        # 외부망 클라이언트에서는 DB 연결 풀 사용하지 않음 (API 사용)
+        if _is_external_client():
+            print("[DB] 외부망 클라이언트 - DB 연결 풀 사용 안함 (API 사용)")
             return None
 
         config = load_db_config()
@@ -116,6 +135,10 @@ def get_connection():
     '''데이터베이스 연결 객체 반환 (풀링 지원)'''
     if not MYSQL_AVAILABLE:
         raise Exception("pymysql이 설치되지 않았습니다.")
+
+    # 외부망 클라이언트에서는 DB 직접 연결 불가 (API 사용해야 함)
+    if _is_external_client():
+        raise Exception("외부망 클라이언트에서는 DB 직접 연결이 불가합니다. API를 사용하세요.")
 
     # 연결 풀 사용 시도
     pool = _get_pool()
