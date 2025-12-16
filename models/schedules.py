@@ -7,6 +7,7 @@
 
 from connection_manager import is_internal_mode, connection_manager
 import datetime
+import time
 
 def _get_api():
     """API 클라이언트 반환"""
@@ -17,11 +18,32 @@ def _get_connection():
     from database import get_connection
     return get_connection()
 
+
+# 전역 캐시 변수
+_schedule_cache = {
+    'data': None,
+    'timestamp': 0,
+    'ttl': 30  # 30초 캐시 유효시간
+}
+
+_columns_checked = False  # 컬럼 확인 여부 (앱 실행 중 한 번만)
+
+
+def invalidate_schedule_cache():
+    """스케줄 캐시 무효화 (데이터 변경 시 호출)"""
+    _schedule_cache['data'] = None
+    _schedule_cache['timestamp'] = 0
+
+
 class Schedule:
     @staticmethod
     def _ensure_columns():
-        """필요한 컬럼이 없으면 추가 (내부망 전용)"""
+        """필요한 컬럼이 없으면 추가 (내부망 전용) - 앱 실행 중 한 번만 실행"""
+        global _columns_checked
+        if _columns_checked:
+            return  # 이미 확인됨
         if not is_internal_mode():
+            _columns_checked = True
             return
         try:
             conn = _get_connection()
@@ -89,8 +111,10 @@ class Schedule:
 
             conn.commit()
             conn.close()
+            _columns_checked = True  # 성공 시에만 플래그 설정
         except Exception as e:
             print(f"컬럼 추가 중 오류: {str(e)}")
+            _columns_checked = True  # 오류 시에도 재시도 방지
 
     @staticmethod
     def _ensure_estimate_date_column():
@@ -143,10 +167,11 @@ class Schedule:
                 schedule_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
+                invalidate_schedule_cache()  # 캐시 무효화
                 return schedule_id
             else:
                 api = _get_api()
-                return api.create_schedule(
+                result = api.create_schedule(
                     client_id=client_id, product_name=product_name, food_type_id=food_type_id,
                     test_method=test_method, storage_condition=storage_condition,
                     test_start_date=test_start_date, expected_date=expected_date,
@@ -158,6 +183,8 @@ class Schedule:
                     status=status, packaging_weight=packaging_weight, packaging_unit=packaging_unit,
                     estimate_date=estimate_date
                 )
+                invalidate_schedule_cache()  # 캐시 무효화
+                return result
         except Exception as e:
             print(f"스케줄 생성 중 오류: {str(e)}")
             import traceback
@@ -192,8 +219,18 @@ class Schedule:
             return None
 
     @staticmethod
-    def get_all():
-        """모든 스케줄 조회"""
+    def get_all(use_cache=True):
+        """모든 스케줄 조회 (캐싱 지원)
+
+        Args:
+            use_cache: True면 캐시 사용, False면 강제로 DB에서 조회
+        """
+        # 캐시 유효성 확인
+        current_time = time.time()
+        if use_cache and _schedule_cache['data'] is not None:
+            if current_time - _schedule_cache['timestamp'] < _schedule_cache['ttl']:
+                return _schedule_cache['data']
+
         try:
             if is_internal_mode():
                 Schedule._ensure_columns()
@@ -214,10 +251,16 @@ class Schedule:
                 schedules = cursor.fetchall()
                 conn.close()
 
-                return [dict(s) for s in schedules]
+                result = [dict(s) for s in schedules]
             else:
                 api = _get_api()
-                return api.get_schedules()
+                result = api.get_schedules()
+
+            # 캐시 업데이트
+            _schedule_cache['data'] = result
+            _schedule_cache['timestamp'] = current_time
+
+            return result
         except Exception as e:
             print(f"스케줄 목록 조회 중 오류: {str(e)}")
             return []
@@ -237,10 +280,15 @@ class Schedule:
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
+                if success:
+                    invalidate_schedule_cache()  # 캐시 무효화
                 return success
             else:
                 api = _get_api()
-                return api.update_schedule_status(schedule_id, status)
+                result = api.update_schedule_status(schedule_id, status)
+                if result:
+                    invalidate_schedule_cache()  # 캐시 무효화
+                return result
         except Exception as e:
             print(f"스케줄 상태 업데이트 중 오류: {str(e)}")
             return False
@@ -256,10 +304,15 @@ class Schedule:
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
+                if success:
+                    invalidate_schedule_cache()  # 캐시 무효화
                 return success
             else:
                 api = _get_api()
-                return api.delete_schedule(schedule_id)
+                result = api.delete_schedule(schedule_id)
+                if result:
+                    invalidate_schedule_cache()  # 캐시 무효화
+                return result
         except Exception as e:
             print(f"스케줄 삭제 중 오류: {str(e)}")
             return False
@@ -406,11 +459,16 @@ class Schedule:
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
+                if success:
+                    invalidate_schedule_cache()  # 캐시 무효화
                 print(f"스케줄 업데이트 완료: ID {schedule_id}")
                 return success
             else:
                 api = _get_api()
-                return api.update_schedule(schedule_id, data)
+                result = api.update_schedule(schedule_id, data)
+                if result:
+                    invalidate_schedule_cache()  # 캐시 무효화
+                return result
         except Exception as e:
             print(f"스케줄 업데이트 중 오류: {str(e)}")
             import traceback
