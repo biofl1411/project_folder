@@ -28,15 +28,19 @@ class CommunicationTab(QWidget):
         self.current_chat_partner_id = None
         self.all_users = []
 
+        # Lazy Loading 플래그
+        self._needs_refresh = True
+        self._data_loaded = False
+
         # 메시징 API 사용 가능 여부 (None=미확인, True=사용가능, False=사용불가)
         self._messaging_api_available = None
         self._messaging_api_fail_count = 0
         self._MAX_API_FAIL_COUNT = 3  # 3회 연속 실패시 폴링 중단
 
-        # 자동 새로고침 타이머 (5초마다)
+        # 자동 새로고침 타이머 (5초마다) - 탭 활성화 후에만 시작
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_data)
-        self.refresh_timer.start(5000)
+        # 초기에는 시작하지 않음 - 탭 활성화 시에만 시작
 
         # API 재확인 타이머 (60초마다) - API가 다시 사용 가능해졌는지 확인
         self.api_recheck_timer = QTimer()
@@ -48,16 +52,33 @@ class CommunicationTab(QWidget):
     def set_current_user(self, user):
         """현재 사용자 설정"""
         self.current_user = user
-        self.load_users()
-        self.load_chat_partners()
-        self.load_email_logs()
-        self.check_unread()
+        # 사용자 변경 시 데이터 새로고침 플래그 설정 (Lazy Loading)
+        self._needs_refresh = True
+        self._data_loaded = False
+
+    def on_tab_activated(self):
+        """탭이 활성화될 때 호출 (Lazy Loading)"""
+        if self._needs_refresh or not self._data_loaded:
+            self.load_users()
+            self.load_chat_partners()
+            self.load_email_logs()
+            self.check_unread()
+            self._needs_refresh = False
+            self._data_loaded = True
+        # 탭이 활성화되면 자동 새로고침 타이머 시작
+        if not self.refresh_timer.isActive():
+            self.refresh_timer.start(5000)
 
     def clear_data(self):
         """탭 데이터 초기화 (로그아웃 시 호출)"""
         self.current_user = None
         self.current_chat_partner_id = None
         self.all_users = []
+        self._needs_refresh = True
+        self._data_loaded = False
+        # 타이머 중지
+        if self.refresh_timer.isActive():
+            self.refresh_timer.stop()
         # 채팅 목록 초기화
         if hasattr(self, 'chat_list') and self.chat_list:
             self.chat_list.clear()
