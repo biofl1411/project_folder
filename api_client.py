@@ -5,12 +5,21 @@
 API 클라이언트
 서버 API와 통신하는 모듈
 기존 database.py의 get_connection() 대신 사용
+
+성능 최적화:
+- HTTP 연결 풀링 (requests.Session)
+- 클라이언트 캐싱 (TTL 기반)
+- 단축된 타임아웃
 '''
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import json
 import os
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # API 서버 설정
 API_BASE_URL = "http://192.168.0.96:8000"  # 내부망
@@ -20,19 +29,82 @@ API_EXTERNAL_URL = "http://14.7.14.31:8000"  # 외부망 (포트포워딩 필요
 CONFIG_PATH = 'config/api_config.json'
 
 
+class ApiCache:
+    """API 응답 캐시 클래스 (TTL 기반)"""
+
+    def __init__(self):
+        self._cache = {}
+        self._lock = threading.Lock()
+
+    def get(self, key):
+        """캐시에서 값 조회 (만료 확인)"""
+        with self._lock:
+            if key in self._cache:
+                data, expire_time = self._cache[key]
+                if time.time() < expire_time:
+                    return data
+                else:
+                    del self._cache[key]
+        return None
+
+    def set(self, key, value, ttl=60):
+        """캐시에 값 저장 (TTL: 초 단위)"""
+        with self._lock:
+            self._cache[key] = (value, time.time() + ttl)
+
+    def invalidate(self, key_pattern=None):
+        """캐시 무효화 (패턴 또는 전체)"""
+        with self._lock:
+            if key_pattern is None:
+                self._cache.clear()
+            else:
+                keys_to_delete = [k for k in self._cache if key_pattern in k]
+                for k in keys_to_delete:
+                    del self._cache[k]
+
+
 class ApiClient:
-    """API 클라이언트 클래스"""
+    """API 클라이언트 클래스 (연결 풀링 + 캐싱)"""
 
     _instance = None
     _token = None
     _user = None
     _base_url = None
+    _session = None
+    _cache = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._load_config()
+            cls._instance._initialize()
         return cls._instance
+
+    def _initialize(self):
+        """초기화"""
+        self._load_config()
+        self._setup_session()
+        self._cache = ApiCache()
+
+    def _setup_session(self):
+        """HTTP 세션 설정 (연결 풀링)"""
+        self._session = requests.Session()
+
+        # 재시도 전략 설정
+        retry_strategy = Retry(
+            total=2,  # 최대 2회 재시도
+            backoff_factor=0.5,  # 재시도 간격: 0.5, 1초
+            status_forcelist=[500, 502, 503, 504],  # 재시도할 상태 코드
+        )
+
+        # 연결 풀 어댑터 설정
+        adapter = HTTPAdapter(
+            pool_connections=10,  # 연결 풀 크기
+            pool_maxsize=20,  # 최대 연결 수
+            max_retries=retry_strategy
+        )
+
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
 
     def _load_config(self):
         """설정 파일 로드"""
@@ -67,36 +139,45 @@ class ApiClient:
             headers["Authorization"] = f"Bearer {self._token}"
         return headers
 
-    def _request(self, method, endpoint, data=None, params=None, retry_count=3):
+    def _request(self, method, endpoint, data=None, params=None, retry_count=2, use_cache=False, cache_ttl=60):
         """
-        API 요청 실행 (재시도 및 타임아웃 개선)
+        API 요청 실행 (연결 풀링 + 캐싱)
 
         Args:
             method: HTTP 메서드 (GET, POST, PUT, PATCH, DELETE)
             endpoint: API 엔드포인트
             data: 요청 바디 데이터
             params: 쿼리 파라미터
-            retry_count: 재시도 횟수 (기본 3회)
+            retry_count: 재시도 횟수 (기본 2회)
+            use_cache: 캐싱 사용 여부 (GET 요청만)
+            cache_ttl: 캐시 유효 시간 (초)
         """
+        # 캐시 확인 (GET 요청만)
+        cache_key = None
+        if use_cache and method == "GET":
+            cache_key = f"{endpoint}:{json.dumps(params or {}, sort_keys=True)}"
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
+
         url = f"{self._base_url}{endpoint}"
-        # 타임아웃 설정: (연결 타임아웃, 읽기 타임아웃)
-        # 연결 타임아웃 단축으로 빠른 응답
-        timeout = (3, 15)  # 연결 3초, 읽기 15초
+        # 타임아웃 단축: 연결 2초, 읽기 5초
+        timeout = (2, 5)
 
         last_exception = None
 
         for attempt in range(retry_count):
             try:
                 if method == "GET":
-                    response = requests.get(url, headers=self._get_headers(), params=params, timeout=timeout)
+                    response = self._session.get(url, headers=self._get_headers(), params=params, timeout=timeout)
                 elif method == "POST":
-                    response = requests.post(url, headers=self._get_headers(), json=data, timeout=timeout)
+                    response = self._session.post(url, headers=self._get_headers(), json=data, timeout=timeout)
                 elif method == "PUT":
-                    response = requests.put(url, headers=self._get_headers(), json=data, timeout=timeout)
+                    response = self._session.put(url, headers=self._get_headers(), json=data, timeout=timeout)
                 elif method == "PATCH":
-                    response = requests.patch(url, headers=self._get_headers(), json=data, params=params, timeout=timeout)
+                    response = self._session.patch(url, headers=self._get_headers(), json=data, params=params, timeout=timeout)
                 elif method == "DELETE":
-                    response = requests.delete(url, headers=self._get_headers(), timeout=timeout)
+                    response = self._session.delete(url, headers=self._get_headers(), timeout=timeout)
                 else:
                     raise ValueError(f"지원하지 않는 HTTP 메서드: {method}")
 
@@ -107,34 +188,37 @@ class ApiClient:
                     raise Exception("인증이 만료되었습니다. 다시 로그인해주세요.")
 
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+
+                # 캐시 저장
+                if cache_key:
+                    self._cache.set(cache_key, result, cache_ttl)
+
+                return result
 
             except requests.exceptions.ConnectionError as e:
                 # 내부망 실패시 외부망 시도 (한 번만)
                 if self._base_url == API_BASE_URL:
                     print(f"[API] 내부망 연결 실패, 외부망으로 전환: {API_EXTERNAL_URL}")
                     self._base_url = API_EXTERNAL_URL
-                    return self._request(method, endpoint, data, params, retry_count)
+                    return self._request(method, endpoint, data, params, retry_count, use_cache, cache_ttl)
                 last_exception = e
-                # 외부망에서도 실패시 재시도 (횟수 축소)
+                # 외부망에서도 실패시 빠른 재시도
                 if attempt < retry_count - 1:
-                    wait_time = 1  # 대기 시간 축소 (1초 고정)
-                    print(f"[API] 연결 실패, {wait_time}초 후 재시도... ({attempt + 1}/{retry_count})")
-                    time.sleep(wait_time)
+                    print(f"[API] 연결 실패, 재시도... ({attempt + 1}/{retry_count})")
+                    time.sleep(0.5)  # 0.5초 대기
                     continue
 
             except requests.exceptions.Timeout as e:
                 last_exception = e
-                # 타임아웃 시 재시도
+                # 타임아웃 시 빠른 재시도
                 if attempt < retry_count - 1:
-                    wait_time = 2 ** attempt
-                    print(f"[API] 타임아웃, {wait_time}초 후 재시도... ({attempt + 1}/{retry_count})")
-                    time.sleep(wait_time)
+                    print(f"[API] 타임아웃, 재시도... ({attempt + 1}/{retry_count})")
+                    time.sleep(0.5)
                     continue
 
             except requests.exceptions.RequestException as e:
                 last_exception = e
-                # 기타 요청 오류는 재시도 안함
                 break
 
         # 모든 재시도 실패
@@ -144,6 +228,44 @@ class ApiClient:
             raise Exception(f"서버에 연결할 수 없습니다: {str(last_exception)}")
         else:
             raise Exception(f"API 요청 오류: {str(last_exception)}")
+
+    def parallel_requests(self, requests_list, max_workers=5):
+        """
+        병렬 API 요청 실행
+
+        Args:
+            requests_list: [{"method": "GET", "endpoint": "/api/...", "params": {...}}, ...]
+            max_workers: 최대 동시 실행 수
+
+        Returns:
+            결과 리스트 (순서 유지)
+        """
+        results = [None] * len(requests_list)
+
+        def execute_request(index, req):
+            try:
+                return index, self._request(
+                    req.get("method", "GET"),
+                    req["endpoint"],
+                    data=req.get("data"),
+                    params=req.get("params"),
+                    use_cache=req.get("use_cache", False),
+                    cache_ttl=req.get("cache_ttl", 60)
+                )
+            except Exception as e:
+                return index, {"error": str(e)}
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(execute_request, i, req) for i, req in enumerate(requests_list)]
+            for future in as_completed(futures):
+                index, result = future.result()
+                results[index] = result
+
+        return results
+
+    def invalidate_cache(self, pattern=None):
+        """캐시 무효화"""
+        self._cache.invalidate(pattern)
 
     # ==================== 인증 ====================
 
@@ -180,9 +302,9 @@ class ApiClient:
 
     # ==================== Users ====================
 
-    def get_users(self):
-        """모든 사용자 조회"""
-        result = self._request("GET", "/api/users")
+    def get_users(self, use_cache=True):
+        """모든 사용자 조회 (캐시 60초)"""
+        result = self._request("GET", "/api/users", use_cache=use_cache, cache_ttl=60)
         return result.get("data", [])
 
     def get_user(self, user_id):
@@ -194,17 +316,22 @@ class ApiClient:
         """사용자 생성"""
         result = self._request("POST", "/api/users", kwargs)
         if result.get("success"):
+            self.invalidate_cache("/api/users")
             return result.get("data", {}).get("id")
         return None
 
     def update_user(self, user_id, **kwargs):
         """사용자 수정"""
         result = self._request("PUT", f"/api/users/{user_id}", kwargs)
+        if result.get("success"):
+            self.invalidate_cache("/api/users")
         return result.get("success", False)
 
     def delete_user(self, user_id):
         """사용자 삭제"""
         result = self._request("DELETE", f"/api/users/{user_id}")
+        if result.get("success"):
+            self.invalidate_cache("/api/users")
         return result.get("success", False)
 
     def toggle_user_active(self, user_id, activate=True):
@@ -246,13 +373,13 @@ class ApiClient:
         return result.get("data", 0)
 
     def get_departments(self):
-        """부서 목록"""
-        result = self._request("GET", "/api/users/constants/departments")
+        """부서 목록 (캐시 5분)"""
+        result = self._request("GET", "/api/users/constants/departments", use_cache=True, cache_ttl=300)
         return result.get("data", [])
 
     def get_permissions(self):
-        """권한 목록"""
-        result = self._request("GET", "/api/users/constants/permissions")
+        """권한 목록 (캐시 5분)"""
+        result = self._request("GET", "/api/users/constants/permissions", use_cache=True, cache_ttl=300)
         return result.get("data", {})
 
     # ==================== Clients ====================
@@ -368,31 +495,36 @@ class ApiClient:
 
     # ==================== Fees ====================
 
-    def get_fees(self):
-        """모든 수수료 조회"""
-        result = self._request("GET", "/api/fees")
+    def get_fees(self, use_cache=True):
+        """모든 수수료 조회 (캐시 2분)"""
+        result = self._request("GET", "/api/fees", use_cache=use_cache, cache_ttl=120)
         return result.get("data", [])
 
     def get_fee_by_item(self, test_item):
-        """검사 항목으로 수수료 조회"""
-        result = self._request("GET", f"/api/fees/{test_item}")
+        """검사 항목으로 수수료 조회 (캐시 2분)"""
+        result = self._request("GET", f"/api/fees/{test_item}", use_cache=True, cache_ttl=120)
         return result.get("data")
 
     def create_fee(self, **kwargs):
         """수수료 생성"""
         result = self._request("POST", "/api/fees", kwargs)
         if result.get("success"):
+            self.invalidate_cache("/api/fees")
             return result.get("data", {}).get("id")
         return None
 
     def update_fee(self, fee_id, **kwargs):
         """수수료 수정"""
         result = self._request("PUT", f"/api/fees/{fee_id}", kwargs)
+        if result.get("success"):
+            self.invalidate_cache("/api/fees")
         return result.get("success", False)
 
     def delete_fee(self, fee_id):
         """수수료 삭제"""
         result = self._request("DELETE", f"/api/fees/{fee_id}")
+        if result.get("success"):
+            self.invalidate_cache("/api/fees")
         return result.get("success", False)
 
     def calculate_fee(self, test_items):
@@ -402,36 +534,41 @@ class ApiClient:
 
     # ==================== Food Types ====================
 
-    def get_food_types(self):
-        """모든 식품 유형 조회"""
-        result = self._request("GET", "/api/food-types")
+    def get_food_types(self, use_cache=True):
+        """모든 식품 유형 조회 (캐시 2분)"""
+        result = self._request("GET", "/api/food-types", use_cache=use_cache, cache_ttl=120)
         return result.get("data", [])
 
     def get_food_type(self, type_id):
-        """ID로 식품 유형 조회"""
-        result = self._request("GET", f"/api/food-types/{type_id}")
+        """ID로 식품 유형 조회 (캐시 2분)"""
+        result = self._request("GET", f"/api/food-types/{type_id}", use_cache=True, cache_ttl=120)
         return result.get("data")
 
     def get_food_type_by_name(self, type_name):
-        """이름으로 식품 유형 조회"""
-        result = self._request("GET", f"/api/food-types/name/{type_name}")
+        """이름으로 식품 유형 조회 (캐시 2분)"""
+        result = self._request("GET", f"/api/food-types/name/{type_name}", use_cache=True, cache_ttl=120)
         return result.get("data")
 
     def create_food_type(self, **kwargs):
         """식품 유형 생성"""
         result = self._request("POST", "/api/food-types", kwargs)
         if result.get("success"):
+            self.invalidate_cache("/api/food-types")
             return result.get("data", {}).get("id")
         return None
 
     def update_food_type(self, type_id, **kwargs):
         """식품 유형 수정"""
         result = self._request("PUT", f"/api/food-types/{type_id}", kwargs)
+        if result.get("success"):
+            self.invalidate_cache("/api/food-types")
         return result.get("success", False)
 
     def delete_food_type(self, type_id):
         """식품 유형 삭제"""
         result = self._request("DELETE", f"/api/food-types/{type_id}")
+        if result.get("success"):
+            self.invalidate_cache("/api/food-types")
         return result.get("success", False)
 
     def search_food_types(self, keyword):
