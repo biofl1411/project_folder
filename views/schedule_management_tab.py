@@ -3375,7 +3375,6 @@ class ScheduleManagementTab(QWidget):
 
         try:
             import json
-            from database import get_connection
 
             schedule_id = self.current_schedule.get('id')
             if not schedule_id:
@@ -3429,41 +3428,35 @@ class ScheduleManagementTab(QWidget):
             extend_experiment_days = self.current_schedule.get('extend_experiment_days', 0) or 0
             extend_rounds = self.current_schedule.get('extend_rounds', 0) or 0
 
-            # 데이터베이스 업데이트
-            conn = get_connection()
-            cursor = conn.cursor()
+            # 업데이트 데이터 구성
+            update_data = {
+                'additional_test_items': additional_items_json,
+                'removed_test_items': removed_items_json,
+                'experiment_schedule_data': experiment_data_json,
+                'status': status,
+                'report_interim': report_interim,
+                'start_date': start_date,
+                'custom_dates': custom_dates_json,
+                'actual_experiment_days': actual_experiment_days,
+                'report1_date': report1_date,
+                'report2_date': report2_date,
+                'report3_date': report3_date,
+                'interim1_round': interim1_round,
+                'interim2_round': interim2_round,
+                'interim3_round': interim3_round,
+                'extend_period_days': extend_period_days,
+                'extend_period_months': extend_period_months,
+                'extend_period_years': extend_period_years,
+                'extend_experiment_days': extend_experiment_days,
+                'extend_rounds': extend_rounds
+            }
 
-            cursor.execute("""
-                UPDATE schedules SET
-                    additional_test_items = %s,
-                    removed_test_items = %s,
-                    experiment_schedule_data = %s,
-                    status = %s,
-                    report_interim = %s,
-                    start_date = %s,
-                    custom_dates = %s,
-                    actual_experiment_days = %s,
-                    report1_date = %s,
-                    report2_date = %s,
-                    report3_date = %s,
-                    interim1_round = %s,
-                    interim2_round = %s,
-                    interim3_round = %s,
-                    extend_period_days = %s,
-                    extend_period_months = %s,
-                    extend_period_years = %s,
-                    extend_experiment_days = %s,
-                    extend_rounds = %s
-                WHERE id = %s
-            """, (additional_items_json, removed_items_json, experiment_data_json,
-                  status, report_interim, start_date, custom_dates_json, actual_experiment_days,
-                  report1_date, report2_date, report3_date,
-                  interim1_round, interim2_round, interim3_round,
-                  extend_period_days, extend_period_months, extend_period_years,
-                  extend_experiment_days, extend_rounds, schedule_id))
+            # 모델을 통해 업데이트 (내부망/외부망 자동 처리)
+            success = Schedule.update_experiment_schedule_data(schedule_id, update_data)
 
-            conn.commit()
-            conn.close()
+            if not success:
+                QMessageBox.warning(self, "저장 실패", "데이터베이스 업데이트에 실패했습니다.")
+                return
 
             # 활동 로그 기록
             self.log_activity(
@@ -3530,18 +3523,14 @@ class ScheduleManagementTab(QWidget):
 
         try:
             import json
-            from database import get_connection
 
             experiment_data = self._collect_experiment_schedule_data()
             experiment_data_json = json.dumps(experiment_data, ensure_ascii=False) if experiment_data else None
 
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE schedules SET experiment_schedule_data = %s WHERE id = %s
-            """, (experiment_data_json, schedule_id))
-            conn.commit()
-            conn.close()
+            # 모델을 통해 업데이트 (내부망/외부망 자동 처리)
+            Schedule.update_experiment_schedule_data(schedule_id, {
+                'experiment_schedule_data': experiment_data_json
+            })
         except Exception as e:
             print(f"O/X 상태 자동 저장 오류: {e}")
 
@@ -3592,28 +3581,26 @@ class ScheduleManagementTab(QWidget):
                 f"color: {color}; font-size: 11px; text-decoration: underline; font-weight: bold;"
             )
 
-            # DB에 즉시 저장
+            # DB에 즉시 저장 (모델을 통해 내부망/외부망 자동 처리)
             try:
-                from database import get_connection
                 schedule_id = self.current_schedule.get('id')
                 if schedule_id:
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE schedules SET status = %s WHERE id = %s", (status_code, schedule_id))
-                    conn.commit()
-                    conn.close()
+                    success = Schedule.update_status(schedule_id, status_code)
 
-                    # 활동 로그 기록
-                    self.log_activity(
-                        'schedule_status_change',
-                        details={'old_status': old_status, 'new_status': new_status}
-                    )
+                    if success:
+                        # 활동 로그 기록
+                        self.log_activity(
+                            'schedule_status_change',
+                            details={'old_status': old_status, 'new_status': new_status}
+                        )
 
-                    # 비용 요약 업데이트
-                    self.recalculate_costs()
+                        # 비용 요약 업데이트
+                        self.recalculate_costs()
 
-                    # 스케줄 저장 시그널 발생 (스케줄 작성 탭 새로고침용)
-                    self.schedule_saved.emit()
+                        # 스케줄 저장 시그널 발생 (스케줄 작성 탭 새로고침용)
+                        self.schedule_saved.emit()
+                    else:
+                        print(f"상태 저장 실패: schedule_id={schedule_id}")
             except Exception as e:
                 print(f"상태 저장 오류: {e}")
 

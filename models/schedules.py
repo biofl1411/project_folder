@@ -366,6 +366,76 @@ class Schedule:
             return False
 
     @staticmethod
+    def update_experiment_schedule_data(schedule_id, data):
+        """스케줄 실험 데이터 업데이트 (experiment_schedule_data, additional_test_items 등)
+
+        Args:
+            schedule_id: 스케줄 ID
+            data: 업데이트할 데이터 딕셔너리. 가능한 키:
+                - additional_test_items (JSON)
+                - removed_test_items (JSON)
+                - experiment_schedule_data (JSON)
+                - status
+                - report_interim
+                - start_date
+                - custom_dates (JSON)
+                - actual_experiment_days
+                - report1_date, report2_date, report3_date
+                - interim1_round, interim2_round, interim3_round
+                - extend_period_days, extend_period_months, extend_period_years
+                - extend_experiment_days, extend_rounds
+        """
+        try:
+            if is_internal_mode():
+                conn = _get_connection()
+                cursor = conn.cursor()
+
+                # 동적으로 UPDATE 쿼리 생성
+                allowed_fields = [
+                    'additional_test_items', 'removed_test_items', 'experiment_schedule_data',
+                    'status', 'report_interim', 'start_date', 'custom_dates', 'actual_experiment_days',
+                    'report1_date', 'report2_date', 'report3_date',
+                    'interim1_round', 'interim2_round', 'interim3_round',
+                    'extend_period_days', 'extend_period_months', 'extend_period_years',
+                    'extend_experiment_days', 'extend_rounds'
+                ]
+
+                set_clauses = []
+                values = []
+
+                for field in allowed_fields:
+                    if field in data:
+                        set_clauses.append(f"{field} = %s")
+                        values.append(data[field])
+
+                if not set_clauses:
+                    return True  # 업데이트할 필드가 없으면 성공 반환
+
+                values.append(schedule_id)
+
+                query = f"UPDATE schedules SET {', '.join(set_clauses)} WHERE id = %s"
+                cursor.execute(query, values)
+
+                success = cursor.rowcount > 0
+                conn.commit()
+                conn.close()
+
+                if success:
+                    invalidate_schedule_cache()  # 캐시 무효화
+                return success
+            else:
+                api = _get_api()
+                result = api.update_schedule_experiment_data(schedule_id, data)
+                if result:
+                    invalidate_schedule_cache()  # 캐시 무효화
+                return result
+        except Exception as e:
+            print(f"스케줄 실험 데이터 업데이트 중 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    @staticmethod
     def update(schedule_id, data):
         """스케줄 전체 업데이트"""
         try:
