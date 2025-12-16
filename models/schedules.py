@@ -31,7 +31,6 @@ _columns_checked = False  # 컬럼 확인 여부 (앱 실행 중 한 번만)
 
 def invalidate_schedule_cache():
     """스케줄 캐시 무효화 (데이터 변경 시 호출)"""
-    global _schedule_cache
     _schedule_cache['data'] = None
     _schedule_cache['timestamp'] = 0
 
@@ -226,8 +225,6 @@ class Schedule:
         Args:
             use_cache: True면 캐시 사용, False면 강제로 DB에서 조회
         """
-        global _schedule_cache
-
         # 캐시 유효성 확인
         current_time = time.time()
         if use_cache and _schedule_cache['data'] is not None:
