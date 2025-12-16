@@ -28,10 +28,20 @@ class CommunicationTab(QWidget):
         self.current_chat_partner_id = None
         self.all_users = []
 
+        # 메시징 API 사용 가능 여부 (None=미확인, True=사용가능, False=사용불가)
+        self._messaging_api_available = None
+        self._messaging_api_fail_count = 0
+        self._MAX_API_FAIL_COUNT = 3  # 3회 연속 실패시 폴링 중단
+
         # 자동 새로고침 타이머 (5초마다)
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_data)
         self.refresh_timer.start(5000)
+
+        # API 재확인 타이머 (60초마다) - API가 다시 사용 가능해졌는지 확인
+        self.api_recheck_timer = QTimer()
+        self.api_recheck_timer.timeout.connect(self._recheck_messaging_api)
+        # 초기에는 시작하지 않음 - API 실패시에만 시작
 
         self.initUI()
 
@@ -329,11 +339,20 @@ class CommunicationTab(QWidget):
         if not self.current_user:
             return
 
+        # 메시징 API가 사용 불가능하면 건너뛰기
+        if self._messaging_api_available is False:
+            return
+
         try:
             from models.communications import Message
 
             partners = Message.get_chat_partners(self.current_user['id'])
             unread_counts = Message.get_unread_by_partner(self.current_user['id'])
+
+            # API 호출 성공 - 실패 카운트 리셋
+            if self._messaging_api_available is None:
+                self._messaging_api_available = True
+            self._messaging_api_fail_count = 0
 
             self.chat_list.clear()
 
@@ -369,9 +388,12 @@ class CommunicationTab(QWidget):
                 self.chat_list.addItem(item)
 
         except Exception as e:
-            print(f"대화 상대 목록 로드 오류: {e}")
-            import traceback
-            traceback.print_exc()
+            self._handle_messaging_api_error(e)
+            # 404가 아닌 경우에만 상세 오류 출력
+            if '404' not in str(e) and 'Not Found' not in str(e):
+                print(f"대화 상대 목록 로드 오류: {e}")
+                import traceback
+                traceback.print_exc()
 
     def on_chat_partner_selected(self, item):
         """대화 상대 선택"""
@@ -719,18 +741,34 @@ class CommunicationTab(QWidget):
         if not self.current_user:
             return
 
+        # 메시징 API가 사용 불가능하면 건너뛰기
+        if self._messaging_api_available is False:
+            return
+
         try:
             from models.communications import Message
 
             msg_unread = Message.get_unread_count(self.current_user['id'])
             self.unread_changed.emit(msg_unread)
 
+            # API 호출 성공 - 실패 카운트 리셋
+            if self._messaging_api_available is None:
+                self._messaging_api_available = True
+            self._messaging_api_fail_count = 0
+
         except Exception as e:
-            print(f"미읽음 확인 오류: {e}")
+            self._handle_messaging_api_error(e)
+            # 404가 아닌 경우에만 오류 출력
+            if '404' not in str(e) and 'Not Found' not in str(e):
+                print(f"미읽음 확인 오류: {e}")
 
     def refresh_data(self):
         """데이터 자동 새로고침"""
         if not self.current_user:
+            return
+
+        # 메시징 API가 사용 불가능하면 폴링 건너뛰기
+        if self._messaging_api_available is False:
             return
 
         self.load_chat_partners()
@@ -739,6 +777,47 @@ class CommunicationTab(QWidget):
         # 현재 대화 중이면 대화 내용도 새로고침
         if self.current_chat_partner_id:
             self.load_conversation()
+
+    def _recheck_messaging_api(self):
+        """메시징 API가 다시 사용 가능해졌는지 확인"""
+        if not self.current_user:
+            return
+
+        try:
+            from models.communications import Message
+
+            # 간단한 API 호출로 확인
+            Message.get_unread_count(self.current_user['id'])
+
+            # 성공 - API가 다시 사용 가능
+            self._messaging_api_available = True
+            self._messaging_api_fail_count = 0
+            self.api_recheck_timer.stop()
+            print("[CommunicationTab] 메시징 API가 다시 사용 가능합니다.")
+
+        except Exception as e:
+            # 여전히 실패 - 조용히 계속 재시도
+            pass
+
+    def _handle_messaging_api_error(self, error):
+        """메시징 API 오류 처리"""
+        error_str = str(error)
+
+        # 404 오류 (API 엔드포인트 없음) 확인
+        is_404 = '404' in error_str or 'Not Found' in error_str
+
+        if is_404:
+            self._messaging_api_fail_count += 1
+
+            if self._messaging_api_fail_count >= self._MAX_API_FAIL_COUNT:
+                if self._messaging_api_available is not False:
+                    self._messaging_api_available = False
+                    print(f"[CommunicationTab] 메시징 API를 사용할 수 없습니다 ({self._MAX_API_FAIL_COUNT}회 연속 404). 폴링을 일시 중단합니다.")
+                    # 60초마다 재확인 시작
+                    self.api_recheck_timer.start(60000)
+        else:
+            # 404가 아닌 다른 오류는 실패 카운트 리셋
+            self._messaging_api_fail_count = 0
 
 
 class SelectUserDialog(QDialog):
