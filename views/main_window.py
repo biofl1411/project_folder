@@ -325,15 +325,34 @@ class MainWindow(QMainWindow):
     def on_tab_changed(self, index):
         """탭 변경 시 호출 - 해당 탭 데이터 로드 (Lazy Loading)"""
         current_widget = self.tab_widget.widget(index)
-        dashboard_widget = self.tab_widgets.get('dashboard')
-        schedule_widget = self.tab_widgets.get('schedule')
 
-        if current_widget == dashboard_widget:
+        # 각 탭별 Lazy Loading 처리
+        if current_widget == self.tab_widgets.get('dashboard'):
             self.load_dashboard_data()
-        elif current_widget == schedule_widget:
-            # 스케줄 작성 탭 활성화 시 데이터 로드
+        elif current_widget == self.tab_widgets.get('schedule'):
             if hasattr(self.schedule_tab, 'on_tab_activated'):
                 self.schedule_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('client'):
+            if hasattr(self.client_tab, 'on_tab_activated'):
+                self.client_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('food_type'):
+            if hasattr(self.food_type_tab, 'on_tab_activated'):
+                self.food_type_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('fee'):
+            if hasattr(self.fee_tab, 'on_tab_activated'):
+                self.fee_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('estimate'):
+            if hasattr(self.estimate_tab, 'on_tab_activated'):
+                self.estimate_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('schedule_mgmt'):
+            if hasattr(self.schedule_management_tab, 'on_tab_activated'):
+                self.schedule_management_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('communication'):
+            if hasattr(self.communication_tab, 'on_tab_activated'):
+                self.communication_tab.on_tab_activated()
+        elif current_widget == self.tab_widgets.get('user_mgmt'):
+            if hasattr(self.user_management_tab, 'on_tab_activated'):
+                self.user_management_tab.on_tab_activated()
 
     def load_dashboard_data(self):
         """대시보드 데이터 로드 및 카드 업데이트"""

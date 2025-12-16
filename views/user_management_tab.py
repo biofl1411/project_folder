@@ -30,20 +30,35 @@ class UserManagementTab(QWidget):
         self.all_users = []  # 전체 사용자 목록 (검색/정렬용)
         self.sort_column = 2  # 기본 정렬 컬럼 (이름)
         self.sort_order = Qt.AscendingOrder  # 기본 정렬 순서
+
+        # Lazy Loading 플래그
+        self._needs_refresh = True
+        self._data_loaded = False
+
         self.initUI()
-        # load_users()는 set_current_user()에서 호출됨 (로그인 후 데이터 로드)
+        # load_users()는 탭 활성화 시 호출됨 (Lazy Loading)
 
     def set_current_user(self, user):
         """현재 로그인한 사용자 설정"""
         self.current_user = user
-        # 사용자 변경 시 데이터 다시 로드
-        self.load_users()
+        # 사용자 변경 시 데이터 새로고침 플래그 설정 (Lazy Loading)
+        self._needs_refresh = True
+        self._data_loaded = False
+
+    def on_tab_activated(self):
+        """탭이 활성화될 때 호출 (Lazy Loading)"""
+        if self._needs_refresh or not self._data_loaded:
+            self.load_users()
+            self._needs_refresh = False
+            self._data_loaded = True
 
     def clear_data(self):
         """탭 데이터 초기화 (로그아웃 시 호출)"""
         self.current_user = None
         self.selected_user_id = None
         self.all_users = []
+        self._needs_refresh = True
+        self._data_loaded = False
         if hasattr(self, 'user_table') and self.user_table:
             self.user_table.setRowCount(0)
 

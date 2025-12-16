@@ -1035,6 +1035,10 @@ class ScheduleManagementTab(QWidget):
         self.current_user = None  # 현재 로그인한 사용자
         self._loading = False  # 로드 중 플래그 (on_cost_input_changed 저장 방지)
 
+        # Lazy Loading 플래그
+        self._needs_refresh = True
+        self._data_loaded = False
+
         # 버튼 참조 저장 (권한 체크용)
         self.estimate_btn = None
         self.settings_btn = None
@@ -1053,16 +1057,27 @@ class ScheduleManagementTab(QWidget):
         """현재 로그인한 사용자 설정 및 권한 적용"""
         self.current_user = user
         self.apply_permissions()
-        # 사용자 변경 시 이전 스케줄 선택 초기화 후 데이터 다시 로드
+        # 사용자 변경 시 이전 스케줄 선택 초기화
         self.clear_schedule_selection()
-        if hasattr(self, 'load_schedules'):
-            self.load_schedules()
+        # 사용자 변경 시 데이터 새로고침 플래그 설정 (Lazy Loading)
+        self._needs_refresh = True
+        self._data_loaded = False
+
+    def on_tab_activated(self):
+        """탭이 활성화될 때 호출 (Lazy Loading)"""
+        if self._needs_refresh or not self._data_loaded:
+            if hasattr(self, 'load_schedules'):
+                self.load_schedules()
+            self._needs_refresh = False
+            self._data_loaded = True
 
     def clear_data(self):
         """탭 데이터 초기화 (로그아웃 시 호출)"""
         self.all_schedules = []
         self.current_schedule = None
         self.current_user = None
+        self._needs_refresh = True
+        self._data_loaded = False
         if hasattr(self, 'schedule_table') and self.schedule_table:
             self.schedule_table.setRowCount(0)
         if hasattr(self, 'item_table') and self.item_table:
