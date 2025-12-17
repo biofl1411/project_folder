@@ -648,6 +648,41 @@ class MainWindow(QMainWindow):
             if self.dashboard_current_filter:
                 self.on_dashboard_card_click(self.dashboard_current_filter)
 
+    def closeEvent(self, event):
+        """메인 윈도우 닫기 이벤트 처리"""
+        # 로그인 상태가 아니면 그냥 종료
+        if not self.current_user:
+            event.accept()
+            return
+
+        # 로그인 상태에서 X 버튼을 누르면 확인
+        reply = QMessageBox.question(
+            self, '종료 확인',
+            '프로그램을 종료하시겠습니까?',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # API 클라이언트 로그아웃
+            try:
+                from api_client import api
+                api.logout()
+            except:
+                pass
+
+            # 로그인 창이 열려있으면 닫기
+            if hasattr(self, 'login_window') and self.login_window:
+                try:
+                    self.login_window._login_success = True  # 종료 시그널 방지
+                    self.login_window.close()
+                except:
+                    pass
+
+            event.accept()
+        else:
+            event.ignore()
+
     def create_status_bar(self):
         """하단 상태 바 생성"""
         from version import VERSION
@@ -857,6 +892,13 @@ class MainWindow(QMainWindow):
 
         if reply == QMessageBox.Yes:
             self.current_user = None
+
+            # API 클라이언트 로그아웃 (캐시 초기화 포함)
+            try:
+                from api_client import api
+                api.logout()
+            except Exception as e:
+                print(f"API 로그아웃 오류: {e}")
 
             # 각 탭의 데이터 초기화
             self.clear_all_tab_data()
