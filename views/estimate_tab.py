@@ -1197,6 +1197,27 @@ class EstimateTab(QWidget):
             logo_path_setting = settings_dict.get('logo_path', '')
             logo_path = logo_path_setting
             print(f"[로고 로드] DB에서 가져온 경로: '{logo_path_setting}'")
+
+            # 서버에서 로고 다운로드 (server:logo 형식이거나, 외부망에서 서버 이미지 확인)
+            if logo_path_setting.startswith('server:') or logo_path_setting == '':
+                try:
+                    from api_client import get_api_client
+                    api = get_api_client()
+                    if api.is_logged_in():
+                        exists, ext = api.check_company_image_exists('logo')
+                        if exists:
+                            success, downloaded_path = api.download_company_image('logo')
+                            if success:
+                                logo_path = downloaded_path
+                                print(f"[로고 로드] 서버에서 다운로드 성공: '{downloaded_path}'")
+                            else:
+                                print(f"[로고 로드] 서버 다운로드 실패: {downloaded_path}")
+                                logo_path = ''
+                        else:
+                            print("[로고 로드] 서버에 로고 이미지 없음")
+                            logo_path = ''
+                except Exception as e:
+                    print(f"[로고 로드] 서버 다운로드 오류: {str(e)}")
             print(f"[로고 로드] base_path: '{base_path}'")
 
             if logo_path:
@@ -1231,6 +1252,27 @@ class EstimateTab(QWidget):
             stamp_path_setting = settings_dict.get('stamp_path', '')
             stamp_path = stamp_path_setting
             print(f"[도장 로드] DB에서 가져온 경로: '{stamp_path_setting}'")
+
+            # 서버에서 직인 다운로드 (server:stamp 형식이거나, 외부망에서 서버 이미지 확인)
+            if stamp_path_setting.startswith('server:') or stamp_path_setting == '':
+                try:
+                    from api_client import get_api_client
+                    api = get_api_client()
+                    if api.is_logged_in():
+                        exists, ext = api.check_company_image_exists('stamp')
+                        if exists:
+                            success, downloaded_path = api.download_company_image('stamp')
+                            if success:
+                                stamp_path = downloaded_path
+                                print(f"[도장 로드] 서버에서 다운로드 성공: '{downloaded_path}'")
+                            else:
+                                print(f"[도장 로드] 서버 다운로드 실패: {downloaded_path}")
+                                stamp_path = ''
+                        else:
+                            print("[도장 로드] 서버에 직인 이미지 없음")
+                            stamp_path = ''
+                except Exception as e:
+                    print(f"[도장 로드] 서버 다운로드 오류: {str(e)}")
 
             if stamp_path:
                 # 상대 경로인 경우 절대 경로로 변환

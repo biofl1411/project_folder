@@ -1170,6 +1170,173 @@ async def update_user_settings_batch(user_id: int, settings: Dict[str, str], use
         return {"success": False, "error": str(e)}
 
 
+# ==================== Company Images API ====================
+
+# 회사 이미지 저장 디렉토리
+COMPANY_IMAGES_DIR = 'company_images'
+
+def ensure_company_images_dir():
+    """회사 이미지 디렉토리 확인 및 생성"""
+    if not os.path.exists(COMPANY_IMAGES_DIR):
+        os.makedirs(COMPANY_IMAGES_DIR)
+    return COMPANY_IMAGES_DIR
+
+
+@app.post("/api/company-images/{image_type}")
+async def upload_company_image(image_type: str, file: UploadFile = File(...), user: dict = Depends(verify_token)):
+    """회사 로고/직인 이미지 업로드
+
+    Args:
+        image_type: 'logo' 또는 'stamp'
+    """
+    import shutil
+
+    if image_type not in ['logo', 'stamp']:
+        raise HTTPException(status_code=400, detail="유효하지 않은 이미지 타입입니다. 'logo' 또는 'stamp'만 가능합니다.")
+
+    # 지원하는 이미지 확장자 확인
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif']
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(allowed_extensions)}")
+
+    try:
+        # 디렉토리 확인
+        ensure_company_images_dir()
+
+        # 파일명 결정
+        dest_name = f"company_{image_type}{ext}"
+        dest_path = os.path.join(COMPANY_IMAGES_DIR, dest_name)
+
+        # 기존 파일 삭제 (다른 확장자 포함)
+        for old_ext in allowed_extensions:
+            old_file = os.path.join(COMPANY_IMAGES_DIR, f"company_{image_type}{old_ext}")
+            if os.path.exists(old_file):
+                os.remove(old_file)
+
+        # 파일 저장
+        with open(dest_path, 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # 설정에 경로 저장
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        setting_key = f"{image_type}_path"
+        setting_value = f"server:{image_type}"  # 서버 이미지 표시
+
+        cursor.execute("""
+            UPDATE settings SET value = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE `key` = %s
+        """, (setting_value, setting_key))
+
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT INTO settings (`key`, value) VALUES (%s, %s)
+            """, (setting_key, setting_value))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "success": True,
+            "message": f"{'로고' if image_type == 'logo' else '직인'} 이미지가 서버에 저장되었습니다.",
+            "path": setting_value
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이미지 업로드 오류: {str(e)}")
+
+
+@app.get("/api/company-images/{image_type}")
+async def get_company_image(image_type: str, user: dict = Depends(verify_token)):
+    """회사 로고/직인 이미지 다운로드
+
+    Args:
+        image_type: 'logo' 또는 'stamp'
+    """
+    from fastapi.responses import FileResponse
+
+    if image_type not in ['logo', 'stamp']:
+        raise HTTPException(status_code=400, detail="유효하지 않은 이미지 타입입니다.")
+
+    # 이미지 파일 찾기
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif']
+
+    for ext in allowed_extensions:
+        file_path = os.path.join(COMPANY_IMAGES_DIR, f"company_{image_type}{ext}")
+        if os.path.exists(file_path):
+            return FileResponse(
+                path=file_path,
+                filename=f"company_{image_type}{ext}",
+                media_type=f"image/{ext[1:]}" if ext != '.jpg' else "image/jpeg"
+            )
+
+    return {"success": False, "message": "이미지를 찾을 수 없습니다."}
+
+
+@app.get("/api/company-images/{image_type}/exists")
+async def check_company_image_exists(image_type: str, user: dict = Depends(verify_token)):
+    """회사 로고/직인 이미지 존재 여부 확인
+
+    Args:
+        image_type: 'logo' 또는 'stamp'
+    """
+    if image_type not in ['logo', 'stamp']:
+        raise HTTPException(status_code=400, detail="유효하지 않은 이미지 타입입니다.")
+
+    # 이미지 파일 찾기
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif']
+
+    for ext in allowed_extensions:
+        file_path = os.path.join(COMPANY_IMAGES_DIR, f"company_{image_type}{ext}")
+        if os.path.exists(file_path):
+            return {"success": True, "exists": True, "extension": ext}
+
+    return {"success": True, "exists": False}
+
+
+@app.delete("/api/company-images/{image_type}")
+async def delete_company_image(image_type: str, user: dict = Depends(verify_token)):
+    """회사 로고/직인 이미지 삭제
+
+    Args:
+        image_type: 'logo' 또는 'stamp'
+    """
+    if image_type not in ['logo', 'stamp']:
+        raise HTTPException(status_code=400, detail="유효하지 않은 이미지 타입입니다.")
+
+    # 이미지 파일 찾기 및 삭제
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif']
+    deleted = False
+
+    for ext in allowed_extensions:
+        file_path = os.path.join(COMPANY_IMAGES_DIR, f"company_{image_type}{ext}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            deleted = True
+
+    # 설정에서 경로 삭제
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        setting_key = f"{image_type}_path"
+        cursor.execute("UPDATE settings SET value = '' WHERE `key` = %s", (setting_key,))
+
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+    if deleted:
+        return {"success": True, "message": f"{'로고' if image_type == 'logo' else '직인'} 이미지가 삭제되었습니다."}
+    else:
+        return {"success": False, "message": "삭제할 이미지가 없습니다."}
+
+
 # ==================== Health Check ====================
 
 @app.get("/api/health")

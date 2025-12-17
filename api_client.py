@@ -271,6 +271,9 @@ class ApiClient:
 
     def login(self, username, password):
         """로그인"""
+        # 로그인 전 캐시 초기화 (이전 사용자 데이터 제거)
+        self._cache.invalidate()
+
         result = self._request("POST", "/api/auth/login", {
             "username": username,
             "password": password
@@ -291,6 +294,8 @@ class ApiClient:
         finally:
             self._token = None
             self._user = None
+            # 캐시 전체 초기화 (다른 사용자 데이터 남지 않도록)
+            self._cache.invalidate()
 
     def get_current_user(self):
         """현재 로그인 사용자"""
@@ -928,6 +933,153 @@ class ApiClient:
             "received_at": received_at
         })
         return result.get("success", False)
+
+    # ==================== Company Images ====================
+
+    def upload_company_image(self, image_type, file_path):
+        """회사 로고/직인 이미지 서버에 업로드
+
+        Args:
+            image_type: 'logo' 또는 'stamp'
+            file_path: 업로드할 이미지 파일 경로
+
+        Returns:
+            (success, message, path)
+        """
+        if not os.path.exists(file_path):
+            return False, "파일을 찾을 수 없습니다.", None
+
+        if image_type not in ['logo', 'stamp']:
+            return False, "유효하지 않은 이미지 타입입니다.", None
+
+        try:
+            file_name = os.path.basename(file_path)
+            headers = {}
+            if self._token:
+                headers["Authorization"] = f"Bearer {self._token}"
+
+            with open(file_path, 'rb') as f:
+                files = {'file': (file_name, f)}
+                response = self._session.post(
+                    f"{self._base_url}/api/company-images/{image_type}",
+                    headers=headers,
+                    files=files,
+                    timeout=(5, 30)
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    return True, data.get("message", "업로드 완료"), data.get("path")
+                else:
+                    return False, data.get("message", "업로드 실패"), None
+            else:
+                return False, f"업로드 실패: {response.status_code}", None
+
+        except Exception as e:
+            return False, f"업로드 오류: {str(e)}", None
+
+    def download_company_image(self, image_type, save_path=None):
+        """회사 로고/직인 이미지 서버에서 다운로드
+
+        Args:
+            image_type: 'logo' 또는 'stamp'
+            save_path: 저장할 경로 (없으면 임시 파일에 저장)
+
+        Returns:
+            (success, file_path or error_message)
+        """
+        import tempfile
+
+        if image_type not in ['logo', 'stamp']:
+            return False, "유효하지 않은 이미지 타입입니다."
+
+        try:
+            response = self._session.get(
+                f"{self._base_url}/api/company-images/{image_type}",
+                headers=self._get_headers(),
+                timeout=(5, 30),
+                stream=True
+            )
+
+            if response.status_code == 200:
+                # JSON 응답인지 확인 (이미지가 없는 경우)
+                content_type = response.headers.get('content-type', '')
+                if 'application/json' in content_type:
+                    data = response.json()
+                    return False, data.get("message", "이미지를 찾을 수 없습니다.")
+
+                # 파일명 추출
+                content_disp = response.headers.get('content-disposition', '')
+                filename = None
+                if 'filename=' in content_disp:
+                    import re
+                    match = re.search(r'filename[*]?=(?:UTF-8\'\')?([^;\n]+)', content_disp)
+                    if match:
+                        filename = match.group(1).strip('"\'')
+
+                # 확장자 결정
+                if filename:
+                    ext = os.path.splitext(filename)[1]
+                else:
+                    ext = '.png'
+
+                # 저장 경로 결정
+                if save_path:
+                    file_path = save_path
+                else:
+                    fd, file_path = tempfile.mkstemp(suffix=ext)
+                    os.close(fd)
+
+                # 파일 저장
+                with open(file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                return True, file_path
+            else:
+                return False, f"다운로드 실패: {response.status_code}"
+
+        except Exception as e:
+            return False, f"다운로드 오류: {str(e)}"
+
+    def check_company_image_exists(self, image_type):
+        """회사 로고/직인 이미지 존재 여부 확인
+
+        Args:
+            image_type: 'logo' 또는 'stamp'
+
+        Returns:
+            (exists, extension or None)
+        """
+        if image_type not in ['logo', 'stamp']:
+            return False, None
+
+        try:
+            result = self._request("GET", f"/api/company-images/{image_type}/exists")
+            if result.get("success"):
+                return result.get("exists", False), result.get("extension")
+            return False, None
+        except:
+            return False, None
+
+    def delete_company_image(self, image_type):
+        """회사 로고/직인 이미지 삭제
+
+        Args:
+            image_type: 'logo' 또는 'stamp'
+
+        Returns:
+            (success, message)
+        """
+        if image_type not in ['logo', 'stamp']:
+            return False, "유효하지 않은 이미지 타입입니다."
+
+        try:
+            result = self._request("DELETE", f"/api/company-images/{image_type}")
+            return result.get("success", False), result.get("message", "")
+        except Exception as e:
+            return False, f"삭제 오류: {str(e)}"
 
     # ==================== Health Check ====================
 
