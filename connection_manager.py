@@ -148,8 +148,8 @@ class ConnectionManager:
     def get_api_client(self):
         """API 클라이언트 인스턴스 반환 (외부망용)"""
         if self._api_client is None:
-            from api_client import ApiClient
-            self._api_client = ApiClient()
+            from api_client import api
+            self._api_client = api  # 싱글톤 인스턴스 사용
         return self._api_client
 
 
