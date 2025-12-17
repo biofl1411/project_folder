@@ -366,15 +366,12 @@ class UserSettings:
             cursor = conn.cursor()
 
             for key, value in settings_dict.items():
+                # INSERT ON DUPLICATE KEY UPDATE 사용 (UPSERT)
                 cursor.execute("""
-                    UPDATE user_settings SET value = %s
-                    WHERE user_id = %s AND `key` = %s
-                """, (value, user_id, key))
-
-                if cursor.rowcount == 0:
-                    cursor.execute("""
-                        INSERT INTO user_settings (user_id, `key`, value) VALUES (%s, %s, %s)
-                    """, (user_id, key, value))
+                    INSERT INTO user_settings (user_id, `key`, value)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE value = VALUES(value)
+                """, (user_id, key, value))
 
             conn.commit()
             conn.close()
