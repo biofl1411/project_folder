@@ -358,6 +358,7 @@ class MainWindow(QMainWindow):
         """대시보드 데이터 로드 및 카드 업데이트"""
         try:
             from models.schedules import Schedule
+            from models.users import User
             from .settings_dialog import get_status_map
 
             # 모든 스케줄 가져오기
@@ -386,15 +387,46 @@ class MainWindow(QMainWindow):
             extension_count = sum(1 for s in self.dashboard_all_schedules
                                 if s.get('status') == 'received' and s.get('extension_test'))
 
-            # 카드 값 업데이트
-            if hasattr(self, 'dashboard_cards') and self.dashboard_cards:
-                self.dashboard_cards['scheduled']['value_label'].setText(str(scheduled_count))
-                self.dashboard_cards['interim']['value_label'].setText(str(interim_count))
-                self.dashboard_cards['received']['value_label'].setText(str(received_count))
-                self.dashboard_cards['extension']['value_label'].setText(str(extension_count))
+            # 카드별 권한 매핑
+            card_permissions = {
+                'scheduled': 'dashboard_scheduled',
+                'interim': 'dashboard_interim',
+                'received': 'dashboard_received',
+                'extension': 'dashboard_extension'
+            }
 
-            # 기본으로 입고 예정 데이터 표시
-            self.on_dashboard_card_click('scheduled')
+            # 카드 값 업데이트 및 권한에 따른 표시/숨김 처리
+            first_visible_card = None
+            if hasattr(self, 'dashboard_cards') and self.dashboard_cards:
+                card_counts = {
+                    'scheduled': scheduled_count,
+                    'interim': interim_count,
+                    'received': received_count,
+                    'extension': extension_count
+                }
+
+                for card_key, card_info in self.dashboard_cards.items():
+                    # 권한 체크 (관리자는 모든 권한)
+                    has_permission = User.has_permission(self.current_user, card_permissions.get(card_key, ''))
+
+                    # 카드 프레임 표시/숨김
+                    card_info['frame'].setVisible(has_permission)
+
+                    # 값 업데이트
+                    card_info['value_label'].setText(str(card_counts.get(card_key, 0)))
+
+                    # 첫 번째 권한 있는 카드 기록
+                    if has_permission and first_visible_card is None:
+                        first_visible_card = card_key
+
+            # 권한 있는 첫 번째 카드 데이터 표시 (없으면 빈 테이블)
+            if first_visible_card:
+                self.on_dashboard_card_click(first_visible_card)
+            else:
+                # 권한 있는 카드가 없으면 빈 테이블 표시
+                self.display_dashboard_detail([])
+                if hasattr(self, 'detail_title_label'):
+                    self.detail_title_label.setText("세부 내역 - 권한 없음")
 
         except Exception as e:
             print(f"대시보드 데이터 로드 오류: {e}")
@@ -403,6 +435,20 @@ class MainWindow(QMainWindow):
 
     def on_dashboard_card_click(self, card_key):
         """대시보드 카드 클릭 시 해당 데이터를 세부 내역에 표시"""
+        from models.users import User
+
+        # 카드별 권한 매핑
+        card_permissions = {
+            'scheduled': 'dashboard_scheduled',
+            'interim': 'dashboard_interim',
+            'received': 'dashboard_received',
+            'extension': 'dashboard_extension'
+        }
+
+        # 권한 체크
+        if not User.has_permission(self.current_user, card_permissions.get(card_key, '')):
+            return  # 권한 없으면 무시
+
         self.dashboard_current_filter = card_key
 
         # 카드별 타이틀 및 필터링

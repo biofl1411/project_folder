@@ -41,6 +41,7 @@ DEPARTMENTS = [
 
 # 권한 카테고리별 설명 (UI 그룹화용)
 PERMISSION_CATEGORIES = {
+    'dashboard': '대시보드',
     'schedule': '스케줄 작성',
     'client': '업체 관리',
     'food_type': '식품 유형 관리',
@@ -52,6 +53,11 @@ PERMISSION_CATEGORIES = {
 
 # 세부 권한 설명 (카테고리별)
 PERMISSION_LABELS = {
+    # 대시보드
+    'dashboard_scheduled': '입고 예정',
+    'dashboard_interim': '중간보고',
+    'dashboard_received': '입고',
+    'dashboard_extension': '연장실험',
     # 스케줄 작성 TAB
     'schedule_create': '새 스케줄 작성',
     'schedule_edit': '수정하기',
@@ -101,6 +107,11 @@ PERMISSION_LABELS = {
 
 # 권한별 상세 설명 (도움말 툴팁용)
 PERMISSION_DESCRIPTIONS = {
+    # 대시보드
+    'dashboard_scheduled': '대시보드에서 "입고 예정" 카드를 볼 수 있습니다.\n입고 예정 상태의 스케줄 목록 조회 가능',
+    'dashboard_interim': '대시보드에서 "중간보고" 카드를 볼 수 있습니다.\n중간보고가 필요한 스케줄 목록 조회 가능',
+    'dashboard_received': '대시보드에서 "입고" 카드를 볼 수 있습니다.\n입고 상태의 스케줄 목록 조회 가능',
+    'dashboard_extension': '대시보드에서 "연장실험" 카드를 볼 수 있습니다.\n연장실험 중인 스케줄 목록 조회 가능',
     # 스케줄 작성 TAB
     'schedule_create': '새로운 스케줄을 작성할 수 있습니다.\n스케줄 작성 탭에서 "새 스케줄 작성" 버튼 사용',
     'schedule_edit': '기존 스케줄을 수정할 수 있습니다.\n스케줄 작성 탭에서 "수정하기" 버튼 사용',
@@ -150,6 +161,7 @@ PERMISSION_DESCRIPTIONS = {
 
 # 카테고리별 권한 키 매핑
 PERMISSION_BY_CATEGORY = {
+    'dashboard': ['dashboard_scheduled', 'dashboard_interim', 'dashboard_received', 'dashboard_extension'],
     'schedule': ['schedule_create', 'schedule_edit', 'schedule_delete',
                  'schedule_status_change', 'schedule_import_excel', 'schedule_export_excel'],
     'client': ['client_view_all', 'client_view_own', 'client_create',
