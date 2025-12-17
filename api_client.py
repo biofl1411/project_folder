@@ -271,6 +271,9 @@ class ApiClient:
 
     def login(self, username, password):
         """로그인"""
+        # 로그인 전 캐시 초기화 (이전 사용자 데이터 제거)
+        self._cache.invalidate()
+
         result = self._request("POST", "/api/auth/login", {
             "username": username,
             "password": password
@@ -291,6 +294,8 @@ class ApiClient:
         finally:
             self._token = None
             self._user = None
+            # 캐시 전체 초기화 (다른 사용자 데이터 남지 않도록)
+            self._cache.invalidate()
 
     def get_current_user(self):
         """현재 로그인 사용자"""
