@@ -540,7 +540,7 @@ class SettingsDialog(QDialog):
         layout.addStretch()
 
     def browse_image(self, image_type):
-        """이미지 파일 선택"""
+        """이미지 파일 선택 및 서버 업로드"""
         from PyQt5.QtWidgets import QFileDialog
         import shutil
         import os
@@ -552,58 +552,121 @@ class SettingsDialog(QDialog):
         )
 
         if file_path:
-            # 기본 경로 설정 (실행파일/스크립트 위치 기준)
-            import sys
-            if getattr(sys, 'frozen', False):
-                base_path = os.path.dirname(sys.executable)
-            else:
-                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
             print(f"[이미지 업로드] 선택한 파일: {file_path}")
-            print(f"[이미지 업로드] base_path: {base_path}")
 
-            # config 폴더에 복사 (절대 경로 사용)
-            config_dir = os.path.join(base_path, "config")
-            print(f"[이미지 업로드] config_dir: {config_dir}")
-
-            if not os.path.exists(config_dir):
-                os.makedirs(config_dir)
-                print(f"[이미지 업로드] config 폴더 생성됨")
-
-            # 파일 이름 결정
-            ext = os.path.splitext(file_path)[1].lower()
-            if image_type == 'logo':
-                dest_name = f"company_logo{ext}"
-            else:
-                dest_name = f"company_stamp{ext}"
-
-            dest_path = os.path.join(config_dir, dest_name)
-            # 상대 경로로 저장 (다른 환경에서도 사용 가능하도록) - 항상 / 사용
-            relative_path = f"config/{dest_name}"
-
-            print(f"[이미지 업로드] 대상 경로: {dest_path}")
-            print(f"[이미지 업로드] 상대 경로: {relative_path}")
-
+            # 외부망 모드 확인 - 서버에 업로드
             try:
-                shutil.copy2(file_path, dest_path)
-                print(f"[이미지 업로드] 파일 복사 성공")
-                print(f"[이미지 업로드] 파일 존재 확인: {os.path.exists(dest_path)}")
+                from connection_manager import is_internal_mode
+                use_server = not is_internal_mode()
+            except:
+                use_server = False
 
-                if image_type == 'logo':
-                    self.logo_path_input.setText(relative_path)
+            if use_server:
+                # 서버에 업로드
+                try:
+                    from api_client import api
+                    success, message, path = api.upload_company_image(image_type, file_path)
+                    print(f"[이미지 업로드] 서버 업로드 결과: success={success}, message={message}, path={path}")
+
+                    if success:
+                        if image_type == 'logo':
+                            self.logo_path_input.setText(path or f"server:{image_type}")
+                        else:
+                            self.stamp_path_input.setText(path or f"server:{image_type}")
+                        QMessageBox.information(self, "완료", f"이미지가 서버에 저장되었습니다.\n모든 사용자가 이 이미지를 공유합니다.")
+                    else:
+                        QMessageBox.critical(self, "오류", f"이미지 서버 업로드 실패: {message}")
+                except Exception as e:
+                    print(f"[이미지 업로드] 서버 업로드 오류: {str(e)}")
+                    QMessageBox.critical(self, "오류", f"이미지 서버 업로드 오류: {str(e)}")
+            else:
+                # 내부망 모드 - 기존 방식 (로컬 저장) + 서버 업로드도 시도
+                import sys
+                if getattr(sys, 'frozen', False):
+                    base_path = os.path.dirname(sys.executable)
                 else:
-                    self.stamp_path_input.setText(relative_path)
-                QMessageBox.information(self, "완료", f"이미지가 저장되었습니다.\n{dest_path}")
-            except Exception as e:
-                print(f"[이미지 업로드] 오류: {str(e)}")
-                QMessageBox.critical(self, "오류", f"이미지 저장 실패: {str(e)}")
+                    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+                print(f"[이미지 업로드] base_path: {base_path}")
+
+                # config 폴더에 복사 (절대 경로 사용)
+                config_dir = os.path.join(base_path, "config")
+                print(f"[이미지 업로드] config_dir: {config_dir}")
+
+                if not os.path.exists(config_dir):
+                    os.makedirs(config_dir)
+                    print(f"[이미지 업로드] config 폴더 생성됨")
+
+                # 파일 이름 결정
+                ext = os.path.splitext(file_path)[1].lower()
+                if image_type == 'logo':
+                    dest_name = f"company_logo{ext}"
+                else:
+                    dest_name = f"company_stamp{ext}"
+
+                dest_path = os.path.join(config_dir, dest_name)
+                relative_path = f"config/{dest_name}"
+
+                print(f"[이미지 업로드] 대상 경로: {dest_path}")
+                print(f"[이미지 업로드] 상대 경로: {relative_path}")
+
+                try:
+                    shutil.copy2(file_path, dest_path)
+                    print(f"[이미지 업로드] 로컬 파일 복사 성공")
+                    print(f"[이미지 업로드] 파일 존재 확인: {os.path.exists(dest_path)}")
+
+                    # 서버에도 업로드 (내부망이지만 서버 공유를 위해)
+                    try:
+                        from api_client import api
+                        if api.is_logged_in():
+                            success, message, path = api.upload_company_image(image_type, file_path)
+                            print(f"[이미지 업로드] 서버 업로드 (내부망): success={success}, message={message}")
+                            if success:
+                                # 서버 경로로 설정 (모든 사용자 공유)
+                                if image_type == 'logo':
+                                    self.logo_path_input.setText(path or f"server:{image_type}")
+                                else:
+                                    self.stamp_path_input.setText(path or f"server:{image_type}")
+                                QMessageBox.information(self, "완료", f"이미지가 서버에 저장되었습니다.\n모든 사용자가 이 이미지를 공유합니다.")
+                                return
+                    except Exception as e:
+                        print(f"[이미지 업로드] 서버 업로드 시도 실패 (로컬 저장 사용): {str(e)}")
+
+                    # 서버 업로드 실패 시 로컬 경로 사용
+                    if image_type == 'logo':
+                        self.logo_path_input.setText(relative_path)
+                    else:
+                        self.stamp_path_input.setText(relative_path)
+                    QMessageBox.information(self, "완료", f"이미지가 로컬에 저장되었습니다.\n{dest_path}")
+                except Exception as e:
+                    print(f"[이미지 업로드] 오류: {str(e)}")
+                    QMessageBox.critical(self, "오류", f"이미지 저장 실패: {str(e)}")
 
     def clear_image(self, image_type):
-        """이미지 경로 삭제"""
-        if image_type == 'logo':
-            self.logo_path_input.clear()
-        else:
-            self.stamp_path_input.clear()
+        """이미지 경로 삭제 (서버에서도 삭제)"""
+        reply = QMessageBox.question(
+            self, "삭제 확인",
+            f"{'로고' if image_type == 'logo' else '직인'} 이미지를 삭제하시겠습니까?\n서버에 저장된 이미지도 삭제됩니다.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # 서버에서도 삭제 시도
+            try:
+                from api_client import api
+                if api.is_logged_in():
+                    success, message = api.delete_company_image(image_type)
+                    print(f"[이미지 삭제] 서버 삭제 결과: success={success}, message={message}")
+            except Exception as e:
+                print(f"[이미지 삭제] 서버 삭제 오류: {str(e)}")
+
+            # UI 업데이트
+            if image_type == 'logo':
+                self.logo_path_input.clear()
+            else:
+                self.stamp_path_input.clear()
+
+            QMessageBox.information(self, "완료", f"{'로고' if image_type == 'logo' else '직인'} 이미지가 삭제되었습니다.")
 
     def setup_schedule_tab(self, tab):
         """스케줄 설정 탭"""
