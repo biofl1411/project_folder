@@ -758,6 +758,9 @@ class MainWindow(QMainWindow):
         # 권한 기반 탭 활성화/비활성화
         self.apply_tab_permissions(user_data)
 
+        # 탭을 대시보드로 초기화 (다른 탭으로 이동 시 데이터 새로고침 보장)
+        self.tab_widget.setCurrentIndex(0)
+
         self.status_label.setText(f"{user_data['name']}님으로 로그인됨")
         self.show()
 
