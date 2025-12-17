@@ -618,6 +618,7 @@ class SettingsDialog(QDialog):
                     # 서버에도 업로드 (내부망이지만 서버 공유를 위해)
                     try:
                         from api_client import api
+                        print(f"[이미지 업로드] api.is_logged_in() = {api.is_logged_in()}, token = {api._token is not None}")
                         if api.is_logged_in():
                             success, message, path = api.upload_company_image(image_type, file_path)
                             print(f"[이미지 업로드] 서버 업로드 (내부망): success={success}, message={message}")
