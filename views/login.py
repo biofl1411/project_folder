@@ -141,6 +141,15 @@ class LoginWindow(QWidget):
                 details={'username': username, 'mode': 'internal'}
             )
 
+            # API 토큰도 설정 (서버 이미지 업로드 등에 필요)
+            try:
+                from connection_manager import connection_manager
+                api = connection_manager.get_api_client()
+                api.login(username, password)
+                print(f"[로그인] 내부망 API 토큰 설정 완료")
+            except Exception as e:
+                print(f"[로그인] API 토큰 설정 실패 (무시): {str(e)}")
+
             self._login_success = True
             self.login_successful.emit(user_data)
             self.close()
