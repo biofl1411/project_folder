@@ -24,19 +24,27 @@ def get_status_settings():
 
     try:
         from connection_manager import is_internal_mode
-        if not is_internal_mode():
-            return default_statuses  # 외부망에서는 기본값 사용
+        if is_internal_mode():
+            # 내부망: DB 직접 조회
+            from database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE `key` = 'custom_statuses'")
+            result = cursor.fetchone()
+            conn.close()
 
-        from database import get_connection
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE `key` = 'custom_statuses'")
-        result = cursor.fetchone()
-        conn.close()
-
-        if result and result['value']:
-            import json
-            return json.loads(result['value'])
+            if result and result['value']:
+                import json
+                return json.loads(result['value'])
+        else:
+            # 외부망: API를 통해 조회
+            from api_client import get_api_client
+            api = get_api_client()
+            if api.is_logged_in():
+                result = api.get_setting('custom_statuses')
+                if result:
+                    import json
+                    return json.loads(result)
     except Exception as e:
         print(f"상태 설정 로드 오류: {e}")
 
@@ -618,7 +626,6 @@ class SettingsDialog(QDialog):
                     # 서버에도 업로드 (내부망이지만 서버 공유를 위해)
                     try:
                         from api_client import api
-                        print(f"[이미지 업로드] api.is_logged_in() = {api.is_logged_in()}, token = {api._token is not None}")
                         if api.is_logged_in():
                             success, message, path = api.upload_company_image(image_type, file_path)
                             print(f"[이미지 업로드] 서버 업로드 (내부망): success={success}, message={message}")
