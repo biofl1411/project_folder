@@ -1,5 +1,5 @@
 {
-    "api_url": "http://14.7.14.31:8000",
+    "api_url": "http://your_server_ip:8000",
     "timeout": 30,
     "retry_count": 3
 }

@@ -1,0 +1,8 @@
+{
+    "host": "your_database_host",
+    "port": 3306,
+    "database": "foodlab",
+    "user": "your_username",
+    "password": "your_password",
+    "charset": "utf8mb4"
+}
