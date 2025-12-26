@@ -114,8 +114,10 @@ jobs:
 
     - name: Copy additional files
       run: |
-        mkdir -p dist/FoodLabManager/data
-        mkdir -p dist/FoodLabManager/output
+        # 필요한 디렉토리 생성
+        New-Item -ItemType Directory -Force -Path "dist/FoodLabManager/data" | Out-Null
+        New-Item -ItemType Directory -Force -Path "dist/FoodLabManager/output" | Out-Null
+        New-Item -ItemType Directory -Force -Path "dist/FoodLabManager/config" | Out-Null
         # 예제 config 파일을 실제 config 파일로 복사
         if (Test-Path "config/db_config.example.json") {
           Copy-Item "config/db_config.example.json" "dist/FoodLabManager/config/db_config.json"
