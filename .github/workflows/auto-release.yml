@@ -103,11 +103,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller PyQt5 reportlab openpyxl pandas pymysql requests packaging
+        pip install --no-cache-dir pyinstaller PyQt5 reportlab openpyxl pandas pymysql requests packaging pyarrow
 
     - name: Build EXE
       run: |
-        pyinstaller --name=FoodLabManager --windowed --onedir --add-data "config;config" main.py
+        pyinstaller --clean --name=FoodLabManager --windowed --onedir --add-data "config;config" main.py
 
     - name: Copy additional files
       run: |
