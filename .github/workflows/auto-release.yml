@@ -103,17 +103,32 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --no-cache-dir pyinstaller PyQt5 reportlab openpyxl pandas pymysql requests packaging pyarrow
+        # pandas를 arrow 없이 설치하여 DLL 충돌 방지
+        pip install --no-cache-dir pyinstaller==6.3.0 PyQt5 reportlab openpyxl pymysql requests packaging
+        pip install --no-cache-dir pandas --no-deps
+        pip install --no-cache-dir numpy python-dateutil pytz tzdata
 
     - name: Build EXE
       run: |
-        pyinstaller --clean --name=FoodLabManager --windowed --onedir --add-data "config;config" main.py
+        pyinstaller --clean --name=FoodLabManager --windowed --onedir --add-data "config;config" --exclude-module pyarrow main.py
 
     - name: Copy additional files
       run: |
         mkdir -p dist/FoodLabManager/data
         mkdir -p dist/FoodLabManager/output
-        if (Test-Path "config") { Copy-Item -Recurse "config/*" "dist/FoodLabManager/config/" -ErrorAction SilentlyContinue }
+        # 예제 config 파일을 실제 config 파일로 복사
+        if (Test-Path "config/db_config.example.json") {
+          Copy-Item "config/db_config.example.json" "dist/FoodLabManager/config/db_config.json"
+        }
+        if (Test-Path "config/api_config.example.json") {
+          Copy-Item "config/api_config.example.json" "dist/FoodLabManager/config/api_config.json"
+        }
+        if (Test-Path "config/connection_config.example.json") {
+          Copy-Item "config/connection_config.example.json" "dist/FoodLabManager/config/connection_config.json"
+        }
+        if (Test-Path "config/settings.json") {
+          Copy-Item "config/settings.json" "dist/FoodLabManager/config/settings.json"
+        }
         if (Test-Path "data/app.db") { Copy-Item "data/app.db" "dist/FoodLabManager/data/" }
         if (Test-Path "cash_db.xlsx") { Copy-Item "cash_db.xlsx" "dist/FoodLabManager/" }
       shell: pwsh
